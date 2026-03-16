@@ -62,6 +62,7 @@ const AuthenticatedApp = () => {
         <Route path="/brokerage/:id/admin" element={<BrokerageAdmin />} />
         <Route path="/team/:id/admin" element={<TeamAdmin />} />
         <Route path="/AccountSettings" element={<AccountSettings />} />
+        <Route path="/settings/branding" element={<AgentBranding />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
