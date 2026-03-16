@@ -54,7 +54,8 @@ export default function Layout() {
     ...(user?.role === "platform_owner"
       ? [{ label: "Platform Admin", path: "/PlatformAdmin", icon: Shield }]
       : []),
-    { label: "Account", path: "/AccountSettings", icon: Settings },
+    { label: "Account Settings", path: "/AccountSettings", icon: Settings },
+    // Brokerage/Team admin links are accessed via org cards in Dashboard, not sidebar nav
   ];
 
   const handleLogout = () => {
@@ -178,11 +179,13 @@ export default function Layout() {
           <div className="p-4 lg:p-8 max-w-7xl mx-auto">
             <FairHousingOverdueBanner user={user} />
             <Outlet />
-            <ChatbotDrawer user={user} />
           </div>
         </main>
       
       </div>
+
+      {/* PropBot floating chatbot */}
+      <ChatbotDrawer user={user} />
     </div>
   );
 }
