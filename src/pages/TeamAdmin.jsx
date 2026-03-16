@@ -9,6 +9,7 @@ import TeamAnalysesTab from "../components/admin/team/TeamAnalysesTab";
 import TeamAIConfigTab from "../components/admin/team/TeamAIConfigTab";
 import TeamPrivacyTab from "../components/admin/team/TeamPrivacyTab";
 import TeamUsageTab from "../components/admin/team/TeamUsageTab";
+import TeamBrandingTab from "../components/admin/team/TeamBrandingTab";
 
 export default function TeamAdmin() {
   const { id } = useParams();
@@ -103,6 +104,7 @@ export default function TeamAdmin() {
           <TabsTrigger value="ai">AI Config</TabsTrigger>
           <TabsTrigger value="privacy">Privacy</TabsTrigger>
           <TabsTrigger value="usage">Usage</TabsTrigger>
+          <TabsTrigger value="branding">Branding</TabsTrigger>
         </TabsList>
 
         <TabsContent value="members" className="mt-6"><TeamMembersTab org={org} user={user} /></TabsContent>
@@ -110,6 +112,7 @@ export default function TeamAdmin() {
         <TabsContent value="ai" className="mt-6"><TeamAIConfigTab org={org} parentOrg={parentOrg} user={user} onOrgUpdate={setOrg} /></TabsContent>
         <TabsContent value="privacy" className="mt-6"><TeamPrivacyTab org={org} parentOrg={parentOrg} user={user} onOrgUpdate={setOrg} /></TabsContent>
         <TabsContent value="usage" className="mt-6"><TeamUsageTab org={org} user={user} /></TabsContent>
+        <TabsContent value="branding" className="mt-6"><TeamBrandingTab org={org} parentOrg={parentOrg} user={user} /></TabsContent>
       </Tabs>
     </div>
   );

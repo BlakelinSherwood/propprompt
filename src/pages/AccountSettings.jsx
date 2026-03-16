@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Settings, User, Key, Plug } from "lucide-react";
+import { Settings, Plug, Palette } from "lucide-react";
 import CrmConnectedApps from "../components/CrmConnectedApps";
 import DriveConnectedApp from "../components/DriveConnectedApp";
+import AgentBrandingSettings from "../components/AgentBrandingSettings";
 
 const TABS = [
   { key: "connected", label: "Connected Apps", icon: Plug },
+  { key: "branding", label: "My Branding", icon: Palette },
 ];
 
 export default function AccountSettings() {
@@ -44,6 +46,8 @@ export default function AccountSettings() {
           </button>
         ))}
       </div>
+
+      {tab === "branding" && <AgentBrandingSettings />}
 
       {tab === "connected" && (
         <div className="space-y-6">

@@ -11,6 +11,7 @@ import BrokerageAIConfigTab from "../components/admin/brokerage/BrokerageAIConfi
 import BrokeragePrivacyTab from "../components/admin/brokerage/BrokeragePrivacyTab";
 import BrokerageBillingTab from "../components/admin/brokerage/BrokerageBillingTab";
 import BrokerageFairHousingTab from "../components/admin/brokerage/BrokerageFairHousingTab";
+import BrokerageBrandingTab from "../components/admin/brokerage/BrokerageBrandingTab";
 
 export default function BrokerageAdmin() {
   const { id } = useParams();
@@ -97,6 +98,7 @@ export default function BrokerageAdmin() {
           <TabsTrigger value="privacy">Privacy</TabsTrigger>
           <TabsTrigger value="billing">Usage & Billing</TabsTrigger>
           <TabsTrigger value="fairhousing">Fair Housing</TabsTrigger>
+          <TabsTrigger value="branding">Branding</TabsTrigger>
         </TabsList>
 
         <TabsContent value="members" className="mt-6"><BrokerageMembersTab org={org} user={user} /></TabsContent>
@@ -106,6 +108,7 @@ export default function BrokerageAdmin() {
         <TabsContent value="privacy" className="mt-6"><BrokeragePrivacyTab org={org} user={user} onOrgUpdate={setOrg} /></TabsContent>
         <TabsContent value="billing" className="mt-6"><BrokerageBillingTab org={org} user={user} /></TabsContent>
         <TabsContent value="fairhousing" className="mt-6"><BrokerageFairHousingTab org={org} user={user} /></TabsContent>
+        <TabsContent value="branding" className="mt-6"><BrokerageBrandingTab org={org} user={user} /></TabsContent>
       </Tabs>
     </div>
   );
