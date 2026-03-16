@@ -110,6 +110,8 @@ export default function AnalysisRun() {
               if (payload.done) {
                 setStatus("complete");
                 setKeySource(payload.keySource);
+                // Trigger Drive sync + CRM auto-push after completion
+                triggerPostCompletion(analysisId);
               }
               if (payload.error) {
                 setErrorMsg(payload.error);
@@ -128,6 +130,19 @@ export default function AnalysisRun() {
   }, [analysisId]);
 
 
+
+  const triggerPostCompletion = async (id) => {
+    try {
+      // Drive sync (fire-and-forget, don't block UI)
+      base44.functions.invoke("driveSync", { analysisId: id }).catch(() => {});
+      // CRM auto-push: find connected CRMs with auto_push_enabled
+      const crmRes = await base44.functions.invoke("crmConnect", { action: "list" });
+      const autoPushConns = (crmRes.data?.connections || []).filter(c => c.auto_push_enabled && c.status === "connected");
+      for (const conn of autoPushConns) {
+        base44.functions.invoke("crmPush", { analysisId: id, crmConnectionId: conn.id }).catch(() => {});
+      }
+    } catch (_) {}
+  };
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(output + "\n\n" + DISCLAIMER.replace(/\*\*/g, ""));
