@@ -10,6 +10,8 @@ import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Members from './pages/Members';
 import PlatformAdmin from './pages/PlatformAdmin';
+import NewAnalysis from './pages/NewAnalysis';
+import Analyses from './pages/Analyses';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -43,6 +45,8 @@ const AuthenticatedApp = () => {
         <Route path="/Dashboard" element={<Dashboard />} />
         <Route path="/Members" element={<Members />} />
         <Route path="/PlatformAdmin" element={<PlatformAdmin />} />
+        <Route path="/NewAnalysis" element={<NewAnalysis />} />
+        <Route path="/Analyses" element={<Analyses />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
