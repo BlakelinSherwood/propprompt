@@ -1,85 +1,102 @@
+/**
+ * resolveApiKey — API key resolution waterfall per Section 5.3:
+ * 1. Agent's own key (AiApiKey entity, is_active=true)
+ * 2. Team org key (org.org_ai_api_keys)
+ * 3. Parent brokerage org key (parentOrg.org_ai_api_keys)
+ * 4. S&C platform env var
+ *
+ * Returns: { apiKey: string, source: "agent"|"team"|"brokerage"|"sc_platform" }
+ */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
-// AES-256-GCM decrypt (iv:ciphertext base64 format)
-async function decryptKey(encrypted, keyStr) {
-  const [ivB64, cipherB64] = encrypted.split(':');
-  if (!ivB64 || !cipherB64) return encrypted;
-  const fromB64 = (s) => Uint8Array.from(atob(s), c => c.charCodeAt(0));
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(keyStr.padEnd(32, '0').slice(0, 32)),
-    { name: 'AES-GCM' }, false, ['decrypt']
+async function getDecryptKey() {
+  const raw = Deno.env.get("ENCRYPTION_KEY") || "default-key-32-bytes-padded-here!!";
+  return crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(raw.slice(0, 32).padEnd(32, "0")),
+    { name: "AES-GCM" },
+    false,
+    ["decrypt"]
   );
-  const plain = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: fromB64(ivB64) }, keyMaterial, fromB64(cipherB64)
-  );
+}
+
+async function decryptKey(encrypted) {
+  if (!encrypted) return null;
+  const key = await getDecryptKey();
+  const combined = Uint8Array.from(atob(encrypted), c => c.charCodeAt(0));
+  const iv = combined.slice(0, 12);
+  const ciphertext = combined.slice(12);
+  const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ciphertext);
   return new TextDecoder().decode(plain);
 }
 
-// S&C platform env var per platform
-const SC_ENV_KEYS = {
-  claude:      'ANTHROPIC_API_KEY',
-  chatgpt:     'OPENAI_API_KEY',
-  gemini:      'GEMINI_API_KEY',
-  perplexity:  'PERPLEXITY_API_KEY',
-  grok:        'XAI_API_KEY',
+// Map platform name to env var for S&C platform keys
+const PLATFORM_ENV_VARS = {
+  claude:      "ANTHROPIC_API_KEY",
+  chatgpt:     "OPENAI_API_KEY",
+  gemini:      "GEMINI_API_KEY",
+  perplexity:  "PERPLEXITY_API_KEY",
+  grok:        "GROK_API_KEY",
 };
 
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
-    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { orgId, platform } = await req.json();
-    if (!orgId || !platform) return Response.json({ error: 'orgId and platform required' }, { status: 400 });
+    const { platform, orgId, agentEmail } = await req.json();
 
-    const encKey = Deno.env.get('ENCRYPTION_KEY') || '';
+    if (!platform) return Response.json({ error: "platform required" }, { status: 400 });
 
-    // --- 1. Agent's own personal key ---
-    const agentKeys = await base44.asServiceRole.entities.AiApiKey.filter({
-      user_email: user.email,
-      ai_platform: platform,
-      is_active: true,
-    });
-    if (agentKeys[0]?.encrypted_key) {
-      const apiKey = await decryptKey(agentKeys[0].encrypted_key, encKey);
-      console.log(`[resolveApiKey] Using agent personal key for ${platform}`);
-      return Response.json({ apiKey, source: 'agent_managed', keyId: agentKeys[0].id });
-    }
-
-    // --- 2. Team/org-level key (from Organization.org_ai_api_keys) ---
-    const orgs = await base44.asServiceRole.entities.Organization.filter({ id: orgId });
-    const org = orgs[0];
-    if (org?.org_ai_api_keys?.[platform]) {
-      const apiKey = await decryptKey(org.org_ai_api_keys[platform], encKey);
-      console.log(`[resolveApiKey] Using org-managed key for ${platform}, org=${orgId}`);
-      return Response.json({ apiKey, source: 'org_managed' });
-    }
-
-    // --- 3. Parent brokerage key ---
-    if (org?.parent_org_id) {
-      const parentOrgs = await base44.asServiceRole.entities.Organization.filter({ id: org.parent_org_id });
-      const parentOrg = parentOrgs[0];
-      if (parentOrg?.org_ai_api_keys?.[platform]) {
-        const apiKey = await decryptKey(parentOrg.org_ai_api_keys[platform], encKey);
-        console.log(`[resolveApiKey] Using brokerage-managed key for ${platform}, parent=${org.parent_org_id}`);
-        return Response.json({ apiKey, source: 'brokerage_managed' });
+    // 1. Agent's own key
+    if (agentEmail) {
+      const agentKeys = await base44.asServiceRole.entities.AiApiKey.filter({
+        user_email: agentEmail,
+        ai_platform: platform,
+        is_active: true,
+      });
+      if (agentKeys.length > 0 && agentKeys[0].encrypted_key) {
+        const decrypted = await decryptKey(agentKeys[0].encrypted_key);
+        if (decrypted) {
+          // Update last_used_at
+          await base44.asServiceRole.entities.AiApiKey.update(agentKeys[0].id, {
+            last_used_at: new Date().toISOString(),
+          });
+          return Response.json({ apiKey: decrypted, source: "agent" });
+        }
       }
     }
 
-    // --- 4. S&C platform key ---
-    const envVarName = SC_ENV_KEYS[platform];
-    const scKey = envVarName ? Deno.env.get(envVarName) : null;
-    if (scKey) {
-      console.log(`[resolveApiKey] Using S&C platform key for ${platform}`);
-      return Response.json({ apiKey: scKey, source: 'sc_managed' });
+    // 2. Team org key
+    if (orgId) {
+      const orgs = await base44.asServiceRole.entities.Organization.filter({ id: orgId });
+      const org = orgs[0];
+      if (org?.org_ai_api_keys?.[platform]) {
+        const decrypted = await decryptKey(org.org_ai_api_keys[platform]);
+        if (decrypted) return Response.json({ apiKey: decrypted, source: "team" });
+      }
+
+      // 3. Parent brokerage key
+      if (org?.parent_org_id) {
+        const parentOrgs = await base44.asServiceRole.entities.Organization.filter({ id: org.parent_org_id });
+        const parent = parentOrgs[0];
+        if (parent?.org_ai_api_keys?.[platform]) {
+          const decrypted = await decryptKey(parent.org_ai_api_keys[platform]);
+          if (decrypted) return Response.json({ apiKey: decrypted, source: "brokerage" });
+        }
+      }
     }
 
-    console.error(`[resolveApiKey] No API key found for platform=${platform}, orgId=${orgId}`);
-    return Response.json({ error: `No API key configured for ${platform}` }, { status: 404 });
+    // 4. S&C platform key
+    const envKey = PLATFORM_ENV_VARS[platform];
+    const scKey = envKey ? Deno.env.get(envKey) : null;
+    if (scKey) return Response.json({ apiKey: scKey, source: "sc_platform" });
+
+    return Response.json({ error: `No API key found for platform: ${platform}` }, { status: 404 });
+
   } catch (error) {
-    console.error('[resolveApiKey] error:', error);
+    console.error("resolveApiKey error:", error);
     return Response.json({ error: error.message }, { status: 500 });
   }
 });

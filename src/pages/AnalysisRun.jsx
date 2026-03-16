@@ -56,7 +56,17 @@ export default function AnalysisRun() {
       const baseUrl = appParams.appBaseUrl || "";
       const appId = appParams.appId || "";
       const token = appParams.token || "";
-      const fnUrl = `${baseUrl}/api/v1/apps/${appId}/functions/claudeStream`;
+
+      // Route to correct stream handler based on ai_platform
+      const PLATFORM_FUNCTIONS = {
+        claude:     "claudeStream",
+        chatgpt:    "chatgptStream",
+        gemini:     "geminiStream",
+        perplexity: "perplexityStream",
+        grok:       "grokStream",
+      };
+      const fnName = PLATFORM_FUNCTIONS[rec.ai_platform] || "claudeStream";
+      const fnUrl = `${baseUrl}/api/v1/apps/${appId}/functions/${fnName}`;
 
       const response = await fetch(fnUrl, {
         method: "POST",

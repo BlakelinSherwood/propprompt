@@ -1,147 +1,127 @@
+/**
+ * assemblePrompt — Builds the full prompt for an analysis from the PromptLibrary.
+ *
+ * Lookup order:
+ * 1. Exact match: ai_platform + assessment_type + property_type + is_active
+ * 2. Fallback: ai_platform + assessment_type + property_type=all + is_active
+ * 3. Fallback: generic + assessment_type + property_type=all + is_active
+ * 4. Hard-coded baseline prompt if nothing found
+ *
+ * Replaces [PLACEHOLDER] tokens with analysis intake data.
+ * Decrypts prompt_text (ENC: prefix) before substitution.
+ */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
-// AES-256-GCM encryption of the assembled prompt
-async function encryptPrompt(plaintext, keyStr) {
-  const enc = new TextEncoder();
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw',
-    enc.encode(keyStr.padEnd(32, '0').slice(0, 32)),
-    { name: 'AES-GCM' },
+async function getDecryptKey() {
+  const raw = Deno.env.get("ENCRYPTION_KEY") || "default-key-32-bytes-padded-here!!";
+  return crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(raw.slice(0, 32).padEnd(32, "0")),
+    { name: "AES-GCM" },
     false,
-    ['encrypt']
+    ["decrypt"]
   );
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ciphertext = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv },
-    keyMaterial,
-    enc.encode(plaintext)
-  );
-  // Store as base64(iv):base64(ciphertext)
-  const toB64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
-  return `${toB64(iv)}:${toB64(ciphertext)}`;
 }
 
-function buildPrompt(analysis, prompts) {
-  const get = (section) => {
-    const p = prompts.find(p => p.prompt_section === section);
-    return p ? p.prompt_text : '';
-  };
+async function decryptText(encrypted) {
+  const key = await getDecryptKey();
+  const combined = Uint8Array.from(atob(encrypted), c => c.charCodeAt(0));
+  const iv = combined.slice(0, 12);
+  const ciphertext = combined.slice(12);
+  const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ciphertext);
+  return new TextDecoder().decode(plain);
+}
 
-  const intake = analysis.intake_data || {};
-  const followup = analysis.followup_answers || {};
+function substituteTokens(template, analysis) {
+  const d = analysis.intake_data || {};
+  return template
+    .replace(/\[ADDRESS\]/g, d.address || "")
+    .replace(/\[PROPERTY_TYPE\]/g, analysis.property_type || "")
+    .replace(/\[ASSESSMENT_TYPE\]/g, analysis.assessment_type || "")
+    .replace(/\[LOCATION_CLASS\]/g, analysis.location_class || "")
+    .replace(/\[CLIENT_RELATIONSHIP\]/g, d.client_relationship || "")
+    .replace(/\[OUTPUT_FORMAT\]/g, analysis.output_format || "narrative")
+    .replace(/\[AI_PLATFORM\]/g, analysis.ai_platform || "")
+    .replace(/\[AGENT_EMAIL\]/g, analysis.run_by_email || "")
+    .replace(/\[ORG_ID\]/g, analysis.org_id || "")
+    .replace(/\[INTAKE_JSON\]/g, JSON.stringify(d, null, 2));
+}
 
-  // Replace common tokens
-  const replace = (text) => text
-    .replace(/\[ASSESSMENT_TYPE\]/g, analysis.assessment_type || '')
-    .replace(/\[PROPERTY_TYPE\]/g, analysis.property_type || '')
-    .replace(/\[LOCATION_CLASS\]/g, analysis.location_class || '')
-    .replace(/\[OUTPUT_FORMAT\]/g, analysis.output_format || 'narrative')
-    .replace(/\[ADDRESS\]/g, intake.address || '')
-    .replace(/\[CLIENT_RELATIONSHIP\]/g, intake.client_relationship || '')
-    .replace(/\[INTAKE_JSON\]/g, JSON.stringify(intake, null, 2))
-    .replace(/\[FOLLOWUP_JSON\]/g, JSON.stringify(followup, null, 2));
+function buildBaselinePrompt(analysis) {
+  const d = analysis.intake_data || {};
+  return `You are PropPrompt™, an elite AI real estate analyst for Eastern Massachusetts.
 
-  const formatModifier = {
-    narrative: 'Write in flowing, professional prose paragraphs. Use headers to organize sections.',
-    structured: 'Use a structured format with clear labeled sections, sub-sections, and data tables where applicable.',
-    bullets: 'Use concise bullet points and numbered lists throughout. Minimize prose.',
-  }[analysis.output_format] || '';
+ASSESSMENT TYPE: ${analysis.assessment_type?.replace(/_/g, " ").toUpperCase()}
+PROPERTY TYPE: ${analysis.property_type?.replace(/_/g, " ")}
+ADDRESS: ${d.address || "Not provided"}
+LOCATION CLASS: ${analysis.location_class || "unknown"}
+CLIENT RELATIONSHIP: ${d.client_relationship || "buyer's agent"}
+OUTPUT FORMAT: ${analysis.output_format || "narrative"}
 
-  const sections = [
-    replace(get('system_instructions')),
-    replace(get('intake_template')),
-    replace(get('valuation_module')),
-    replace(get('migration_module')),
-    replace(get('archetype_module')),
-    replace(get('avm_module')),
-    replace(get('listing_strategy_module')),
-    `\n\n## Output Format Instructions\n${formatModifier}`,
-    replace(get('disclaimer_footer')),
-  ].filter(Boolean).join('\n\n---\n\n');
+INTAKE DATA:
+${JSON.stringify(d, null, 2)}
 
-  return sections;
+Provide a thorough, professional real estate analysis. Include:
+1. Executive Summary
+2. Market Context (current conditions, recent trends)
+3. Property/Pricing Analysis
+4. Comparable Properties
+5. Strategic Recommendations
+6. Risk Factors
+7. Conclusion
+
+Use current market knowledge for Eastern Massachusetts. Be data-driven and specific. Use markdown formatting.`;
 }
 
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
-    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
     const { analysisId } = await req.json();
-    if (!analysisId) return Response.json({ error: 'analysisId required' }, { status: 400 });
+    if (!analysisId) return Response.json({ error: "analysisId required" }, { status: 400 });
 
-    // Load analysis
-    const analyses = await base44.asServiceRole.entities.Analysis.filter({ id: analysisId });
-    const analysis = analyses[0];
-    if (!analysis) return Response.json({ error: 'Analysis not found' }, { status: 404 });
+    const records = await base44.asServiceRole.entities.Analysis.filter({ id: analysisId });
+    const analysis = records[0];
+    if (!analysis) return Response.json({ error: "Analysis not found" }, { status: 404 });
 
-    // Authorization: only the owner or an admin can assemble
-    if (analysis.run_by_email !== user.email && user.role !== 'platform_owner' && user.role !== 'brokerage_admin') {
-      return Response.json({ error: 'Forbidden' }, { status: 403 });
+    // Try to find a prompt in the library
+    const allPrompts = await base44.asServiceRole.entities.PromptLibrary.filter({
+      is_active: true,
+      prompt_section: "full_assembled",
+    });
+
+    const platform = analysis.ai_platform;
+    const assessmentType = analysis.assessment_type;
+    const propertyType = analysis.property_type;
+
+    // Priority lookup
+    let match =
+      allPrompts.find((p) => p.ai_platform === platform && p.assessment_type === assessmentType && p.property_type === propertyType) ||
+      allPrompts.find((p) => p.ai_platform === platform && p.assessment_type === assessmentType && p.property_type === "all") ||
+      allPrompts.find((p) => p.ai_platform === "generic" && p.assessment_type === assessmentType && p.property_type === "all") ||
+      null;
+
+    if (!match) {
+      // No library entry — use baseline
+      return Response.json({ prompt: buildBaselinePrompt(analysis), source: "baseline" });
     }
 
-    // Load matching prompts from prompt_library
-    const prompts = await base44.asServiceRole.entities.PromptLibrary.filter({
-      assessment_type: analysis.assessment_type,
-      is_active: true,
-    });
-
-    // Also load generic/all property_type prompts
-    const genericPrompts = await base44.asServiceRole.entities.PromptLibrary.filter({
-      property_type: 'all',
-      is_active: true,
-    });
-
-    const allPrompts = [...prompts, ...genericPrompts];
-
-    // If no prompts in library yet, build a sensible default prompt
-    let assembled;
-    if (allPrompts.length === 0) {
-      const intake = analysis.intake_data || {};
-      const followup = analysis.followup_answers || {};
-      assembled = `You are PropPrompt™ v3.0 — an AI-calibrated real estate analysis engine for Eastern Massachusetts developed by Sherwood & Company.
-
-## Analysis Request
-- Assessment Type: ${analysis.assessment_type}
-- Property Type: ${analysis.property_type}
-- Location Class: ${analysis.location_class || 'Not specified'}
-- Output Format: ${analysis.output_format || 'narrative'}
-- Client Relationship: ${intake.client_relationship || 'Not specified'}
-
-## Property Details
-${JSON.stringify(intake, null, 2)}
-
-## Follow-Up Context
-${Object.keys(followup).length > 0 ? JSON.stringify(followup, null, 2) : 'No follow-up answers provided.'}
-
-## Instructions
-Provide a comprehensive, professional real estate analysis based on the above data. Apply Eastern Massachusetts market expertise, current market conditions, and relevant comparable analysis frameworks.
-
----
-**DISCLAIMER:** This analysis is generated by artificial intelligence and is intended solely as a professional research aid for licensed real estate practitioners. It does not constitute an appraisal, a Broker Price Opinion (BPO), or legal advice. All figures, valuations, and recommendations must be independently verified by the agent/broker of record before use in any client-facing communication. Sherwood & Company and its affiliates assume no liability for decisions made based on AI-generated content. © 2026 Sherwood & Company. PropPrompt™ is a proprietary system.`;
-    } else {
-      assembled = buildPrompt(analysis, allPrompts);
+    let promptText = match.prompt_text || "";
+    if (promptText.startsWith("ENC:")) {
+      promptText = await decryptText(promptText.slice(4));
     }
 
-    // Encrypt the prompt before storing
-    const encKey = Deno.env.get('ENCRYPTION_KEY') || '';
-    const encryptedPrompt = await encryptPrompt(assembled, encKey);
+    const assembled = substituteTokens(promptText, analysis);
 
-    // Store encrypted prompt and update status
-    await base44.asServiceRole.entities.Analysis.update(analysisId, {
-      prompt_assembled: encryptedPrompt,
-      status: 'in_progress',
-    });
+    // Store assembled prompt on the analysis
+    await base44.asServiceRole.entities.Analysis.update(analysisId, { prompt_assembled: assembled });
 
-    // Return a confirmation token (not the prompt itself)
-    return Response.json({
-      success: true,
-      analysisId,
-      status: 'in_progress',
-      promptSections: allPrompts.length,
-    });
+    return Response.json({ prompt: assembled, source: "library", promptId: match.id });
+
   } catch (error) {
+    console.error("assemblePrompt error:", error);
     return Response.json({ error: error.message }, { status: 500 });
   }
 });

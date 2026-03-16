@@ -1,173 +1,128 @@
+/**
+ * perplexityStream — SSE streaming handler for Perplexity AI.
+ *
+ * Model: sonar-pro always (Deep Research mode).
+ * Perplexity's sonar-pro has live web search built in — no additional tool config needed.
+ * Uses OpenAI-compatible chat completions endpoint with streaming.
+ *
+ * Model cascade (Section 5.1): sonar-pro for all tiers — no downgrade.
+ */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
-async function decryptData(encrypted, keyStr) {
-  const [ivB64, cipherB64] = encrypted.split(':');
-  if (!ivB64 || !cipherB64) return encrypted;
-  const fromB64 = (s) => Uint8Array.from(atob(s), c => c.charCodeAt(0));
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(keyStr.padEnd(32, '0').slice(0, 32)),
-    { name: 'AES-GCM' }, false, ['decrypt']
-  );
-  const plain = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: fromB64(ivB64) }, keyMaterial, fromB64(cipherB64)
-  );
-  return new TextDecoder().decode(plain);
-}
-
-// Perplexity always uses sonar-pro in Deep Research mode (Section 5.1)
-// sonar-pro has web search built-in — ideal for real-time comp data
-function selectModel() {
-  return 'sonar-pro';
-}
-
-async function resolveKey(base44, user, orgId, encKey) {
-  const agentKeys = await base44.asServiceRole.entities.AiApiKey.filter({
-    user_email: user.email, ai_platform: 'perplexity', is_active: true,
-  });
-  if (agentKeys[0]?.encrypted_key) {
-    return { apiKey: await decryptData(agentKeys[0].encrypted_key, encKey), source: 'agent_managed' };
-  }
-  if (orgId) {
-    const orgs = await base44.asServiceRole.entities.Organization.filter({ id: orgId });
-    const org = orgs[0];
-    if (org?.org_ai_api_keys?.perplexity) {
-      return { apiKey: await decryptData(org.org_ai_api_keys.perplexity, encKey), source: 'org_managed' };
-    }
-    if (org?.parent_org_id) {
-      const parents = await base44.asServiceRole.entities.Organization.filter({ id: org.parent_org_id });
-      const parent = parents[0];
-      if (parent?.org_ai_api_keys?.perplexity) {
-        return { apiKey: await decryptData(parent.org_ai_api_keys.perplexity, encKey), source: 'brokerage_managed' };
-      }
-    }
-  }
-  const scKey = Deno.env.get('PERPLEXITY_API_KEY');
-  if (scKey) return { apiKey: scKey, source: 'sc_managed' };
-  return null;
-}
+const MODEL = "sonar-pro";
 
 Deno.serve(async (req) => {
-  try {
-    const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  const base44 = createClientFromRequest(req);
 
-    const { analysisId, orgId } = await req.json();
-    if (!analysisId) return Response.json({ error: 'analysisId required' }, { status: 400 });
+  const user = await base44.auth.me();
+  if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-    const analyses = await base44.asServiceRole.entities.Analysis.filter({ id: analysisId });
-    const analysis = analyses[0];
-    if (!analysis) return Response.json({ error: 'Analysis not found' }, { status: 404 });
+  const { analysisId, orgId } = await req.json();
+  if (!analysisId) return Response.json({ error: "analysisId required" }, { status: 400 });
 
-    if (analysis.run_by_email !== user.email &&
-        analysis.on_behalf_of_email !== user.email &&
-        user.role !== 'platform_owner') {
-      return Response.json({ error: 'Forbidden' }, { status: 403 });
-    }
+  const records = await base44.asServiceRole.entities.Analysis.filter({ id: analysisId });
+  const analysis = records[0];
+  if (!analysis) return Response.json({ error: "Analysis not found" }, { status: 404 });
 
-    if (!analysis.prompt_assembled) {
-      return Response.json({ error: 'Prompt not assembled. Call assemblePrompt first.' }, { status: 400 });
-    }
-
-    const encKey = Deno.env.get('ENCRYPTION_KEY') || '';
-    const promptText = await decryptData(analysis.prompt_assembled, encKey);
-    const effectiveOrgId = orgId || analysis.org_id;
-
-    const keyResult = await resolveKey(base44, user, effectiveOrgId, encKey);
-    if (!keyResult) return Response.json({ error: 'No Perplexity API key configured' }, { status: 500 });
-
-    const selectedModel = selectModel();
-    console.log(`[perplexityStream] model=${selectedModel} keySource=${keyResult.source}`);
-
-    // Perplexity uses OpenAI-compatible API
-    const pplxRes = await fetch('https://api.perplexity.ai/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${keyResult.apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: selectedModel,
-        stream: true,
-        max_tokens: 4096,
-        messages: [
-          {
-            role: 'system',
-            content: 'You are PropPrompt™ v3.0, an AI-calibrated real estate analysis engine for Eastern Massachusetts developed by Sherwood & Company. You have access to real-time web data. Use current market data, recent comps, and live listing information where relevant. Always include the disclaimer footer at the end.',
-          },
-          { role: 'user', content: promptText },
-        ],
-        // Deep Research mode — web search enabled by default in sonar-pro
-        search_domain_filter: ['zillow.com', 'redfin.com', 'realtor.com', 'mlspin.com', 'bostonrealestate.com'],
-        return_citations: true,
-        return_related_questions: false,
-      }),
-    });
-
-    if (!pplxRes.ok) {
-      const err = await pplxRes.text();
-      console.error(`[perplexityStream] Perplexity error: ${err}`);
-      return Response.json({ error: `Perplexity API error: ${err}` }, { status: 500 });
-    }
-
-    const encoder = new TextEncoder();
-    let fullOutput = '';
-    let tokensUsed = 0;
-
-    const stream = new ReadableStream({
-      async start(controller) {
-        const reader = pplxRes.body.getReader();
-        const dec = new TextDecoder();
-        let buffer = '';
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            buffer += dec.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop();
-            for (const line of lines) {
-              if (!line.startsWith('data: ')) continue;
-              const data = line.slice(6).trim();
-              if (data === '[DONE]') {
-                await base44.asServiceRole.entities.Analysis.update(analysisId, {
-                  output_text: fullOutput,
-                  status: 'complete',
-                  tokens_used: tokensUsed,
-                  ai_model: selectedModel,
-                  completed_at: new Date().toISOString(),
-                });
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, keySource: keyResult.source, model: selectedModel })}\n\n`));
-                continue;
-              }
-              try {
-                const event = JSON.parse(data);
-                const token = event.choices?.[0]?.delta?.content || '';
-                if (token) {
-                  fullOutput += token;
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ token })}\n\n`));
-                }
-                if (event.usage) {
-                  tokensUsed = (event.usage.prompt_tokens || 0) + (event.usage.completion_tokens || 0);
-                }
-              } catch (_) {}
-            }
-          }
-        } catch (e) {
-          console.error('[perplexityStream] stream error:', e);
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: e.message })}\n\n`));
-        } finally {
-          controller.close();
-        }
-      },
-    });
-
-    return new Response(stream, {
-      headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive', 'Access-Control-Allow-Origin': '*' },
-    });
-  } catch (error) {
-    console.error('[perplexityStream] error:', error);
-    return Response.json({ error: error.message }, { status: 500 });
+  const keyRes = await base44.functions.invoke("resolveApiKey", {
+    platform: "perplexity",
+    orgId: analysis.org_id || orgId,
+    agentEmail: analysis.run_by_email,
+  });
+  if (!keyRes.data?.apiKey) {
+    return Response.json({ error: keyRes.data?.error || "No Perplexity API key available" }, { status: 402 });
   }
+  const { apiKey, source: keySource } = keyRes.data;
+
+  const promptRes = await base44.functions.invoke("assemblePrompt", { analysisId });
+  const prompt = promptRes.data?.prompt || `Analyze: ${JSON.stringify(analysis.intake_data)}`;
+
+  await base44.asServiceRole.entities.Analysis.update(analysisId, { status: "in_progress", ai_model: MODEL });
+
+  const encoder = new TextEncoder();
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      function send(obj) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
+      }
+
+      try {
+        const response = await fetch("https://api.perplexity.ai/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: MODEL,
+            stream: true,
+            messages: [
+              {
+                role: "system",
+                content: "You are PropPrompt™, an elite real estate AI analyst specializing in Eastern Massachusetts. You have access to current web data. Use Deep Research mode: retrieve live MLS trends, recent comp sales, town assessment data, and market conditions before generating your analysis. Cite your sources inline.",
+              },
+              { role: "user", content: prompt },
+            ],
+            temperature: 0.3,
+            max_tokens: 4096,
+            search_domain_filter: ["zillow.com", "mlspin.com", "redfin.com", "mass.gov", "bostonglobe.com"],
+            return_citations: true,
+            search_recency_filter: "month",
+          }),
+        });
+
+        if (!response.ok) {
+          const err = await response.json();
+          console.error("Perplexity API error:", err);
+          send({ error: err.error?.message || "Perplexity API error" });
+          controller.close();
+          return;
+        }
+
+        const reader = response.body.getReader();
+        const dec = new TextDecoder();
+        let buffer = "";
+        let fullOutput = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += dec.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop();
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const raw = line.slice(6).trim();
+            if (raw === "[DONE]") continue;
+            try {
+              const evt = JSON.parse(raw);
+              const delta = evt.choices?.[0]?.delta?.content;
+              if (delta) {
+                fullOutput += delta;
+                send({ token: delta });
+              }
+            } catch (_) {}
+          }
+        }
+
+        await base44.asServiceRole.entities.Analysis.update(analysisId, {
+          status: "complete", output_text: fullOutput, completed_at: new Date().toISOString(),
+          ai_model: MODEL, intake_data: { ...analysis.intake_data, api_key_source: keySource },
+        });
+        send({ done: true, keySource, model: MODEL });
+
+      } catch (err) {
+        console.error("perplexityStream error:", err);
+        await base44.asServiceRole.entities.Analysis.update(analysisId, { status: "failed" });
+        send({ error: err.message });
+      }
+      controller.close();
+    },
+  });
+
+  return new Response(stream, {
+    headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" },
+  });
 });

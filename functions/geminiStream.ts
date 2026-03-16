@@ -1,171 +1,135 @@
+/**
+ * geminiStream — SSE streaming handler for Google Gemini.
+ *
+ * Model cascade (Section 5.1):
+ *   - location_class=coastal OR intake_data.address contains North Shore submarket keywords
+ *     → gemini-2.0-pro-exp (higher reasoning for coastal/luxury markets)
+ *   - default → gemini-2.0-flash (fast, cost-efficient)
+ *
+ * Uses Gemini generateContent API with streamGenerateContent endpoint.
+ */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
-async function decryptData(encrypted, keyStr) {
-  const [ivB64, cipherB64] = encrypted.split(':');
-  if (!ivB64 || !cipherB64) return encrypted;
-  const fromB64 = (s) => Uint8Array.from(atob(s), c => c.charCodeAt(0));
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(keyStr.padEnd(32, '0').slice(0, 32)),
-    { name: 'AES-GCM' }, false, ['decrypt']
-  );
-  const plain = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: fromB64(ivB64) }, keyMaterial, fromB64(cipherB64)
-  );
-  return new TextDecoder().decode(plain);
-}
+const NORTH_SHORE_KEYWORDS = [
+  "marblehead", "swampscott", "gloucester", "rockport", "manchester",
+  "essex", "hamilton", "wenham", "beverly", "salem", "nahant",
+  "north shore", "cape ann",
+];
 
-// Section 5.1 model cascade for Gemini
-// gemini-2.0-pro for coastal or North Shore location_class
-// gemini-2.0-flash default
-const NORTH_SHORE_LOCATIONS = ['coastal', 'inner_suburb']; // North Shore maps to coastal/inner_suburb
 function selectModel(analysis) {
-  const isCoastalOrNorthShore = NORTH_SHORE_LOCATIONS.includes(analysis.location_class);
-  if (isCoastalOrNorthShore) return 'gemini-2.0-pro-exp';
-  return 'gemini-2.0-flash';
-}
+  const isCoastal = analysis.location_class === "coastal";
+  const address = (analysis.intake_data?.address || "").toLowerCase();
+  const isNorthShore = NORTH_SHORE_KEYWORDS.some((kw) => address.includes(kw));
 
-async function resolveKey(base44, user, orgId, encKey) {
-  const agentKeys = await base44.asServiceRole.entities.AiApiKey.filter({
-    user_email: user.email, ai_platform: 'gemini', is_active: true,
-  });
-  if (agentKeys[0]?.encrypted_key) {
-    return { apiKey: await decryptData(agentKeys[0].encrypted_key, encKey), source: 'agent_managed' };
-  }
-  if (orgId) {
-    const orgs = await base44.asServiceRole.entities.Organization.filter({ id: orgId });
-    const org = orgs[0];
-    if (org?.org_ai_api_keys?.gemini) {
-      return { apiKey: await decryptData(org.org_ai_api_keys.gemini, encKey), source: 'org_managed' };
-    }
-    if (org?.parent_org_id) {
-      const parents = await base44.asServiceRole.entities.Organization.filter({ id: org.parent_org_id });
-      const parent = parents[0];
-      if (parent?.org_ai_api_keys?.gemini) {
-        return { apiKey: await decryptData(parent.org_ai_api_keys.gemini, encKey), source: 'brokerage_managed' };
-      }
-    }
-  }
-  const scKey = Deno.env.get('GEMINI_API_KEY');
-  if (scKey) return { apiKey: scKey, source: 'sc_managed' };
-  return null;
+  if (isCoastal || isNorthShore) return "gemini-2.0-pro-exp";
+  return "gemini-2.0-flash";
 }
 
 Deno.serve(async (req) => {
-  try {
-    const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  const base44 = createClientFromRequest(req);
 
-    const { analysisId, orgId } = await req.json();
-    if (!analysisId) return Response.json({ error: 'analysisId required' }, { status: 400 });
+  const user = await base44.auth.me();
+  if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-    const analyses = await base44.asServiceRole.entities.Analysis.filter({ id: analysisId });
-    const analysis = analyses[0];
-    if (!analysis) return Response.json({ error: 'Analysis not found' }, { status: 404 });
+  const { analysisId, orgId } = await req.json();
+  if (!analysisId) return Response.json({ error: "analysisId required" }, { status: 400 });
 
-    if (analysis.run_by_email !== user.email &&
-        analysis.on_behalf_of_email !== user.email &&
-        user.role !== 'platform_owner') {
-      return Response.json({ error: 'Forbidden' }, { status: 403 });
-    }
+  const records = await base44.asServiceRole.entities.Analysis.filter({ id: analysisId });
+  const analysis = records[0];
+  if (!analysis) return Response.json({ error: "Analysis not found" }, { status: 404 });
 
-    if (!analysis.prompt_assembled) {
-      return Response.json({ error: 'Prompt not assembled. Call assemblePrompt first.' }, { status: 400 });
-    }
-
-    const encKey = Deno.env.get('ENCRYPTION_KEY') || '';
-    const promptText = await decryptData(analysis.prompt_assembled, encKey);
-    const effectiveOrgId = orgId || analysis.org_id;
-
-    const keyResult = await resolveKey(base44, user, effectiveOrgId, encKey);
-    if (!keyResult) return Response.json({ error: 'No Gemini API key configured' }, { status: 500 });
-
-    const selectedModel = selectModel(analysis);
-    console.log(`[geminiStream] model=${selectedModel} keySource=${keyResult.source}`);
-
-    // Gemini streaming endpoint (server-sent events with alt=sse)
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:streamGenerateContent?alt=sse&key=${keyResult.apiKey}`;
-
-    const geminiRes = await fetch(geminiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{
-            text: `You are PropPrompt™ v3.0, an AI-calibrated real estate analysis engine for Eastern Massachusetts developed by Sherwood & Company. Provide expert, data-driven real estate analysis. Always include the disclaimer footer at the end.\n\n${promptText}`,
-          }],
-        }],
-        generationConfig: {
-          maxOutputTokens: 4096,
-          temperature: 0.7,
-        },
-      }),
-    });
-
-    if (!geminiRes.ok) {
-      const err = await geminiRes.text();
-      console.error(`[geminiStream] Gemini error: ${err}`);
-      return Response.json({ error: `Gemini API error: ${err}` }, { status: 500 });
-    }
-
-    const encoder = new TextEncoder();
-    let fullOutput = '';
-    let tokensUsed = 0;
-
-    const stream = new ReadableStream({
-      async start(controller) {
-        const reader = geminiRes.body.getReader();
-        const dec = new TextDecoder();
-        let buffer = '';
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) {
-              // Stream ended — save and emit done
-              await base44.asServiceRole.entities.Analysis.update(analysisId, {
-                output_text: fullOutput,
-                status: fullOutput ? 'complete' : 'failed',
-                tokens_used: tokensUsed,
-                ai_model: selectedModel,
-                completed_at: new Date().toISOString(),
-              });
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, keySource: keyResult.source, model: selectedModel })}\n\n`));
-              break;
-            }
-            buffer += dec.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop();
-            for (const line of lines) {
-              if (!line.startsWith('data: ')) continue;
-              const data = line.slice(6).trim();
-              try {
-                const event = JSON.parse(data);
-                const token = event.candidates?.[0]?.content?.parts?.[0]?.text || '';
-                if (token) {
-                  fullOutput += token;
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ token })}\n\n`));
-                }
-                if (event.usageMetadata) {
-                  tokensUsed = (event.usageMetadata.promptTokenCount || 0) + (event.usageMetadata.candidatesTokenCount || 0);
-                }
-              } catch (_) {}
-            }
-          }
-        } catch (e) {
-          console.error('[geminiStream] stream error:', e);
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: e.message })}\n\n`));
-        } finally {
-          controller.close();
-        }
-      },
-    });
-
-    return new Response(stream, {
-      headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive', 'Access-Control-Allow-Origin': '*' },
-    });
-  } catch (error) {
-    console.error('[geminiStream] error:', error);
-    return Response.json({ error: error.message }, { status: 500 });
+  const keyRes = await base44.functions.invoke("resolveApiKey", {
+    platform: "gemini",
+    orgId: analysis.org_id || orgId,
+    agentEmail: analysis.run_by_email,
+  });
+  if (!keyRes.data?.apiKey) {
+    return Response.json({ error: keyRes.data?.error || "No Gemini API key available" }, { status: 402 });
   }
+  const { apiKey, source: keySource } = keyRes.data;
+  const model = selectModel(analysis);
+
+  const promptRes = await base44.functions.invoke("assemblePrompt", { analysisId });
+  const prompt = promptRes.data?.prompt || `Analyze: ${JSON.stringify(analysis.intake_data)}`;
+
+  await base44.asServiceRole.entities.Analysis.update(analysisId, { status: "in_progress", ai_model: model });
+
+  const encoder = new TextEncoder();
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      function send(obj) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
+      }
+
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${apiKey}&alt=sse`;
+
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{
+              role: "user",
+              parts: [{ text: `You are PropPrompt™, an elite real estate AI analyst for Eastern Massachusetts. Provide detailed, professional analysis.\n\n${prompt}` }],
+            }],
+            generationConfig: {
+              temperature: 0.4,
+              maxOutputTokens: 4096,
+            },
+          }),
+        });
+
+        if (!response.ok) {
+          const err = await response.json();
+          console.error("Gemini API error:", err);
+          send({ error: err.error?.message || "Gemini API error" });
+          controller.close();
+          return;
+        }
+
+        const reader = response.body.getReader();
+        const dec = new TextDecoder();
+        let buffer = "";
+        let fullOutput = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += dec.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop();
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const raw = line.slice(6).trim();
+            try {
+              const evt = JSON.parse(raw);
+              const text = evt.candidates?.[0]?.content?.parts?.[0]?.text;
+              if (text) {
+                fullOutput += text;
+                send({ token: text });
+              }
+            } catch (_) {}
+          }
+        }
+
+        await base44.asServiceRole.entities.Analysis.update(analysisId, {
+          status: "complete", output_text: fullOutput, completed_at: new Date().toISOString(),
+          ai_model: model, intake_data: { ...analysis.intake_data, api_key_source: keySource },
+        });
+        send({ done: true, keySource, model });
+
+      } catch (err) {
+        console.error("geminiStream error:", err);
+        await base44.asServiceRole.entities.Analysis.update(analysisId, { status: "failed" });
+        send({ error: err.message });
+      }
+      controller.close();
+    },
+  });
+
+  return new Response(stream, {
+    headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" },
+  });
 });
