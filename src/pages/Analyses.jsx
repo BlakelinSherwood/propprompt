@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
-import { Plus, FileText } from "lucide-react";
+import { Plus, FileText, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import PrivateToggle from "../components/PrivateToggle";
 
 const STATUS_STYLES = {
-  draft: "bg-[#1A3226]/8 text-[#1A3226]/60",
+  draft: "bg-[#1A3226]/5 text-[#1A3226]/50",
   in_progress: "bg-amber-50 text-amber-600",
   complete: "bg-emerald-50 text-emerald-700",
   failed: "bg-red-50 text-red-600",
@@ -24,11 +25,32 @@ const TYPE_LABELS = {
 export default function Analyses() {
   const [analyses, setAnalyses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [orgAllowsPrivate, setOrgAllowsPrivate] = useState(false);
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
-    base44.entities.Analysis.list("-created_date", 50)
-      .then(setAnalyses)
-      .finally(() => setLoading(false));
+    async function load() {
+      const me = await base44.auth.me();
+      setUser(me);
+
+      const [data] = await Promise.all([
+        base44.entities.Analysis.list("-created_date", 50),
+      ]);
+      setAnalyses(data);
+
+      // Check if org allows private toggle
+      const memberships = await base44.entities.OrgMembership.filter({
+        user_email: me.email,
+        status: "active",
+      });
+      if (memberships.length > 0) {
+        const orgs = await base44.entities.Organization.filter({ id: memberships[0].org_id });
+        if (orgs[0]?.allow_agent_private_toggle) setOrgAllowsPrivate(true);
+      }
+
+      setLoading(false);
+    }
+    load();
   }, []);
 
   if (loading) {
@@ -73,28 +95,55 @@ export default function Analyses() {
       ) : (
         <div className="rounded-2xl border border-[#1A3226]/10 bg-white overflow-hidden">
           {analyses.map((a, i) => (
-            <div
+            <Link
               key={a.id}
-              className={`flex items-center gap-4 px-5 py-4 hover:bg-[#FAF8F4]/50 transition-colors ${i !== analyses.length - 1 ? "border-b border-[#1A3226]/5" : ""}`}
+              to={`/Analysis/${a.id}`}
+              className={`flex items-center gap-4 px-5 py-4 hover:bg-[#FAF8F4]/70 transition-colors ${
+                i !== analyses.length - 1 ? "border-b border-[#1A3226]/5" : ""
+              }`}
             >
               <div className="w-9 h-9 rounded-lg bg-[#1A3226]/5 flex items-center justify-center flex-shrink-0">
-                <FileText className="w-4 h-4 text-[#1A3226]/40" />
+                {a.is_private ? (
+                  <Lock className="w-4 h-4 text-[#1A3226]/60" />
+                ) : (
+                  <FileText className="w-4 h-4 text-[#1A3226]/40" />
+                )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-[#1A3226] truncate">
-                  {a.intake_data?.address || "Untitled Analysis"}
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium text-[#1A3226] truncate">
+                    {a.intake_data?.address || "Untitled Analysis"}
+                  </p>
+                  {a.is_private && (
+                    <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[#1A3226] text-white flex-shrink-0">
+                      Private
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-[#1A3226]/40 mt-0.5">
                   {TYPE_LABELS[a.assessment_type] || a.assessment_type} · {a.ai_platform} ·{" "}
                   {new Date(a.created_date).toLocaleDateString()}
                 </p>
               </div>
-              <span
-                className={`text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-full font-semibold flex-shrink-0 ${STATUS_STYLES[a.status] || STATUS_STYLES.draft}`}
-              >
-                {a.status}
-              </span>
-            </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <PrivateToggle
+                  analysis={a}
+                  orgAllowsPrivate={orgAllowsPrivate}
+                  onToggled={(newVal) =>
+                    setAnalyses((prev) =>
+                      prev.map((x) => (x.id === a.id ? { ...x, is_private: newVal } : x))
+                    )
+                  }
+                />
+                <span
+                  className={`text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-full font-semibold ${
+                    STATUS_STYLES[a.status] || STATUS_STYLES.draft
+                  }`}
+                >
+                  {a.status}
+                </span>
+              </div>
+            </Link>
           ))}
         </div>
       )}
