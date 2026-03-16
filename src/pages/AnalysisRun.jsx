@@ -117,17 +117,7 @@ export default function AnalysisRun() {
     });
   }, [analysisId]);
 
-  async function getToken() {
-    // base44 SDK manages auth; use its internal token via a known header trick
-    // We'll use the SDK invoke method instead for proper auth
-    return "";
-  }
 
-  // Re-route SSE through the SDK invoke for proper auth
-  useEffect(() => {
-    if (!analysisId || status !== "loading") return;
-    // handled above
-  }, []);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(output + "\n\n" + DISCLAIMER.replace(/\*\*/g, ""));
