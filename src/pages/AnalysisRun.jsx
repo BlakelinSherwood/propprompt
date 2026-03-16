@@ -4,7 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { appParams } from "@/lib/app-params";
 import ReactMarkdown from "react-markdown";
 import { Button } from "@/components/ui/button";
-import { Copy, Download, Mail, CheckCircle, AlertCircle, Loader2, ArrowLeft } from "lucide-react";
+import { Copy, Download, Mail, CheckCircle, AlertCircle, Loader2, ArrowLeft, Cloud, Database } from "lucide-react";
 import StreamProgressBar from "../components/StreamProgressBar";
 
 const DISCLAIMER = `**DISCLAIMER:** This AI-generated analysis is provided for informational purposes only and does not constitute legal, financial, or professional real estate advice. All valuations and recommendations should be verified by a licensed real estate professional. PropPrompt™ analyses are tools to augment, not replace, professional judgment. © 2026 Sherwood & Company, Brokered by Compass.`;
@@ -29,6 +29,12 @@ export default function AnalysisRun() {
   const [errorMsg, setErrorMsg] = useState("");
   const [keySource, setKeySource] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [crmPushing, setCrmPushing] = useState(false);
+  const [crmPushed, setCrmPushed] = useState(false);
+  const [driveUploading, setDriveUploading] = useState(false);
+  const [driveUploaded, setDriveUploaded] = useState(false);
+  const [driveUrl, setDriveUrl] = useState(null);
+  const [crmConnections, setCrmConnections] = useState([]);
   const outputRef = useRef(null);
   const hasStarted = useRef(false);
 
@@ -49,6 +55,16 @@ export default function AnalysisRun() {
         setStatus("complete");
         return;
       }
+
+      // Load CRM connections for this user
+      const me = await base44.auth.me().catch(() => null);
+      if (me) {
+        base44.entities.CrmConnection.filter({ user_email: me.email, status: "connected" })
+          .then(setCrmConnections).catch(() => {});
+      }
+      // Check if analysis already has drive sync
+      if (rec.drive_url) setDriveUrl(rec.drive_url);
+      if (rec.crm_push_status === "pushed") setCrmPushed(true);
 
       setStatus("streaming");
 
@@ -110,8 +126,6 @@ export default function AnalysisRun() {
               if (payload.done) {
                 setStatus("complete");
                 setKeySource(payload.keySource);
-                // Trigger Drive sync + CRM auto-push after completion
-                triggerPostCompletion(analysisId);
               }
               if (payload.error) {
                 setErrorMsg(payload.error);
@@ -131,19 +145,6 @@ export default function AnalysisRun() {
 
 
 
-  const triggerPostCompletion = async (id) => {
-    try {
-      // Drive sync (fire-and-forget, don't block UI)
-      base44.functions.invoke("driveSync", { analysisId: id }).catch(() => {});
-      // CRM auto-push: find connected CRMs with auto_push_enabled
-      const crmRes = await base44.functions.invoke("crmConnect", { action: "list" });
-      const autoPushConns = (crmRes.data?.connections || []).filter(c => c.auto_push_enabled && c.status === "connected");
-      for (const conn of autoPushConns) {
-        base44.functions.invoke("crmPush", { analysisId: id, crmConnectionId: conn.id }).catch(() => {});
-      }
-    } catch (_) {}
-  };
-
   const handleCopy = async () => {
     await navigator.clipboard.writeText(output + "\n\n" + DISCLAIMER.replace(/\*\*/g, ""));
     setCopied(true);
@@ -156,22 +157,53 @@ export default function AnalysisRun() {
     window.open(`mailto:?subject=${subject}&body=${body}`);
   };
 
-  const handleDownloadPdf = () => {
-    // Trigger jsPDF generation
-    import("jspdf").then(({ jsPDF }) => {
+  function buildPdfDoc() {
+    return import("jspdf").then(({ jsPDF }) => {
       const doc = new jsPDF();
       doc.setFontSize(14);
       doc.text(`PropPrompt™ — ${ASSESSMENT_LABELS[analysis?.assessment_type] || "Analysis"}`, 20, 20);
       doc.setFontSize(10);
       const lines = doc.splitTextToSize(output, 170);
       doc.text(lines, 20, 35);
-      // Disclaimer at bottom
       doc.setFontSize(8);
       doc.setTextColor(100);
       const discLines = doc.splitTextToSize(DISCLAIMER.replace(/\*\*/g, ""), 170);
       doc.text(discLines, 20, doc.internal.pageSize.height - 30);
-      doc.save(`PropPrompt-Analysis-${analysisId}.pdf`);
+      return doc;
     });
+  }
+
+  const handleDownloadPdf = async () => {
+    const doc = await buildPdfDoc();
+    doc.save(`PropPrompt-Analysis-${analysisId}.pdf`);
+    await base44.functions.invoke("logPrivacyEvent", {
+      event_type: "data_export_delivered",
+      entity_type: "Analysis", entity_id: analysisId,
+      metadata: { export_type: "pdf" },
+    }).catch(() => {});
+  };
+
+  const handleDriveUpload = async () => {
+    setDriveUploading(true);
+    const doc = await buildPdfDoc();
+    const pdfBase64 = doc.output("datauristring").split(",")[1];
+    const fileName = `PropPrompt-${analysis?.intake_data?.address || analysisId}.pdf`;
+    const res = await base44.functions.invoke("driveUpload", { analysisId, pdfBase64, fileName });
+    if (res.data?.success) {
+      setDriveUploaded(true);
+      setDriveUrl(res.data.driveUrl);
+    }
+    setDriveUploading(false);
+  };
+
+  const handleCrmPush = async () => {
+    if (!crmConnections.length) return;
+    setCrmPushing(true);
+    // Push to first active connection (user can expand this later)
+    const conn = crmConnections[0];
+    const res = await base44.functions.invoke("crmPush", { analysisId, connectionId: conn.id });
+    if (res.data?.success) setCrmPushed(true);
+    setCrmPushing(false);
   };
 
   if (!analysisId) {
@@ -269,6 +301,27 @@ export default function AnalysisRun() {
               >
                 <Mail className="w-3.5 h-3.5" /> Email
               </Button>
+              <Button
+                variant="outline" size="sm"
+                onClick={handleDriveUpload}
+                disabled={status !== "complete" || driveUploading || driveUploaded}
+                className="h-7 text-xs gap-1.5 border-[#1A3226]/15"
+                title={driveUrl ? "View in Drive" : "Upload to Google Drive"}
+              >
+                {driveUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : driveUploaded ? <CheckCircle className="w-3.5 h-3.5 text-emerald-500" /> : <Cloud className="w-3.5 h-3.5" />}
+                {driveUploaded ? <a href={driveUrl} target="_blank" rel="noopener noreferrer" className="text-emerald-600">Drive ↗</a> : "Drive"}
+              </Button>
+              {crmConnections.length > 0 && (
+                <Button
+                  variant="outline" size="sm"
+                  onClick={handleCrmPush}
+                  disabled={status !== "complete" || crmPushing || crmPushed}
+                  className="h-7 text-xs gap-1.5 border-[#1A3226]/15"
+                >
+                  {crmPushing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : crmPushed ? <CheckCircle className="w-3.5 h-3.5 text-emerald-500" /> : <Database className="w-3.5 h-3.5" />}
+                  {crmPushed ? "Pushed" : "CRM"}
+                </Button>
+              )}
             </div>
           </div>
 
