@@ -15,6 +15,7 @@ import AnalysisDetail from './pages/AnalysisDetail';
 import AnalysisRun from './pages/AnalysisRun';
 import Analyses from './pages/Analyses';
 import Billing from './pages/Billing';
+import Landing from './pages/Landing';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -64,6 +65,9 @@ function App() {
     <AuthProvider>
       <QueryClientProvider client={queryClientInstance}>
         <Router>
+          <Routes>
+            <Route path="/home" element={<Landing />} />
+          </Routes>
           <AuthenticatedApp />
         </Router>
         <Toaster />
