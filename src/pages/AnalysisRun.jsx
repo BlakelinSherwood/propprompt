@@ -4,7 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { appParams } from "@/lib/app-params";
 import ReactMarkdown from "react-markdown";
 import { Button } from "@/components/ui/button";
-import { Copy, Download, Mail, CheckCircle, AlertCircle, Loader2, ArrowLeft, Cloud, Database } from "lucide-react";
+import { Copy, Download, Mail, CheckCircle, AlertCircle, Loader2, ArrowLeft, Cloud, Database, Presentation, Send } from "lucide-react";
 import StreamProgressBar from "../components/StreamProgressBar";
 
 const DISCLAIMER = `**DISCLAIMER:** This AI-generated analysis is provided for informational purposes only and does not constitute legal, financial, or professional real estate advice. All valuations and recommendations should be verified by a licensed real estate professional. PropPrompt™ analyses are tools to augment, not replace, professional judgment. © 2026 Sherwood & Company, Brokered by Compass.`;
@@ -35,6 +35,12 @@ export default function AnalysisRun() {
   const [driveUploaded, setDriveUploaded] = useState(false);
   const [driveUrl, setDriveUrl] = useState(null);
   const [crmConnections, setCrmConnections] = useState([]);
+  const [pptxGenerating, setPptxGenerating] = useState(false);
+  const [pptxUrl, setPptxUrl] = useState(null);
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [emailTo, setEmailTo] = useState("");
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
   const outputRef = useRef(null);
   const hasStarted = useRef(false);
 
@@ -157,43 +163,42 @@ export default function AnalysisRun() {
     window.open(`mailto:?subject=${subject}&body=${body}`);
   };
 
-  function buildPdfDoc() {
-    return import("jspdf").then(({ jsPDF }) => {
-      const doc = new jsPDF();
-      doc.setFontSize(14);
-      doc.text(`PropPrompt™ — ${ASSESSMENT_LABELS[analysis?.assessment_type] || "Analysis"}`, 20, 20);
-      doc.setFontSize(10);
-      const lines = doc.splitTextToSize(output, 170);
-      doc.text(lines, 20, 35);
-      doc.setFontSize(8);
-      doc.setTextColor(100);
-      const discLines = doc.splitTextToSize(DISCLAIMER.replace(/\*\*/g, ""), 170);
-      doc.text(discLines, 20, doc.internal.pageSize.height - 30);
-      return doc;
-    });
-  }
-
+  // Server-side branded PDF (white-label)
   const handleDownloadPdf = async () => {
-    const doc = await buildPdfDoc();
-    doc.save(`PropPrompt-Analysis-${analysisId}.pdf`);
-    await base44.functions.invoke("logPrivacyEvent", {
-      event_type: "data_export_delivered",
-      entity_type: "Analysis", entity_id: analysisId,
-      metadata: { export_type: "pdf" },
-    }).catch(() => {});
+    const res = await base44.functions.invoke("generateDocuments", { analysisId, format: "pdf" });
+    if (res.data?.url) {
+      window.open(res.data.url, "_blank");
+    }
+  };
+
+  // Server-side branded PPTX
+  const handleDownloadPptx = async () => {
+    setPptxGenerating(true);
+    const res = await base44.functions.invoke("generateDocuments", { analysisId, format: "pptx" });
+    if (res.data?.url) {
+      setPptxUrl(res.data.url);
+      window.open(res.data.url, "_blank");
+    }
+    setPptxGenerating(false);
   };
 
   const handleDriveUpload = async () => {
     setDriveUploading(true);
-    const doc = await buildPdfDoc();
-    const pdfBase64 = doc.output("datauristring").split(",")[1];
-    const fileName = `PropPrompt-${analysis?.intake_data?.address || analysisId}.pdf`;
-    const res = await base44.functions.invoke("driveUpload", { analysisId, pdfBase64, fileName });
-    if (res.data?.success) {
+    const res = await base44.functions.invoke("driveSync", { analysisId });
+    if (res.data?.driveUrl) {
       setDriveUploaded(true);
       setDriveUrl(res.data.driveUrl);
     }
     setDriveUploading(false);
+  };
+
+  const handleSendEmail = async () => {
+    if (!emailTo) return;
+    setEmailSending(true);
+    await base44.functions.invoke("sendAnalysisEmail", { analysisId, toEmail: emailTo });
+    setEmailSent(true);
+    setEmailSending(false);
+    setTimeout(() => { setEmailDialogOpen(false); setEmailSent(false); setEmailTo(""); }, 1500);
   };
 
   const handleCrmPush = async () => {
@@ -295,7 +300,16 @@ export default function AnalysisRun() {
               </Button>
               <Button
                 variant="outline" size="sm"
-                onClick={handleEmail}
+                onClick={handleDownloadPptx}
+                disabled={status !== "complete" || pptxGenerating}
+                className="h-7 text-xs gap-1.5 border-[#1A3226]/15"
+              >
+                {pptxGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Presentation className="w-3.5 h-3.5" />}
+                PPTX
+              </Button>
+              <Button
+                variant="outline" size="sm"
+                onClick={() => setEmailDialogOpen(true)}
                 disabled={status !== "complete"}
                 className="h-7 text-xs gap-1.5 border-[#1A3226]/15"
               >
