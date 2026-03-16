@@ -50,6 +50,7 @@ export default function Layout() {
     ...(user?.role === "platform_owner"
       ? [{ label: "Platform Admin", path: "/PlatformAdmin", icon: Shield }]
       : []),
+    // Brokerage/Team admin links are accessed via org cards in Dashboard, not sidebar nav
   ];
 
   const handleLogout = () => {
