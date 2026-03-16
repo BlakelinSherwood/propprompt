@@ -13,6 +13,8 @@ import {
   CreditCard
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import FairHousingOverdueBanner from "./FairHousingOverdueBanner";
+import PrivacyNoticeModal from "./PrivacyNoticeModal";
 
 const PLATFORM_OWNER_EMAIL = "blake.sherwood@compass.com";
 
@@ -59,6 +61,7 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen bg-[#FAF8F4]">
+      <PrivacyNoticeModal user={user} />
       <style>{`
         :root {
           --pp-green: #1A3226;
@@ -171,9 +174,11 @@ export default function Layout() {
         {/* Main Content */}
         <main className="flex-1 min-h-[calc(100vh-4rem)]">
           <div className="p-4 lg:p-8 max-w-7xl mx-auto">
+            <FairHousingOverdueBanner user={user} />
             <Outlet />
           </div>
         </main>
+      
       </div>
     </div>
   );
