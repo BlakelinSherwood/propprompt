@@ -48,6 +48,7 @@ const AuthenticatedApp = () => {
         <Route path="/PlatformAdmin" element={<PlatformAdmin />} />
         <Route path="/NewAnalysis" element={<NewAnalysis />} />
         <Route path="/Analysis/:id" element={<AnalysisDetail />} />
+        <Route path="/AnalysisRun" element={<AnalysisRun />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
