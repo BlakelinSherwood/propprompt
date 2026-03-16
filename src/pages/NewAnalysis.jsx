@@ -2,111 +2,120 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import WizardProgress from "../components/wizard/WizardProgress";
-import StepAIPlatform from "../components/wizard/StepAIPlatform";
-import StepAssessmentType from "../components/wizard/StepAssessmentType";
-import StepClientRelationship from "../components/wizard/StepClientRelationship";
-import StepPropertyDetails from "../components/wizard/StepPropertyDetails";
-import StepOutputFormat from "../components/wizard/StepOutputFormat";
-import StepConfirmLaunch from "../components/wizard/StepConfirmLaunch";
+import Step1Platform from "../components/wizard/Step1Platform";
+import Step2Assessment from "../components/wizard/Step2Assessment";
+import Step3ClientRelationship from "../components/wizard/Step3ClientRelationship";
+import Step4PropertyDetails from "../components/wizard/Step4PropertyDetails";
+import Step5OutputFormat from "../components/wizard/Step5OutputFormat";
+import Step6Confirm from "../components/wizard/Step6Confirm";
 
-const TOTAL_STEPS = 6;
+const STEP_LABELS = [
+  "AI Platform",
+  "Assessment",
+  "Client Role",
+  "Property",
+  "Output",
+  "Confirm",
+];
 
-const INITIAL_FORM = {
+const INITIAL_INTAKE = {
   ai_platform: "claude",
+  ai_model: "",
   assessment_type: "",
   client_relationship: "",
   address: "",
   property_type: "",
   location_class: "",
   output_format: "narrative",
-  preparing_agent_email: "",
+  on_behalf_of_email: "",
+  drive_sync: true,
 };
 
 export default function NewAnalysis() {
-  const navigate = useNavigate();
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState(INITIAL_FORM);
+  const [intake, setIntake] = useState(INITIAL_INTAKE);
   const [user, setUser] = useState(null);
   const [orgMembers, setOrgMembers] = useState([]);
   const [submitting, setSubmitting] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     async function load() {
       const me = await base44.auth.me();
       setUser(me);
-      if (me.role === "assistant" || me.role === "team_lead" || me.role === "brokerage_admin") {
+      if (me.role === "assistant" || me.role === "team_lead") {
         const members = await base44.entities.User.list();
-        setOrgMembers(members.filter((m) => m.email !== me.email && ["agent", "team_agent", "team_lead"].includes(m.role)));
+        setOrgMembers(members.filter((m) => m.email !== me.email && ["agent", "team_agent"].includes(m.role)));
       }
     }
     load();
   }, []);
 
-  const update = (fields) => setForm((prev) => ({ ...prev, ...fields }));
+  function update(fields) {
+    setIntake((prev) => ({ ...prev, ...fields }));
+  }
 
-  const next = () => setStep((s) => Math.min(s + 1, TOTAL_STEPS));
-  const back = () => setStep((s) => Math.max(s - 1, 1));
+  function next() {
+    setStep((s) => Math.min(s + 1, 6));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 
-  const canProceed = () => {
-    switch (step) {
-      case 1: return !!form.ai_platform;
-      case 2: return !!form.assessment_type;
-      case 3: return !!form.client_relationship;
-      case 4: return !!form.address && !!form.property_type && !!form.location_class;
-      case 5: return !!form.output_format;
-      case 6: return true;
-      default: return false;
-    }
-  };
+  function back() {
+    setStep((s) => Math.max(s - 1, 1));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 
-  const handleLaunch = async () => {
+  async function handleSubmit() {
     setSubmitting(true);
-    const onBehalfOf = form.preparing_agent_email || null;
-    await base44.entities.Analysis.create({
-      org_id: user?.org_name || "default",
-      run_by_email: user?.email,
-      on_behalf_of_email: onBehalfOf,
-      assessment_type: form.assessment_type,
-      property_type: form.property_type,
-      location_class: form.location_class,
-      ai_platform: form.ai_platform,
-      output_format: form.output_format,
+    const analysis = await base44.entities.Analysis.create({
+      run_by_email: user.email,
+      on_behalf_of_email: intake.on_behalf_of_email || null,
+      org_id: user.org_id || null,
+      assessment_type: intake.assessment_type,
+      property_type: intake.property_type,
+      location_class: intake.location_class,
+      ai_platform: intake.ai_platform,
+      ai_model: intake.ai_model || null,
+      output_format: intake.output_format,
       status: "draft",
       intake_data: {
-        address: form.address,
-        client_relationship: form.client_relationship,
+        address: intake.address,
+        client_relationship: intake.client_relationship,
+        drive_sync: intake.drive_sync,
       },
+      drive_sync_status: intake.drive_sync ? "pending" : "not_synced",
     });
-    setSubmitting(false);
-    navigate("/Analyses");
-  };
+    navigate(`/Analysis/${analysis.id}`);
+  }
 
-  const stepProps = { form, update, user, next, back, canProceed };
+  const stepProps = { intake, update, user, onNext: next, onBack: back };
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div>
-        <p className="text-xs font-medium uppercase tracking-widest text-[#B8982F] mb-1">New Analysis</p>
+        <p className="text-[#B8982F] text-xs font-medium uppercase tracking-widest mb-1">New Analysis</p>
         <h1 className="text-2xl font-semibold text-[#1A3226]" style={{ fontFamily: "Georgia, serif" }}>
           PropPrompt™ Intake Wizard
         </h1>
-        <p className="text-sm text-[#1A3226]/50 mt-1">Complete all steps to assemble and launch your AI analysis.</p>
+        <p className="text-sm text-[#1A3226]/50 mt-1">
+          Complete all 6 steps to generate your AI-calibrated analysis.
+        </p>
       </div>
 
-      <WizardProgress currentStep={step} totalSteps={TOTAL_STEPS} form={form} />
+      <WizardProgress currentStep={step} labels={STEP_LABELS} />
 
-      <div className="rounded-2xl border border-[#1A3226]/10 bg-white shadow-sm overflow-hidden">
-        {step === 1 && <StepAIPlatform {...stepProps} />}
-        {step === 2 && <StepAssessmentType {...stepProps} />}
-        {step === 3 && <StepClientRelationship {...stepProps} />}
-        {step === 4 && <StepPropertyDetails {...stepProps} />}
-        {step === 5 && <StepOutputFormat {...stepProps} />}
+      <div className="rounded-2xl border border-[#1A3226]/10 bg-white overflow-hidden shadow-sm">
+        {step === 1 && <Step1Platform {...stepProps} />}
+        {step === 2 && <Step2Assessment {...stepProps} />}
+        {step === 3 && <Step3ClientRelationship {...stepProps} />}
+        {step === 4 && <Step4PropertyDetails {...stepProps} />}
+        {step === 5 && <Step5OutputFormat {...stepProps} />}
         {step === 6 && (
-          <StepConfirmLaunch
+          <Step6Confirm
             {...stepProps}
             orgMembers={orgMembers}
             submitting={submitting}
-            onLaunch={handleLaunch}
+            onSubmit={handleSubmit}
           />
         )}
       </div>
