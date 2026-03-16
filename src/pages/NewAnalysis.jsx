@@ -85,7 +85,7 @@ export default function NewAnalysis() {
       },
       drive_sync_status: intake.drive_sync ? "pending" : "not_synced",
     });
-    navigate(`/Analysis/${analysis.id}`);
+    navigate(`/AnalysisRun?id=${analysis.id}`);
   }
 
   const stepProps = { intake, update, user, onNext: next, onBack: back };
