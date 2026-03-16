@@ -14,6 +14,7 @@ import NewAnalysis from './pages/NewAnalysis';
 import AnalysisDetail from './pages/AnalysisDetail';
 import AnalysisRun from './pages/AnalysisRun';
 import Analyses from './pages/Analyses';
+import Billing from './pages/Billing';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -51,6 +52,7 @@ const AuthenticatedApp = () => {
         <Route path="/Analysis/:id" element={<AnalysisDetail />} />
         <Route path="/AnalysisRun" element={<AnalysisRun />} />
         <Route path="/Analyses" element={<Analyses />} />
+        <Route path="/Billing" element={<Billing />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>

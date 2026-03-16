@@ -9,7 +9,8 @@ import {
   X,
   Shield,
   FileText,
-  PlusCircle
+  PlusCircle,
+  CreditCard
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -42,6 +43,9 @@ export default function Layout() {
     { label: "Analyses", path: "/Analyses", icon: FileText },
     ...(isAdmin
       ? [{ label: "Members", path: "/Members", icon: Users }]
+      : []),
+    ...(isAdmin
+      ? [{ label: "Billing", path: "/Billing", icon: CreditCard }]
       : []),
     ...(user?.role === "platform_owner"
       ? [{ label: "Platform Admin", path: "/PlatformAdmin", icon: Shield }]
