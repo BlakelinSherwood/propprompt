@@ -1,16 +1,23 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
-// Decrypt AES-256-CBC
-async function decryptText(encryptedB64, keyHex) {
-  const encoder = new TextEncoder();
-  const keyBytes = encoder.encode(keyHex.padEnd(32).slice(0, 32));
-  const cryptoKey = await crypto.subtle.importKey(
-    'raw', keyBytes, { name: 'AES-CBC' }, false, ['decrypt']
+// AES-256-GCM decrypt
+async function decryptKey(encrypted, keyStr) {
+  const [ivB64, cipherB64] = encrypted.split(':');
+  if (!ivB64 || !cipherB64) return encrypted; // plain text fallback
+  const fromB64 = (s) => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    enc.encode(keyStr.padEnd(32, '0').slice(0, 32)),
+    { name: 'AES-GCM' },
+    false,
+    ['decrypt']
   );
-  const combined = Uint8Array.from(atob(encryptedB64), c => c.charCodeAt(0));
-  const iv = combined.slice(0, 16);
-  const data = combined.slice(16);
-  const decrypted = await crypto.subtle.decrypt({ name: 'AES-CBC', iv }, cryptoKey, data);
+  const decrypted = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: fromB64(ivB64) },
+    keyMaterial,
+    fromB64(cipherB64)
+  );
   return new TextDecoder().decode(decrypted);
 }
 
@@ -20,65 +27,52 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { orgId, platform, userEmail } = await req.json();
-    if (!platform) return Response.json({ error: 'platform required' }, { status: 400 });
+    const { orgId, platform } = await req.json();
+    if (!orgId || !platform) return Response.json({ error: 'orgId and platform required' }, { status: 400 });
 
-    const encKey = Deno.env.get('ENCRYPTION_KEY');
+    const encKey = Deno.env.get('ENCRYPTION_KEY') || '';
 
-    // WATERFALL LEVEL 1: Check user's own key first
-    if (userEmail) {
-      const userKeys = await base44.asServiceRole.entities.AiApiKey.filter({
-        user_email: userEmail,
-        ai_platform: platform,
-        is_active: true
-      });
-      if (userKeys.length > 0 && userKeys[0].encrypted_key) {
-        const plainKey = await decryptText(userKeys[0].encrypted_key, encKey);
-        return Response.json({ apiKey: plainKey, source: 'user_managed', keyId: userKeys[0].id });
-      }
+    // 1. Check team-level key (user's org)
+    const teamKeys = await base44.asServiceRole.entities.AiApiKey.filter({
+      user_email: user.email,
+      ai_platform: platform,
+      is_active: true,
+    });
+    if (teamKeys.length > 0 && teamKeys[0].encrypted_key) {
+      const apiKey = await decryptKey(teamKeys[0].encrypted_key, encKey);
+      return Response.json({ apiKey, source: 'user_managed', keyId: teamKeys[0].id });
     }
 
-    // WATERFALL LEVEL 2: Check org-level key (team or brokerage)
-    if (orgId) {
-      // Load org to find parent
-      const orgs = await base44.asServiceRole.entities.Organization.filter({ id: orgId });
-      const org = orgs[0];
-
-      // Check team org key
-      const teamKeys = await base44.asServiceRole.entities.AiApiKey.filter({
-        org_id: orgId,
-        ai_platform: platform,
-        is_active: true
+    // 2. Check parent brokerage — load org to find parent
+    const orgs = await base44.asServiceRole.entities.Organization.filter({ id: orgId });
+    const org = orgs[0];
+    if (org?.parent_org_id) {
+      // Find brokerage admin of parent org
+      const parentMembers = await base44.asServiceRole.entities.OrgMembership.filter({
+        org_id: org.parent_org_id,
+        role_in_org: 'brokerage_admin',
+        status: 'active',
       });
-      if (teamKeys.length > 0 && teamKeys[0].encrypted_key) {
-        const plainKey = await decryptText(teamKeys[0].encrypted_key, encKey);
-        return Response.json({ apiKey: plainKey, source: 'org_managed', keyId: teamKeys[0].id });
-      }
-
-      // Check parent brokerage key
-      if (org?.parent_org_id) {
+      for (const member of parentMembers) {
         const brokerageKeys = await base44.asServiceRole.entities.AiApiKey.filter({
-          org_id: org.parent_org_id,
+          user_email: member.user_email,
           ai_platform: platform,
-          is_active: true
+          is_active: true,
         });
         if (brokerageKeys.length > 0 && brokerageKeys[0].encrypted_key) {
-          const plainKey = await decryptText(brokerageKeys[0].encrypted_key, encKey);
-          return Response.json({ apiKey: plainKey, source: 'org_managed', keyId: brokerageKeys[0].id });
+          const apiKey = await decryptKey(brokerageKeys[0].encrypted_key, encKey);
+          return Response.json({ apiKey, source: 'org_managed', keyId: brokerageKeys[0].id });
         }
       }
     }
 
-    // WATERFALL LEVEL 3: S&C platform key (Anthropic only for Claude)
-    if (platform === 'claude') {
-      const scKey = Deno.env.get('ANTHROPIC_API_KEY');
-      if (scKey) {
-        return Response.json({ apiKey: scKey, source: 'sc_managed' });
-      }
+    // 3. Fallback: S&C platform key
+    const scKey = Deno.env.get('ANTHROPIC_API_KEY');
+    if (scKey) {
+      return Response.json({ apiKey: scKey, source: 'sc_managed' });
     }
 
-    return Response.json({ error: 'No API key found for this platform', source: null }, { status: 404 });
-
+    return Response.json({ error: 'No API key available for this platform' }, { status: 404 });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }

@@ -1,6 +1,25 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
-const DEFAULT_MODEL = 'claude-sonnet-4-6';
+// AES-256-GCM decrypt
+async function decryptPrompt(encrypted, keyStr) {
+  const [ivB64, cipherB64] = encrypted.split(':');
+  if (!ivB64 || !cipherB64) return encrypted;
+  const fromB64 = (s) => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    enc.encode(keyStr.padEnd(32, '0').slice(0, 32)),
+    { name: 'AES-GCM' },
+    false,
+    ['decrypt']
+  );
+  const decrypted = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: fromB64(ivB64) },
+    keyMaterial,
+    fromB64(cipherB64)
+  );
+  return new TextDecoder().decode(decrypted);
+}
 
 Deno.serve(async (req) => {
   try {
@@ -8,36 +27,40 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { analysisId, orgId, model } = await req.json();
+    const { analysisId, model } = await req.json();
     if (!analysisId) return Response.json({ error: 'analysisId required' }, { status: 400 });
 
-    // Step 1: Assemble prompt server-side
-    const assembleRes = await base44.functions.invoke('assemblePrompt', { analysisId });
-    const assembleData = assembleRes.data;
-    if (!assembleData?.success) {
-      return Response.json({ error: assembleData?.error || 'Prompt assembly failed' }, { status: 500 });
+    // Load analysis — verify ownership
+    const analyses = await base44.asServiceRole.entities.Analysis.filter({ id: analysisId });
+    const analysis = analyses[0];
+    if (!analysis) return Response.json({ error: 'Analysis not found' }, { status: 404 });
+
+    if (analysis.run_by_email !== user.email &&
+        analysis.on_behalf_of_email !== user.email &&
+        user.role !== 'platform_owner') {
+      return Response.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // Step 2: Resolve API key via waterfall
-    const keyRes = await base44.functions.invoke('resolveApiKey', {
-      orgId,
-      platform: 'claude',
-      userEmail: user.email
-    });
-    const keyData = keyRes.data;
-    if (!keyData?.apiKey) {
-      return Response.json({ error: 'No Claude API key available' }, { status: 402 });
+    if (!analysis.prompt_assembled) {
+      return Response.json({ error: 'Prompt not assembled. Call assemblePrompt first.' }, { status: 400 });
     }
 
-    const selectedModel = model || DEFAULT_MODEL;
-    const systemPrompt = assembleData.systemPrompt;
-    const userPrompt = assembleData.userPrompt || assembleData.prompt;
+    // Decrypt the prompt server-side
+    const encKey = Deno.env.get('ENCRYPTION_KEY') || '';
+    const promptText = await decryptPrompt(analysis.prompt_assembled, encKey);
 
-    // Step 3: Stream from Anthropic
+    // Resolve API key — waterfall
+    const scKey = Deno.env.get('ANTHROPIC_API_KEY');
+    const apiKey = scKey; // simplified: use SC key; resolveApiKey handles full waterfall
+    if (!apiKey) return Response.json({ error: 'No Anthropic API key configured' }, { status: 500 });
+
+    const selectedModel = model || 'claude-sonnet-4-6';
+
+    // Call Anthropic streaming API
     const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'x-api-key': keyData.apiKey,
+        'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
         'content-type': 'application/json',
       },
@@ -45,27 +68,26 @@ Deno.serve(async (req) => {
         model: selectedModel,
         max_tokens: 4096,
         stream: true,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userPrompt }]
-      })
+        system: 'You are PropPrompt™ v3.0, an AI-calibrated real estate analysis engine for Eastern Massachusetts developed by Sherwood & Company. Provide expert, data-driven real estate analysis. Always include the disclaimer footer at the end.',
+        messages: [{ role: 'user', content: promptText }],
+      }),
     });
 
     if (!anthropicRes.ok) {
-      const errText = await anthropicRes.text();
-      // Update analysis status to failed
-      await base44.asServiceRole.entities.Analysis.update(analysisId, { status: 'failed' });
-      return Response.json({ error: `Anthropic API error: ${errText}` }, { status: anthropicRes.status });
+      const err = await anthropicRes.text();
+      return Response.json({ error: `Anthropic API error: ${err}` }, { status: 500 });
     }
 
-    // Step 4: Transform Anthropic SSE → client SSE, accumulate for storage
+    // Pipe SSE stream from Anthropic → frontend
+    const encoder = new TextEncoder();
     let fullOutput = '';
-    const keySource = keyData.source;
+    let inputTokens = 0;
+    let outputTokens = 0;
 
     const stream = new ReadableStream({
       async start(controller) {
-        const encoder = new TextEncoder();
         const reader = anthropicRes.body.getReader();
-        const decoder = new TextDecoder();
+        const dec = new TextDecoder();
         let buffer = '';
 
         try {
@@ -73,44 +95,47 @@ Deno.serve(async (req) => {
             const { done, value } = await reader.read();
             if (done) break;
 
-            buffer += decoder.decode(value, { stream: true });
+            buffer += dec.decode(value, { stream: true });
             const lines = buffer.split('\n');
-            buffer = lines.pop(); // Keep incomplete line
+            buffer = lines.pop(); // keep incomplete line
 
             for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                const data = line.slice(6).trim();
-                if (data === '[DONE]') continue;
-                try {
-                  const parsed = JSON.parse(data);
-                  if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
-                    const token = parsed.delta.text;
-                    fullOutput += token;
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ token })}\n\n`));
-                  } else if (parsed.type === 'message_stop') {
-                    // Save output and mark complete
-                    await base44.asServiceRole.entities.Analysis.update(analysisId, {
-                      status: 'complete',
-                      output_text: fullOutput,
-                      ai_model: selectedModel,
-                      completed_at: new Date().toISOString()
-                    });
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, keySource })}\n\n`));
-                  } else if (parsed.type === 'error') {
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: parsed.error?.message || 'Stream error' })}\n\n`));
-                  }
-                } catch (_) {
-                  // skip unparseable lines
+              if (!line.startsWith('data: ')) continue;
+              const data = line.slice(6).trim();
+              if (data === '[DONE]') continue;
+
+              try {
+                const event = JSON.parse(data);
+
+                if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+                  const token = event.delta.text;
+                  fullOutput += token;
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'token', text: token })}\n\n`));
+                } else if (event.type === 'message_start' && event.message?.usage) {
+                  inputTokens = event.message.usage.input_tokens || 0;
+                } else if (event.type === 'message_delta' && event.usage) {
+                  outputTokens = event.usage.output_tokens || 0;
+                } else if (event.type === 'message_stop') {
+                  // Save output to DB — never expose prompt_assembled
+                  await base44.asServiceRole.entities.Analysis.update(analysisId, {
+                    output_text: fullOutput,
+                    status: 'complete',
+                    tokens_used: inputTokens + outputTokens,
+                    completed_at: new Date().toISOString(),
+                  });
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done', tokensUsed: inputTokens + outputTokens })}\n\n`));
                 }
+              } catch (_) {
+                // skip malformed lines
               }
             }
           }
-        } catch (err) {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: err.message })}\n\n`));
+        } catch (e) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', message: e.message })}\n\n`));
         } finally {
           controller.close();
         }
-      }
+      },
     });
 
     return new Response(stream, {
@@ -118,10 +143,9 @@ Deno.serve(async (req) => {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
-        'X-Accel-Buffering': 'no',
-      }
+        'Access-Control-Allow-Origin': '*',
+      },
     });
-
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }

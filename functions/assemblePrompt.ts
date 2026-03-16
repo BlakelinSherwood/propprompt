@@ -1,73 +1,65 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
-// AES-256-CBC encryption using Web Crypto API
-async function encryptText(plaintext, keyHex) {
-  const encoder = new TextEncoder();
-  const keyBytes = encoder.encode(keyHex.padEnd(32).slice(0, 32));
-  const cryptoKey = await crypto.subtle.importKey(
-    'raw', keyBytes, { name: 'AES-CBC' }, false, ['encrypt']
+// AES-256-GCM encryption of the assembled prompt
+async function encryptPrompt(plaintext, keyStr) {
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    enc.encode(keyStr.padEnd(32, '0').slice(0, 32)),
+    { name: 'AES-GCM' },
+    false,
+    ['encrypt']
   );
-  const iv = crypto.getRandomValues(new Uint8Array(16));
-  const encrypted = await crypto.subtle.encrypt(
-    { name: 'AES-CBC', iv },
-    cryptoKey,
-    encoder.encode(plaintext)
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    keyMaterial,
+    enc.encode(plaintext)
   );
-  const combined = new Uint8Array(iv.byteLength + encrypted.byteLength);
-  combined.set(iv, 0);
-  combined.set(new Uint8Array(encrypted), iv.byteLength);
-  return btoa(String.fromCharCode(...combined));
+  // Store as base64(iv):base64(ciphertext)
+  const toB64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+  return `${toB64(iv)}:${toB64(ciphertext)}`;
 }
 
-function buildPrompt(analysis, promptParts, format) {
+function buildPrompt(analysis, prompts) {
+  const get = (section) => {
+    const p = prompts.find(p => p.prompt_section === section);
+    return p ? p.prompt_text : '';
+  };
+
   const intake = analysis.intake_data || {};
   const followup = analysis.followup_answers || {};
 
-  // Substitute intake data into template tokens
-  function fillTemplate(text) {
-    if (!text) return '';
-    return text
-      .replace(/\[PROPERTY_ADDRESS\]/g, intake.address || 'Not provided')
-      .replace(/\[PROPERTY_TYPE\]/g, analysis.property_type || '')
-      .replace(/\[LOCATION_CLASS\]/g, analysis.location_class || '')
-      .replace(/\[ASSESSMENT_TYPE\]/g, analysis.assessment_type || '')
-      .replace(/\[CLIENT_RELATIONSHIP\]/g, intake.client_relationship || '')
-      .replace(/\[OUTPUT_FORMAT\]/g, format || 'narrative')
-      .replace(/\[BEDROOMS\]/g, intake.bedrooms || '')
-      .replace(/\[BATHROOMS\]/g, intake.bathrooms || '')
-      .replace(/\[SQFT\]/g, intake.sqft || '')
-      .replace(/\[YEAR_BUILT\]/g, intake.year_built || '')
-      .replace(/\[LIST_PRICE\]/g, intake.list_price || 'Not specified')
-      .replace(/\[ADDITIONAL_NOTES\]/g, intake.additional_notes || 'None')
-      .replace(/\[FOLLOWUP_ANSWERS\]/g, JSON.stringify(followup, null, 2) || 'None');
-  }
+  // Replace common tokens
+  const replace = (text) => text
+    .replace(/\[ASSESSMENT_TYPE\]/g, analysis.assessment_type || '')
+    .replace(/\[PROPERTY_TYPE\]/g, analysis.property_type || '')
+    .replace(/\[LOCATION_CLASS\]/g, analysis.location_class || '')
+    .replace(/\[OUTPUT_FORMAT\]/g, analysis.output_format || 'narrative')
+    .replace(/\[ADDRESS\]/g, intake.address || '')
+    .replace(/\[CLIENT_RELATIONSHIP\]/g, intake.client_relationship || '')
+    .replace(/\[INTAKE_JSON\]/g, JSON.stringify(intake, null, 2))
+    .replace(/\[FOLLOWUP_JSON\]/g, JSON.stringify(followup, null, 2));
+
+  const formatModifier = {
+    narrative: 'Write in flowing, professional prose paragraphs. Use headers to organize sections.',
+    structured: 'Use a structured format with clear labeled sections, sub-sections, and data tables where applicable.',
+    bullets: 'Use concise bullet points and numbered lists throughout. Minimize prose.',
+  }[analysis.output_format] || '';
 
   const sections = [
-    'system_instructions',
-    'intake_template',
-    'followup_protocol',
-    'valuation_module',
-    'archetype_module',
-    'avm_module',
-    'listing_strategy_module',
-    'disclaimer_footer'
-  ];
+    replace(get('system_instructions')),
+    replace(get('intake_template')),
+    replace(get('valuation_module')),
+    replace(get('migration_module')),
+    replace(get('archetype_module')),
+    replace(get('avm_module')),
+    replace(get('listing_strategy_module')),
+    `\n\n## Output Format Instructions\n${formatModifier}`,
+    replace(get('disclaimer_footer')),
+  ].filter(Boolean).join('\n\n---\n\n');
 
-  const parts = sections
-    .map(section => promptParts[section])
-    .filter(Boolean)
-    .map(fillTemplate);
-
-  // Format modifier
-  const formatModifier = format === 'structured'
-    ? '\n\nOUTPUT FORMAT: Respond with clearly labeled sections using headers (##). Use tables where helpful.'
-    : format === 'bullets'
-    ? '\n\nOUTPUT FORMAT: Respond primarily in bullet points and sub-bullets. Keep each point concise.'
-    : '\n\nOUTPUT FORMAT: Respond in flowing narrative paragraphs with professional real estate language.';
-
-  parts.splice(-1, 0, formatModifier); // Insert before disclaimer
-
-  return parts.join('\n\n---\n\n');
+  return sections;
 }
 
 Deno.serve(async (req) => {
@@ -84,53 +76,71 @@ Deno.serve(async (req) => {
     const analysis = analyses[0];
     if (!analysis) return Response.json({ error: 'Analysis not found' }, { status: 404 });
 
-    // Load prompt library parts for this assessment/property combo
-    const promptRecords = await base44.asServiceRole.entities.PromptLibrary.filter({
+    // Authorization: only the owner or an admin can assemble
+    if (analysis.run_by_email !== user.email && user.role !== 'platform_owner' && user.role !== 'brokerage_admin') {
+      return Response.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    // Load matching prompts from prompt_library
+    const prompts = await base44.asServiceRole.entities.PromptLibrary.filter({
       assessment_type: analysis.assessment_type,
-      is_active: true
+      is_active: true,
     });
 
-    // Build a map: section → text (prefer property-specific over 'all')
-    const promptMap = {};
-    for (const rec of promptRecords) {
-      if (rec.property_type === analysis.property_type || rec.property_type === 'all') {
-        // property-specific takes priority
-        if (!promptMap[rec.prompt_section] || rec.property_type === analysis.property_type) {
-          promptMap[rec.prompt_section] = rec.prompt_text;
-        }
-      }
+    // Also load generic/all property_type prompts
+    const genericPrompts = await base44.asServiceRole.entities.PromptLibrary.filter({
+      property_type: 'all',
+      is_active: true,
+    });
+
+    const allPrompts = [...prompts, ...genericPrompts];
+
+    // If no prompts in library yet, build a sensible default prompt
+    let assembled;
+    if (allPrompts.length === 0) {
+      const intake = analysis.intake_data || {};
+      const followup = analysis.followup_answers || {};
+      assembled = `You are PropPrompt™ v3.0 — an AI-calibrated real estate analysis engine for Eastern Massachusetts developed by Sherwood & Company.
+
+## Analysis Request
+- Assessment Type: ${analysis.assessment_type}
+- Property Type: ${analysis.property_type}
+- Location Class: ${analysis.location_class || 'Not specified'}
+- Output Format: ${analysis.output_format || 'narrative'}
+- Client Relationship: ${intake.client_relationship || 'Not specified'}
+
+## Property Details
+${JSON.stringify(intake, null, 2)}
+
+## Follow-Up Context
+${Object.keys(followup).length > 0 ? JSON.stringify(followup, null, 2) : 'No follow-up answers provided.'}
+
+## Instructions
+Provide a comprehensive, professional real estate analysis based on the above data. Apply Eastern Massachusetts market expertise, current market conditions, and relevant comparable analysis frameworks.
+
+---
+**DISCLAIMER:** This analysis is generated by artificial intelligence and is intended solely as a professional research aid for licensed real estate practitioners. It does not constitute an appraisal, a Broker Price Opinion (BPO), or legal advice. All figures, valuations, and recommendations must be independently verified by the agent/broker of record before use in any client-facing communication. Sherwood & Company and its affiliates assume no liability for decisions made based on AI-generated content. © 2026 Sherwood & Company. PropPrompt™ is a proprietary system.`;
+    } else {
+      assembled = buildPrompt(analysis, allPrompts);
     }
 
-    // If no prompts found in library, use a built-in fallback system prompt
-    if (Object.keys(promptMap).length === 0) {
-      promptMap['system_instructions'] = `You are PropPrompt™, an AI-Calibrated Real Estate Analysis System developed for Sherwood & Company, Brokered by Compass, specializing in Eastern Massachusetts real estate markets. You provide professional, data-informed analysis for licensed real estate agents. You are bound by all applicable Fair Housing laws and Massachusetts real estate regulations. Never make statements about neighborhood demographics, school quality in relation to demographics, or any language that could constitute steering.`;
-      promptMap['intake_template'] = `PROPERTY ANALYSIS REQUEST\n\nProperty Address: [PROPERTY_ADDRESS]\nProperty Type: [PROPERTY_TYPE]\nLocation Classification: [LOCATION_CLASS]\nAssessment Type: [ASSESSMENT_TYPE]\nClient Relationship: [CLIENT_RELATIONSHIP]\nBedrooms: [BEDROOMS] | Bathrooms: [BATHROOMS]\nSquare Footage: [SQFT] | Year Built: [YEAR_BUILT]\nList Price / Target: [LIST_PRICE]\nAdditional Notes: [ADDITIONAL_NOTES]`;
-      promptMap['followup_protocol'] = `FOLLOW-UP CONTEXT:\n[FOLLOWUP_ANSWERS]`;
-      promptMap['valuation_module'] = `Provide a thorough valuation analysis based on the property details above. Include comparable sales analysis, market trend assessment, and price positioning recommendations specific to the Eastern Massachusetts market and the [LOCATION_CLASS] location class.`;
-      promptMap['disclaimer_footer'] = `---\n**DISCLAIMER:** This AI-generated analysis is provided for informational purposes only and does not constitute legal, financial, or professional real estate advice. All valuations and recommendations should be verified by a licensed real estate professional. PropPrompt™ analyses are tools to augment, not replace, professional judgment. This analysis was generated by PropPrompt™ v3.0 for Sherwood & Company, Brokered by Compass.`;
-    }
+    // Encrypt the prompt before storing
+    const encKey = Deno.env.get('ENCRYPTION_KEY') || '';
+    const encryptedPrompt = await encryptPrompt(assembled, encKey);
 
-    const assembled = buildPrompt(analysis, promptMap, analysis.output_format);
-
-    // Encrypt before storing
-    const encryptionKey = Deno.env.get('ENCRYPTION_KEY');
-    const encrypted = await encryptText(assembled, encryptionKey);
-
-    // Store encrypted prompt, update status
+    // Store encrypted prompt and update status
     await base44.asServiceRole.entities.Analysis.update(analysisId, {
-      prompt_assembled: encrypted,
-      status: 'in_progress'
+      prompt_assembled: encryptedPrompt,
+      status: 'in_progress',
     });
 
-    // Return the PLAIN prompt only to this authorized server call — never expose to frontend directly
-    // The claudeStream function will call this and receive the plaintext
-    return Response.json({ 
-      success: true, 
-      prompt: assembled,  // returned only to server-to-server calls
-      systemPrompt: promptMap['system_instructions'] || '',
-      userPrompt: assembled.replace(promptMap['system_instructions'] || '', '').trim()
+    // Return a confirmation token (not the prompt itself)
+    return Response.json({
+      success: true,
+      analysisId,
+      status: 'in_progress',
+      promptSections: allPrompts.length,
     });
-
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }

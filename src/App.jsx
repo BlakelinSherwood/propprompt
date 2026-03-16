@@ -12,6 +12,7 @@ import Members from './pages/Members';
 import PlatformAdmin from './pages/PlatformAdmin';
 import NewAnalysis from './pages/NewAnalysis';
 import AnalysisDetail from './pages/AnalysisDetail';
+import AnalysisRun from './pages/AnalysisRun';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
