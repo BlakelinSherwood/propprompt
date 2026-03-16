@@ -145,15 +145,14 @@ Deno.serve(async (req) => {
     });
 
     // Execute push
-    let result;
+    let result = null;
     try {
-      switch (conn.crm_provider) {
-        case 'follow_up_boss': result = await pushToFollowUpBoss(conn, analysis, summary); break;
-        case 'kvcore':         result = await pushToKvcore(conn, analysis, summary); break;
-        case 'salesforce':     result = await pushToSalesforce(conn, analysis, summary); break;
-        case 'lofty':          result = await pushToLofty(conn, analysis, summary); break;
-        default: throw new Error(`Unknown CRM provider: ${conn.crm_provider}`);
-      }
+      const provider = conn.crm_provider;
+      if (provider === 'follow_up_boss') result = await pushToFollowUpBoss(conn, analysis, summary);
+      else if (provider === 'kvcore') result = await pushToKvcore(conn, analysis, summary);
+      else if (provider === 'salesforce') result = await pushToSalesforce(conn, analysis, summary);
+      else if (provider === 'lofty') result = await pushToLofty(conn, analysis, summary);
+      else throw new Error(`Unknown CRM provider: ${provider}`);
     } catch (pushErr) {
       console.error(`[crmPush] Push error for ${conn.crm_provider}:`, pushErr);
       await base44.asServiceRole.entities.CrmPushLog.update(log.id, {
