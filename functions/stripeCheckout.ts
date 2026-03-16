@@ -15,11 +15,11 @@ Deno.serve(async (req) => {
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       line_items: [{ price: price_id, quantity: 1 }],
-      mode: price_id.startsWith("price_1TBhHSPxCu5z2jl1KO2") ||
-            price_id.startsWith("price_1TBhHRPxCu5z2jl1CS") ||
-            price_id.startsWith("price_1TBhHSPxCu5z2jl1Lpq")
-        ? "payment"
-        : "subscription",
+      mode: [
+        "price_1TBhejF8FK2SYLZUMEp2wWPz",
+        "price_1TBhejF8FK2SYLZUID3SdPfo",
+        "price_1TBhejF8FK2SYLZUAb1MfMbK"
+      ].includes(price_id) ? "payment" : "subscription",
       success_url: success_url || `${req.headers.get("origin")}/Billing?success=1`,
       cancel_url: cancel_url || `${req.headers.get("origin")}/Billing?canceled=1`,
       metadata: {

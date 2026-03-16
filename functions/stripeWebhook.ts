@@ -13,18 +13,18 @@ const ROLE_QUOTA = {
 
 // Price → product metadata map (hardcoded price IDs)
 const PRICE_META = {
-  "price_1TBhHSPxCu5z2jl196ENxBaz": { role: "brokerage_admin", plan: "brokerage_admin_seat" },
-  "price_1TBhHSPxCu5z2jl1q0RgV73T": { role: "team_lead",       plan: "team_lead_seat" },
-  "price_1TBhHSPxCu5z2jl1zHQjECgx": { role: "agent",           plan: "agent_seat" },
-  "price_1TBhHSPxCu5z2jl1UJgLYOYc": { role: "assistant",       plan: "assistant_seat" },
-  "price_1TBhHSPxCu5z2jl11qXgCzrm": { role: null,              plan: "brokerage_license" },
-  "price_1TBhHSPxCu5z2jl1Tz4NeQix": { role: null,              plan: "team_license" },
+  "price_1TBhejF8FK2SYLZURefHB3TX": { role: "brokerage_admin", plan: "brokerage_admin_seat" },
+  "price_1TBhejF8FK2SYLZUplITgfKk": { role: "team_lead",       plan: "team_lead_seat" },
+  "price_1TBhejF8FK2SYLZUE4imcOoB": { role: "agent",           plan: "agent_seat" },
+  "price_1TBhejF8FK2SYLZUSE3t8zz6": { role: "assistant",       plan: "assistant_seat" },
+  "price_1TBhejF8FK2SYLZUHUHlr95S": { role: null,              plan: "brokerage_license" },
+  "price_1TBhejF8FK2SYLZUU7nYtlWJ": { role: null,              plan: "team_license" },
 };
 
 const OVERAGE_PACKS = {
-  "price_1TBhHSPxCu5z2jl1KO2WXIjV": 10,
-  "price_1TBhHRPxCu5z2jl1CStSQCYo": 25,
-  "price_1TBhHSPxCu5z2jl1Lpq2Y131": 50,
+  "price_1TBhejF8FK2SYLZUMEp2wWPz": 10,
+  "price_1TBhejF8FK2SYLZUID3SdPfo": 25,
+  "price_1TBhejF8FK2SYLZUAb1MfMbK": 50,
 };
 
 Deno.serve(async (req) => {

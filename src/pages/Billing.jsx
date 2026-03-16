@@ -10,7 +10,7 @@ const PLANS = [
     name: "Brokerage License",
     price: 199,
     interval: "month",
-    priceId: "price_1TBhHSPxCu5z2jl11qXgCzrm",
+    priceId: "price_1TBhejF8FK2SYLZUHUHlr95S",
     icon: Building2,
     description: "Full brokerage platform access",
     features: ["Unlimited agents", "Fair housing compliance", "CRM integrations", "White-label branding"],
@@ -20,7 +20,7 @@ const PLANS = [
     name: "Standalone Team License",
     price: 99,
     interval: "month",
-    priceId: "price_1TBhHSPxCu5z2jl1Tz4NeQix",
+    priceId: "price_1TBhejF8FK2SYLZUU7nYtlWJ",
     icon: Users,
     description: "For independent teams",
     features: ["Up to 10 agents", "Team dashboard", "Analyses history", "Drive sync"],
@@ -28,16 +28,16 @@ const PLANS = [
 ];
 
 const SEATS = [
-  { id: "brokerage_admin_seat", name: "Brokerage Admin Seat", price: 99, priceId: "price_1TBhHSPxCu5z2jl196ENxBaz", quota: 60 },
-  { id: "team_lead_seat",       name: "Team Lead Seat",       price: 79, priceId: "price_1TBhHSPxCu5z2jl1q0RgV73T", quota: 40 },
-  { id: "agent_seat",           name: "Agent Seat",           price: 49, priceId: "price_1TBhHSPxCu5z2jl1zHQjECgx", quota: 20 },
-  { id: "assistant_seat",       name: "Assistant Seat",       price: 29, priceId: "price_1TBhHSPxCu5z2jl1UJgLYOYc", quota: null },
+  { id: "brokerage_admin_seat", name: "Brokerage Admin Seat", price: 99, priceId: "price_1TBhejF8FK2SYLZURefHB3TX", quota: 60 },
+  { id: "team_lead_seat",       name: "Team Lead Seat",       price: 79, priceId: "price_1TBhejF8FK2SYLZUplITgfKk", quota: 40 },
+  { id: "agent_seat",           name: "Agent Seat",           price: 49, priceId: "price_1TBhejF8FK2SYLZUE4imcOoB", quota: 20 },
+  { id: "assistant_seat",       name: "Assistant Seat",       price: 29, priceId: "price_1TBhejF8FK2SYLZUSE3t8zz6", quota: null },
 ];
 
 const OVERAGE_PACKS = [
-  { name: "10 Analyses",  price: 29,  priceId: "price_1TBhHSPxCu5z2jl1KO2WXIjV", analyses: 10 },
-  { name: "25 Analyses",  price: 59,  priceId: "price_1TBhHRPxCu5z2jl1CStSQCYo", analyses: 25, popular: true },
-  { name: "50 Analyses",  price: 99,  priceId: "price_1TBhHSPxCu5z2jl1Lpq2Y131", analyses: 50 },
+  { name: "10 Analyses",  price: 29,  priceId: "price_1TBhejF8FK2SYLZUMEp2wWPz", analyses: 10 },
+  { name: "25 Analyses",  price: 59,  priceId: "price_1TBhejF8FK2SYLZUID3SdPfo", analyses: 25, popular: true },
+  { name: "50 Analyses",  price: 99,  priceId: "price_1TBhejF8FK2SYLZUAb1MfMbK", analyses: 50 },
 ];
 
 export default function Billing() {
