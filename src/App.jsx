@@ -19,6 +19,7 @@ import Landing from './pages/Landing';
 import BrokerageAdmin from './pages/BrokerageAdmin';
 import TeamAdmin from './pages/TeamAdmin';
 import AccountSettings from './pages/AccountSettings';
+import AgentBranding from './pages/AgentBranding';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
