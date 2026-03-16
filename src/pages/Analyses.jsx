@@ -73,7 +73,10 @@ export default function Analyses() {
       ) : (
         <div className="rounded-2xl border border-[#1A3226]/10 bg-white overflow-hidden">
           {analyses.map((a, i) => (
-            <div key={a.id} className={`flex items-center gap-4 px-5 py-4 hover:bg-[#FAF8F4]/50 transition-colors ${i !== analyses.length - 1 ? "border-b border-[#1A3226]/5" : ""}`}>
+            <div
+              key={a.id}
+              className={`flex items-center gap-4 px-5 py-4 hover:bg-[#FAF8F4]/50 transition-colors ${i !== analyses.length - 1 ? "border-b border-[#1A3226]/5" : ""}`}
+            >
               <div className="w-9 h-9 rounded-lg bg-[#1A3226]/5 flex items-center justify-center flex-shrink-0">
                 <FileText className="w-4 h-4 text-[#1A3226]/40" />
               </div>
@@ -82,10 +85,13 @@ export default function Analyses() {
                   {a.intake_data?.address || "Untitled Analysis"}
                 </p>
                 <p className="text-xs text-[#1A3226]/40 mt-0.5">
-                  {TYPE_LABELS[a.assessment_type] || a.assessment_type} · {a.ai_platform} · {new Date(a.created_date).toLocaleDateString()}
+                  {TYPE_LABELS[a.assessment_type] || a.assessment_type} · {a.ai_platform} ·{" "}
+                  {new Date(a.created_date).toLocaleDateString()}
                 </p>
               </div>
-              <span className={`text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-full font-semibold flex-shrink-0 ${STATUS_STYLES[a.status] || STATUS_STYLES.draft}`}>
+              <span
+                className={`text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-full font-semibold flex-shrink-0 ${STATUS_STYLES[a.status] || STATUS_STYLES.draft}`}
+              >
                 {a.status}
               </span>
             </div>
