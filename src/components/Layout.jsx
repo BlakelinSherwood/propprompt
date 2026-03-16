@@ -9,7 +9,7 @@ import {
   X,
   Shield,
   FileText,
-  Plus
+  PlusCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -38,6 +38,7 @@ export default function Layout() {
 
   const navItems = [
     { label: "Dashboard", path: "/Dashboard", icon: LayoutDashboard },
+    { label: "New Analysis", path: "/NewAnalysis", icon: PlusCircle },
     { label: "Analyses", path: "/Analyses", icon: FileText },
     ...(isAdmin
       ? [{ label: "Members", path: "/Members", icon: Users }]
