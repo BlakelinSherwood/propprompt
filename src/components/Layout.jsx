@@ -10,11 +10,13 @@ import {
   Shield,
   FileText,
   PlusCircle,
-  CreditCard
+  CreditCard,
+  Settings
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import FairHousingOverdueBanner from "./FairHousingOverdueBanner";
 import PrivacyNoticeModal from "./PrivacyNoticeModal";
+import ChatbotDrawer from "./ChatbotDrawer";
 
 const PLATFORM_OWNER_EMAIL = "blake.sherwood@compass.com";
 
@@ -52,7 +54,7 @@ export default function Layout() {
     ...(user?.role === "platform_owner"
       ? [{ label: "Platform Admin", path: "/PlatformAdmin", icon: Shield }]
       : []),
-    // Brokerage/Team admin links are accessed via org cards in Dashboard, not sidebar nav
+    { label: "Account", path: "/AccountSettings", icon: Settings },
   ];
 
   const handleLogout = () => {
@@ -176,6 +178,7 @@ export default function Layout() {
           <div className="p-4 lg:p-8 max-w-7xl mx-auto">
             <FairHousingOverdueBanner user={user} />
             <Outlet />
+            <ChatbotDrawer user={user} />
           </div>
         </main>
       

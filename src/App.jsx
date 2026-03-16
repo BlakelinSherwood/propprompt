@@ -18,6 +18,7 @@ import Billing from './pages/Billing';
 import Landing from './pages/Landing';
 import BrokerageAdmin from './pages/BrokerageAdmin';
 import TeamAdmin from './pages/TeamAdmin';
+import AccountSettings from './pages/AccountSettings';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -59,6 +60,7 @@ const AuthenticatedApp = () => {
         <Route path="/Billing" element={<Billing />} />
         <Route path="/brokerage/:id/admin" element={<BrokerageAdmin />} />
         <Route path="/team/:id/admin" element={<TeamAdmin />} />
+        <Route path="/AccountSettings" element={<AccountSettings />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
