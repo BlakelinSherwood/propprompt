@@ -157,11 +157,7 @@ export default function AnalysisRun() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleEmail = () => {
-    const subject = encodeURIComponent(`PropPrompt™ ${ASSESSMENT_LABELS[analysis?.assessment_type] || "Analysis"}`);
-    const body = encodeURIComponent(output.substring(0, 2000) + "\n\n[Full analysis attached]");
-    window.open(`mailto:?subject=${subject}&body=${body}`);
-  };
+
 
   // Server-side branded PDF (white-label)
   const handleDownloadPdf = async () => {
@@ -368,6 +364,42 @@ export default function AnalysisRun() {
               </div>
             </div>
           )}
+        </div>
+      )}
+      {/* Email Dialog */}
+      {emailDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-xl p-7 w-full max-w-sm space-y-4">
+            <h3 className="text-base font-semibold text-[#1A3226]">Send Analysis Report</h3>
+            <p className="text-xs text-[#1A3226]/50">The report will be sent with your brokerage/team branding. A PDF will be attached if available.</p>
+            <div>
+              <label className="text-xs font-medium text-[#1A3226]/70 block mb-1">Recipient Email</label>
+              <input
+                type="email"
+                value={emailTo}
+                onChange={e => setEmailTo(e.target.value)}
+                placeholder="client@email.com"
+                className="w-full border border-[#1A3226]/20 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#1A3226]/30"
+                onKeyDown={e => e.key === "Enter" && handleSendEmail()}
+              />
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setEmailDialogOpen(false)}
+                className="text-sm text-[#1A3226]/50 hover:text-[#1A3226] px-3 py-1.5"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSendEmail}
+                disabled={!emailTo || emailSending || emailSent}
+                className="flex items-center gap-2 bg-[#1A3226] text-white text-sm px-5 py-2 rounded-lg disabled:opacity-50 hover:bg-[#1A3226]/90 transition-colors"
+              >
+                {emailSending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : emailSent ? <CheckCircle className="w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />}
+                {emailSent ? "Sent!" : "Send"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
