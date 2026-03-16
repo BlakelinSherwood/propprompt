@@ -67,8 +67,8 @@ function App() {
         <Router>
           <Routes>
             <Route path="/home" element={<Landing />} />
+            <Route path="*" element={<AuthenticatedApp />} />
           </Routes>
-          <AuthenticatedApp />
         </Router>
         <Toaster />
       </QueryClientProvider>
