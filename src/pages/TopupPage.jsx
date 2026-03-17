@@ -7,7 +7,7 @@ import { Elements, CardElement, useStripe, useElements } from "@stripe/react-str
 import { Loader2, ShoppingCart, Lock, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+const stripePromise = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ? loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY) : Promise.resolve(null);
 
 function CheckoutForm({ pack, clientSecret, paymentIntentId, subscriptionId, bundleId, onSuccess, onCancel }) {
   const stripe = useStripe();

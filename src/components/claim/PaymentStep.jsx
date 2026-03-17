@@ -6,7 +6,7 @@ import { Elements, CardElement, useStripe, useElements } from "@stripe/react-str
 import { Lock, Loader2 } from "lucide-react";
 import PaymentTrustBlock from "./PaymentTrustBlock";
 
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+const stripePromise = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ? loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY) : Promise.resolve(null);
 
 function CardForm({ clientSecret, setupIntentId, onSuccess, onBack, summary, autoApproveHours }) {
   const stripe = useStripe();
