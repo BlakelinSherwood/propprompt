@@ -9,9 +9,18 @@ export function usePricing() {
 
   const load = useCallback(async (force = false) => {
     setLoading(true);
-    const res = await base44.functions.invoke('getPricingConfig', { force_refresh: force });
-    _cache = res.data.pricing;
-    setPricing(_cache);
+    try {
+      const res = await base44.functions.invoke('getPricingConfig', { force_refresh: force });
+      if (res.data?.pricing) {
+        _cache = res.data.pricing;
+        setPricing(_cache);
+      }
+    } catch (err) {
+      console.warn('[usePricing] Could not load pricing config:', err.message);
+      // Fall back to empty object — components should handle missing values gracefully
+      if (!_cache) _cache = {};
+      setPricing(_cache);
+    }
     setLoading(false);
     return _cache;
   }, []);
