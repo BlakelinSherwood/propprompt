@@ -23,6 +23,21 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'format must be pdf, pptx, or email' }, { status: 400 });
     }
 
+    // Tier enforcement: PPTX requires Pro or Team plan
+    if (format === 'pptx') {
+      const memberships = await base44.asServiceRole.entities.OrgMembership.filter({ user_email: user.email, status: 'active' });
+      if (memberships.length > 0) {
+        const orgId = memberships[0].org_id;
+        const orgs = await base44.asServiceRole.entities.Organization.filter({ id: orgId });
+        const org = orgs[0];
+        const allowedPlans = ['team', 'brokerage', 'enterprise'];
+        if (!org || !allowedPlans.includes(org.subscription_plan)) {
+          console.warn(`[generateDocuments] PPTX blocked for user ${user.email} — plan: ${org?.subscription_plan}`);
+          return Response.json({ error: 'PPTX export requires a Pro or Team plan. Please upgrade to access this feature.' }, { status: 403 });
+        }
+      }
+    }
+
     // 1. Resolve branding
     const brandingRes = await base44.functions.invoke('resolveBranding', { analysisId });
     const branding = brandingRes?.data?.branding;
