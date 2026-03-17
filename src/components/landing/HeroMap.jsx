@@ -29,18 +29,18 @@ export default function HeroMap() {
   return (
     <div className="relative w-full h-full opacity-30 select-none pointer-events-none">
       <svg viewBox="0 0 380 380" className="w-full h-full" fill="none">
-        {/* ME rough outline */}
-        <path d="M120,40 L270,40 L290,80 L270,110 L280,150 L250,170 L240,200 L200,210 L180,240 L160,230 L140,200 L100,180 L80,140 L90,90 Z"
-          fill="#1A3226" stroke="#B8982F" strokeWidth="0.8" strokeOpacity="0.4" fillOpacity="0.3" />
-        {/* NH outline */}
-        <path d="M100,180 L140,200 L160,230 L155,280 L120,295 L90,270 L80,230 L80,200 Z"
-          fill="#1A3226" stroke="#B8982F" strokeWidth="0.8" strokeOpacity="0.4" fillOpacity="0.3" />
-        {/* VT outline */}
-        <path d="M60,185 L80,200 L80,230 L90,270 L70,290 L40,270 L30,230 L35,200 L50,190 Z"
-          fill="#1A3226" stroke="#B8982F" strokeWidth="0.8" strokeOpacity="0.4" fillOpacity="0.3" />
-        {/* MA outline */}
-        <path d="M70,295 L155,290 L165,305 L145,330 L110,340 L65,335 L55,320 L65,305 Z"
-          fill="#1A3226" stroke="#B8982F" strokeWidth="0.8" strokeOpacity="0.4" fillOpacity="0.3" />
+        {/* ME accurate outline */}
+        <path d="M165,35 Q200,40 245,50 Q265,55 275,75 Q280,95 275,130 Q270,155 255,165 Q240,172 225,178 Q210,185 200,200 Q190,215 180,225 Q165,235 155,230 Q145,215 140,195 Q135,170 130,145 Q128,120 130,95 Q135,70 145,55 Q155,42 165,35 Z"
+          fill="#1A3226" stroke="#B8982F" strokeWidth="1" strokeOpacity="0.5" fillOpacity="0.35" />
+        {/* NH accurate outline */}
+        <path d="M110,165 Q130,175 155,185 Q165,190 170,210 Q172,245 160,280 Q150,295 125,300 Q100,300 85,285 Q75,270 75,240 Q78,210 85,190 Q95,170 110,165 Z"
+          fill="#1A3226" stroke="#ef4444" strokeWidth="1" strokeOpacity="0.5" fillOpacity="0.35" />
+        {/* VT accurate outline */}
+        <path d="M75,165 Q85,170 95,180 Q100,190 95,225 Q90,265 80,285 Q70,300 50,305 Q40,300 35,280 Q32,250 35,220 Q40,190 50,175 Q60,165 75,165 Z"
+          fill="#1A3226" stroke="#22c55e" strokeWidth="1" strokeOpacity="0.5" fillOpacity="0.35" />
+        {/* MA accurate outline */}
+        <path d="M85,285 Q115,290 160,295 Q170,300 168,315 Q160,335 140,345 Q110,350 75,340 Q50,332 45,315 Q50,300 85,285 Z"
+          fill="#1A3226" stroke="#f59e0b" strokeWidth="1" strokeOpacity="0.5" fillOpacity="0.35" />
         {/* Grid lines */}
         {[80, 120, 160, 200, 240, 280].map(y => (
           <line key={`h${y}`} x1="20" y1={y} x2="310" y2={y} stroke="white" strokeWidth="0.3" strokeOpacity="0.08" />
