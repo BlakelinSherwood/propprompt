@@ -1,10 +1,10 @@
 import { Clock, CheckCircle, XCircle, Layers, Grid3X3, Shield, AlertTriangle } from "lucide-react";
 
-function StatCard({ icon: Icon, label, value, color = "text-[#1A3226]", bg = "bg-white" }) {
+function StatCard({ icon: StatIcon, label, value, color = "text-[#1A3226]", bg = "bg-white" }) {
   return (
     <div className={`${bg} rounded-xl border border-[#1A3226]/10 p-4 flex items-start gap-3`}>
       <div className="w-9 h-9 rounded-lg bg-[#1A3226]/5 flex items-center justify-center flex-shrink-0">
-        <Icon className={`w-4 h-4 ${color}`} />
+        <StatIcon className={`w-4 h-4 ${color}`} />
       </div>
       <div>
         <p className="text-2xl font-bold text-[#1A3226]">{value}</p>
