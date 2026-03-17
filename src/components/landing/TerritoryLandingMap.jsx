@@ -115,8 +115,8 @@ export default function TerritoryLandingMap() {
     <div className="space-y-4">
       <div
         ref={mapContainer}
-        className="w-full rounded-2xl overflow-hidden"
-        style={{ height: "420px" }}
+        className="w-full rounded-2xl overflow-hidden bg-gradient-to-br from-[#1A3226] to-[#2D5A40]"
+        style={{ height: "420px", minHeight: "420px" }}
       />
       <div className="text-center">
         <a
