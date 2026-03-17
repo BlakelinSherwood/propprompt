@@ -459,13 +459,15 @@ export default function Landing() {
       <footer className="bg-[#1A3226]/95 text-white py-12">
         <div className="max-w-6xl mx-auto px-6">
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-10">
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-7 h-7 rounded-md bg-[#B8982F] flex items-center justify-center text-[#1A3226] font-bold text-xs">PP</div>
-                <span className="font-semibold text-white">PropPrompt™</span>
-              </div>
-              <p className="text-xs text-white/40 leading-relaxed">by Sherwood & Company<br />Brokered by Compass</p>
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-7 h-7 rounded-md bg-[#B8982F] flex items-center justify-center text-[#1A3226] font-bold text-xs">PP</div>
+              <span className="font-semibold text-white">PropPrompt™</span>
             </div>
+            <p className="text-xs text-white/40 leading-relaxed">
+              {founder ? `Founded by ${founder.founder_name}, Licensed Real Estate Broker — ${founder.licensed_states?.join(' · ') || 'MA, NH, ME, VT'}` : 'by Sherwood & Company'}
+            </p>
+          </div>
             <div>
               <p className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-3">Product</p>
               <div className="space-y-2">
