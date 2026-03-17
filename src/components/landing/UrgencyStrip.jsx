@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Zap } from "lucide-react";
 
 export default function UrgencyStrip() {
   const [stats, setStats] = useState({ claimed: null, available: null });
