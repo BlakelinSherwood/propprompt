@@ -206,9 +206,9 @@ export default function Landing() {
                 </li>
               ))}
             </ul>
-            <a href="/app/Territories" className="inline-flex items-center gap-2 text-sm font-semibold text-[#1A3226] hover:text-[#B8982F] transition-colors">
+            <Link to="/territories" className="inline-flex items-center gap-2 text-sm font-semibold text-[#1A3226] hover:text-[#B8982F] transition-colors">
               See full territory map → 
-            </a>
+            </Link>
 
             {/* MA note */}
             <div className="rounded-xl border border-[#B8982F]/30 bg-[#B8982F]/5 p-4 space-y-2">
@@ -313,9 +313,9 @@ export default function Landing() {
             ))}
           </div>
           <div className="text-center">
-            <Link to="/territories" className="inline-flex items-center gap-2 bg-[#B8982F] text-[#1A3226] font-bold px-7 py-3.5 rounded-xl hover:bg-[#B8982F]/90 transition-colors">
+            <a href="/app/Territories" className="inline-flex items-center gap-2 bg-[#B8982F] text-[#1A3226] font-bold px-7 py-3.5 rounded-xl hover:bg-[#B8982F]/90 transition-colors">
               Start Your Territory <ArrowRight className="w-4 h-4" />
-            </Link>
+            </a>
           </div>
         </div>
       </section>
