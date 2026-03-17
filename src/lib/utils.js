@@ -6,4 +6,7 @@ export function cn(...inputs) {
 } 
 
 
-export const isIframe = window.self !== window.top;
+export const isIframe = (() => {
+  try { return window.self !== window.top; }
+  catch { return true; }
+})();

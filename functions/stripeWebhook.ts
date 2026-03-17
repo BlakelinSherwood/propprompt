@@ -67,14 +67,16 @@ Deno.serve(async (req) => {
         // Handle overage pack (one-time)
         if (OVERAGE_PACKS[priceId]) {
           const extraAnalyses = OVERAGE_PACKS[priceId];
-          const quotas = await base44.asServiceRole.entities.SeatQuota.filter({ org_id: orgId });
-          if (quotas.length > 0) {
-            const q = quotas[0];
-            await base44.asServiceRole.entities.SeatQuota.update(q.id, {
-              analyses_included_per_seat_monthly: (q.analyses_included_per_seat_monthly || 0) + extraAnalyses,
-            });
-          }
-          console.log(`Overage pack applied: +${extraAnalyses} analyses for org ${orgId}`);
+          await base44.asServiceRole.entities.TopupPack.create({
+            org_id: orgId,
+            analyses_remaining: extraAnalyses,
+            analyses_total: extraAnalyses,
+            source: 'overage_pack',
+            stripe_payment_intent_id: session.payment_intent,
+            expires_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
+            created_at: new Date().toISOString(),
+          });
+          console.log(`Overage pack created: +${extraAnalyses} analyses for org ${orgId}`);
           break;
         }
 
