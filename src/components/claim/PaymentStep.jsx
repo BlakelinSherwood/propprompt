@@ -3,6 +3,16 @@ import { Button } from "@/components/ui/button";
 import { base44 } from "@/api/base44Client";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
+
+let cachedStripePromise = null;
+let cachedStripeKey = null;
+function getStripePromise(publishableKey) {
+  if (cachedStripeKey !== publishableKey) {
+    cachedStripePromise = loadStripe(publishableKey);
+    cachedStripeKey = publishableKey;
+  }
+  return cachedStripePromise;
+}
 import { Lock, Loader2 } from "lucide-react";
 import PaymentTrustBlock from "./PaymentTrustBlock";
 
@@ -97,6 +107,7 @@ export default function PaymentStep({ onSuccess, onBack, summary, pricing }) {
       const { clientSecret, setupIntentId } = res.data;
       setClientSecret(clientSecret);
       setSetupIntentId(setupIntentId);
+      setStripePromise(getStripePromise(publishableKey));
     }).catch(err => setLoadError(err.message));
   }, []);
 

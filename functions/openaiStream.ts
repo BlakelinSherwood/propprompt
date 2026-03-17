@@ -75,7 +75,6 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Prompt not assembled. Call assemblePrompt first.' }, { status: 400 });
     }
 
-    const encKey = Deno.env.get('ENCRYPTION_KEY') || '';
     const promptText = analysis.prompt_assembled;
 
     const effectiveOrgId = orgId || analysis.org_id;
@@ -141,14 +140,10 @@ Deno.serve(async (req) => {
         completed_at: new Date().toISOString(),
       });
 
-      // Deduct quota
       try {
-        await base44.functions.invoke("deductAnalysisQuota", {
-          analysisId,
-          orgId: analysis.org_id,
-        });
+        await base44.functions.invoke("deductAnalysisQuota", { analysisId, orgId: analysis.org_id });
       } catch (e) {
-        console.warn("[openaiStream o3] quota deduction failed:", e.message);
+        console.warn("[openaiStream] quota deduction failed:", e.message);
       }
 
       // Emit full output in chunks so frontend stream consumer works
@@ -190,25 +185,19 @@ Deno.serve(async (req) => {
               const data = line.slice(6).trim();
               if (data === '[DONE]') {
                 await base44.asServiceRole.entities.Analysis.update(analysisId, {
-                   output_text: fullOutput,
-                   status: 'complete',
-                   tokens_used: tokensUsed,
-                   ai_model: selectedModel,
-                   completed_at: new Date().toISOString(),
-                 });
-
-                 // Deduct quota
-                 try {
-                   await base44.functions.invoke("deductAnalysisQuota", {
-                     analysisId,
-                     orgId: analysis.org_id,
-                   });
-                 } catch (e) {
-                   console.warn("[openaiStream gpt-4o] quota deduction failed:", e.message);
-                 }
-
-                 controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, keySource: keyResult.source, model: selectedModel })}\n\n`));
-                 continue;
+                  output_text: fullOutput,
+                  status: 'complete',
+                  tokens_used: tokensUsed,
+                  ai_model: selectedModel,
+                  completed_at: new Date().toISOString(),
+                });
+                try {
+                  await base44.functions.invoke("deductAnalysisQuota", { analysisId, orgId: analysis.org_id });
+                } catch (e) {
+                  console.warn("[openaiStream] quota deduction failed:", e.message);
+                }
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, keySource: keyResult.source, model: selectedModel })}\n\n`));
+                continue;
               }
               try {
                 const event = JSON.parse(data);

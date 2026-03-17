@@ -70,15 +70,12 @@ Deno.serve(async (req) => {
       }
 
       try {
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-goog-api-key": apiKey,
-            },
-            body: JSON.stringify({
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`;
+
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+          body: JSON.stringify({
             contents: [{
               role: "user",
               parts: [{ text: `You are PropPrompt™, an elite real estate AI analyst for Eastern Massachusetts. Provide detailed, professional analysis.\n\n${prompt}` }],
@@ -129,12 +126,8 @@ Deno.serve(async (req) => {
           ai_model: model, intake_data: { ...analysis.intake_data, api_key_source: keySource },
         });
 
-        // Deduct quota
         try {
-          await base44.functions.invoke("deductAnalysisQuota", {
-            analysisId,
-            orgId: analysis.org_id,
-          });
+          await base44.functions.invoke("deductAnalysisQuota", { analysisId, orgId: analysis.org_id });
         } catch (e) {
           console.warn("[geminiStream] quota deduction failed:", e.message);
         }

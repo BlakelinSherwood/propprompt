@@ -45,6 +45,19 @@ Deno.serve(async (req) => {
 
   const base44 = createClientFromRequest(req);
 
+  // Idempotency check
+  try {
+    const processedEvents = await base44.asServiceRole.entities.ProcessedWebhookEvent.filter({
+      event_id: event.id,
+    });
+    if (processedEvents.length > 0) {
+      console.log(`Skipping duplicate event: ${event.id}`);
+      return Response.json({ received: true, duplicate: true });
+    }
+  } catch (_) {
+    // ProcessedWebhookEvent entity may not exist yet — continue
+  }
+
   try {
     // Idempotency check
     const processedEvents = await base44.asServiceRole.entities.ProcessedWebhookEvent.filter({
@@ -69,8 +82,8 @@ Deno.serve(async (req) => {
           const extraAnalyses = OVERAGE_PACKS[priceId];
           await base44.asServiceRole.entities.TopupPack.create({
             org_id: orgId,
+            analyses_purchased: extraAnalyses,
             analyses_remaining: extraAnalyses,
-            analyses_total: extraAnalyses,
             source: 'overage_pack',
             stripe_payment_intent_id: session.payment_intent,
             expires_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
@@ -173,15 +186,15 @@ Deno.serve(async (req) => {
     return new Response("Handler error", { status: 500 });
   }
 
-  // After successful processing, record the event
+  // Record processed event for idempotency
   try {
     await base44.asServiceRole.entities.ProcessedWebhookEvent.create({
       event_id: event.id,
       event_type: event.type,
       processed_at: new Date().toISOString(),
     });
-  } catch (e) {
-    console.error("Failed to record processed event:", e.message);
+  } catch (_) {
+    // ProcessedWebhookEvent entity may not exist yet
   }
 
   return Response.json({ received: true });

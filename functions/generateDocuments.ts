@@ -396,12 +396,6 @@ function buildEmailHtml(analysis, branding) {
   const assessmentLabel = escapeHtml(ASSESSMENT_LABELS[analysis.assessment_type] || 'Analysis');
   const address = escapeHtml(analysis.intake_data?.address || '');
   const outputText = escapeHtml(analysis.output_text || '').replace(/\n/g, '<br>');
-  const orgName = escapeHtml(branding.org_name);
-  const orgTagline = escapeHtml(branding.org_tagline);
-  const agentName = escapeHtml(branding.agent_name);
-  const agentTitle = escapeHtml(branding.agent_title);
-  const agentPhone = escapeHtml(branding.agent_phone);
-  const agentEmail = escapeHtml(branding.agent_email);
 
   return `
 <!DOCTYPE html>
@@ -412,10 +406,10 @@ function buildEmailHtml(analysis, branding) {
     <tr><td align="center">
       <table width="640" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
         <!-- Header -->
-         <tr><td style="background:${primary};padding:28px 36px;">
-           ${branding.org_logo_url ? `<img src="${escapeHtml(branding.org_logo_url)}" height="44" style="display:block;margin-bottom:10px;" alt="${orgName}">` : ''}
-           <div style="color:#ffffff;font-size:20px;font-weight:bold;">${orgName}</div>
-           ${orgTagline ? `<div style="color:rgba(255,255,255,0.75);font-size:12px;margin-top:4px;">${orgTagline}</div>` : ''}
+        <tr><td style="background:${primary};padding:28px 36px;">
+          ${branding.org_logo_url ? `<img src="${branding.org_logo_url}" height="44" style="display:block;margin-bottom:10px;" alt="${branding.org_name}">` : ''}
+          <div style="color:#ffffff;font-size:20px;font-weight:bold;">${escapeHtml(branding.org_name || '')}</div>
+          ${branding.org_tagline ? `<div style="color:rgba(255,255,255,0.75);font-size:12px;margin-top:4px;">${escapeHtml(branding.org_tagline)}</div>` : ''}
         </td></tr>
         <!-- Subject bar -->
         <tr><td style="padding:20px 36px 12px;border-bottom:2px solid ${accent};">
@@ -428,11 +422,11 @@ function buildEmailHtml(analysis, branding) {
         </td></tr>
         <!-- Agent footer -->
         <tr><td style="padding:20px 36px;background:#f5f5f5;border-top:1px solid #e5e5e5;">
-          ${branding.agent_headshot_url ? `<img src="${escapeHtml(branding.agent_headshot_url)}" width="48" height="48" style="border-radius:50%;float:left;margin-right:14px;" alt="${agentName}">` : ''}
-          <div style="font-size:13px;font-weight:bold;color:#222;">${agentName}</div>
-          ${agentTitle ? `<div style="font-size:12px;color:#555;">${agentTitle}</div>` : ''}
+          ${branding.agent_headshot_url ? `<img src="${branding.agent_headshot_url}" width="48" height="48" style="border-radius:50%;float:left;margin-right:14px;" alt="${branding.agent_name}">` : ''}
+          <div style="font-size:13px;font-weight:bold;color:#222;">${escapeHtml(branding.agent_name || '')}</div>
+          ${branding.agent_title ? `<div style="font-size:12px;color:#555;">${escapeHtml(branding.agent_title)}</div>` : ''}
           <div style="font-size:12px;color:#777;margin-top:4px;">
-            ${[agentPhone, agentEmail].filter(Boolean).join(' &nbsp;|&nbsp; ')}
+            ${[branding.agent_phone, branding.agent_email].filter(Boolean).map(escapeHtml).join(' &nbsp;|&nbsp; ')}
           </div>
         </td></tr>
         <!-- Disclaimer -->

@@ -98,7 +98,7 @@ export default function AnalysisRun() {
           "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({ analysisId, orgId }),
-        signal: abortController.signal
+        signal: abortController.signal,
       });
 
       if (!response.ok) {
@@ -146,7 +146,7 @@ export default function AnalysisRun() {
     }
 
     loadAndStream().catch(err => {
-      if (err.name === 'AbortError') return; // Ignore abort errors
+      if (err.name === 'AbortError') return;
       setErrorMsg(err.message);
       setStatus("error");
     });

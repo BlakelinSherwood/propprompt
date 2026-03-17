@@ -19,6 +19,8 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Invalid or expired state token' }, { status: 400 });
     }
     const userEmail = stateRecord.user_email;
+    // Delete used token
+    await base44.asServiceRole.entities.OAuthState.delete(stateRecord.id);
 
     const clientId = Deno.env.get('GOOGLE_DRIVE_CLIENT_ID');
     const clientSecret = Deno.env.get('GOOGLE_DRIVE_CLIENT_SECRET');

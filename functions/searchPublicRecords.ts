@@ -71,11 +71,11 @@ async function searchMassachusetts(address, base44) {
   3. Find mortgage recordings (amount, date, lender)
   4. Check for mortgage discharge
   5. Search "[municipality] MA assessor property search ${address}" for assessed value and annual tax
-  
-  Return structured JSON with: last_sale_date, last_sale_price, original_mortgage_amount, original_mortgage_date, 
-  original_mortgage_lender, most_recent_mortgage_amount, most_recent_mortgage_date, assessed_value, annual_property_tax, 
+
+  Return structured JSON with: last_sale_date, last_sale_price, original_mortgage_amount, original_mortgage_date,
+  original_mortgage_lender, most_recent_mortgage_amount, most_recent_mortgage_date, assessed_value, annual_property_tax,
   search_status (found/partial/not_found), source_urls, search_notes`;
-  
+
   return await invokeAISearch(prompt, base44);
 }
 
@@ -88,9 +88,9 @@ async function searchMaine(address, base44) {
   4. Find mortgage recordings
   5. Check for discharges
   6. Search "[municipality] ME online assessing" for assessed value
-  
+
   Return structured JSON with deed, mortgage, tax assessment data, search_status, source_urls, search_notes`;
-  
+
   return await invokeAISearch(prompt, base44);
 }
 
@@ -101,9 +101,9 @@ async function searchNewHampshire(address, base44) {
   3. Find mortgage recordings
   4. Check discharge status
   5. Search "[municipality] NH kiosk assessing ${address}" for value/tax
-  
+
   Return structured JSON with property data, search_status, source_urls, search_notes`;
-  
+
   return await invokeAISearch(prompt, base44);
 }
 
@@ -115,14 +115,14 @@ async function searchVermont(address, base44) {
   3. Find deed/transfer records by grantor/grantee
   4. Find mortgage recordings
   5. Search "[town] VT listers property record ${address}" (note: "listers" not assessors)
-  
+
   Return structured JSON with deed, mortgage, lister assessment data, search_status, source_urls, search_notes`;
-  
+
   return await invokeAISearch(prompt, base44);
 }
 
 async function invokeAISearch(prompt, base44) {
-  // Use InvokeLLM integration for web search with authenticated client
+
   try {
     const response = await base44.integrations.Core.InvokeLLM({
       prompt: prompt,

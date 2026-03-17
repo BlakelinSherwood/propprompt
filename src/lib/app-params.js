@@ -16,7 +16,9 @@ export function isInIframe() {
   }
 }
 
-// App configuration
+// App params — hardcoded per Base44 support guidance (no vite plugin injection)
 export const appParams = {
   appId: '69b849e8d5f86924955e7fae',
+  appBaseUrl: '',
+  token: '',
 };

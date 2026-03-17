@@ -126,10 +126,7 @@ Deno.serve(async (req) => {
 
         // Deduct quota
         try {
-          await base44.functions.invoke("deductAnalysisQuota", {
-            analysisId,
-            orgId: analysis.org_id,
-          });
+          await base44.functions.invoke("deductAnalysisQuota", { analysisId, orgId: analysis.org_id });
         } catch (e) {
           console.warn("[claudeStream] quota deduction failed:", e.message);
         }

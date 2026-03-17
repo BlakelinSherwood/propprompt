@@ -347,9 +347,7 @@ export default function Landing() {
                   <h3 className="text-2xl font-bold mb-4">"I built the tool I wished I had."</h3>
                   <div className="text-white/80 leading-relaxed space-y-4 text-sm">
                     {founder.founder_statement && (
-                      <p className="text-sm text-white/70 leading-relaxed whitespace-pre-line">
-                      {founder.founder_statement}
-                    </p>
+                      <p className="text-sm text-white/80 leading-relaxed whitespace-pre-line">{founder.founder_statement}</p>
                     )}
                     {!founder.founder_statement && (
                       <p>For [YEARS_EXPERIENCE] years I've sat across from sellers trying to explain market data that took me hours to pull together. PropPrompt is what I built to solve that — a practitioner's tool for agents who want to compete on intelligence.</p>

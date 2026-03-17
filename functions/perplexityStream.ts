@@ -119,12 +119,8 @@ Deno.serve(async (req) => {
           ai_model: MODEL, intake_data: { ...analysis.intake_data, api_key_source: keySource },
         });
 
-        // Deduct quota
         try {
-          await base44.functions.invoke("deductAnalysisQuota", {
-            analysisId,
-            orgId: analysis.org_id,
-          });
+          await base44.functions.invoke("deductAnalysisQuota", { analysisId, orgId: analysis.org_id });
         } catch (e) {
           console.warn("[perplexityStream] quota deduction failed:", e.message);
         }

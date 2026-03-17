@@ -16,10 +16,8 @@ Deno.serve(async (req) => {
 
     if (!clientId) return Response.json({ error: 'Google Drive not configured. Set GOOGLE_DRIVE_CLIENT_ID.' }, { status: 500 });
 
-    // Generate random CSRF token
+    // Generate CSRF token instead of using user email as state
     const csrfToken = crypto.randomUUID();
-    
-    // Store token → email mapping (10 min expiry)
     await base44.asServiceRole.entities.OAuthState.create({
       token: csrfToken,
       user_email: user.email,

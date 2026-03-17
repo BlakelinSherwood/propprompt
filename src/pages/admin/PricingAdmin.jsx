@@ -31,7 +31,7 @@ export default function PricingAdmin() {
 
   useEffect(() => {
     base44.auth.me().then((u) => {
-      if (!u || u.role !== "admin") { navigate("/Dashboard"); return; }
+      if (!u || (u.role !== "platform_owner" && u.role !== "admin")) { navigate("/Dashboard"); return; }
       setUser(u);
       loadConfigs();
     });

@@ -30,12 +30,15 @@ export default function PlatformAIConfig() {
   async function handleSave() {
     setSaving(true);
     try {
-      await base44.entities.PlatformConfig.update(config.id, formData);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+      await base44.entities.PlatformConfig.create({
+        sc_managed_enabled: scManagedEnabled,
+        platform_toggles: platformToggles,
+        updated_at: new Date().toISOString(),
+      });
+      toast({ title: "AI configuration saved", description: "Changes will take effect on next analysis run." });
     } catch (err) {
       console.error("Save failed:", err);
-      alert("Failed to save configuration.");
+      toast({ title: "Save failed", description: err.message, variant: "destructive" });
     } finally {
       setSaving(false);
     }

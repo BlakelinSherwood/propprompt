@@ -4,6 +4,16 @@ import { base44 } from "@/api/base44Client";
 import { usePricing } from "@/components/pricing/usePricing";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
+
+let cachedStripePromise = null;
+let cachedStripeKey = null;
+function getStripePromise(publishableKey) {
+  if (cachedStripeKey !== publishableKey) {
+    cachedStripePromise = loadStripe(publishableKey);
+    cachedStripeKey = publishableKey;
+  }
+  return cachedStripePromise;
+}
 import { Loader2, ShoppingCart, Lock, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -128,7 +138,8 @@ export default function TopupPage() {
       subscription_id: sub?.type === 'single' ? sub.id : undefined,
       bundle_id: sub?.type === 'bundle' ? sub.id : undefined,
     });
-    const { clientSecret, paymentIntentId } = res.data;
+    const { clientSecret, paymentIntentId, publishableKey } = res.data;
+    setStripePromise(getStripePromise(publishableKey));
     setCheckoutData({ clientSecret, paymentIntentId, pack });
     setSelectedPack(pack);
     setLoadingCheckout(false);

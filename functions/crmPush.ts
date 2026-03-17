@@ -29,6 +29,7 @@ function validateCrmUrl(url) {
     }
     return parsed.toString();
   } catch (e) {
+    if (e.message.startsWith('CRM URL')) throw e;
     throw new Error(`Invalid CRM URL: ${e.message}`);
   }
 }
@@ -77,8 +78,8 @@ async function pushToFollowUpBoss(conn, analysis, summary) {
 async function pushToKvcore(conn, analysis, summary) {
   const instanceUrl = conn.crm_account_name || 'https://api.kvcore.com';
   const token = conn.encrypted_api_key;
-  const url = validateCrmUrl(instanceUrl);
-  const res = await fetch(`${url}/api/v1/notes`, {
+  const validatedUrl = validateCrmUrl(`${instanceUrl}/api/v1/notes`);
+  const res = await fetch(validatedUrl, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -101,7 +102,8 @@ async function pushToSalesforce(conn, analysis, summary) {
   const url = validateCrmUrl(instanceUrl);
 
   // Create Task record
-  const res = await fetch(`${url}/services/data/v58.0/sobjects/Task`, {
+  const validatedUrl = validateCrmUrl(`${instanceUrl}/services/data/v58.0/sobjects/Task`);
+  const res = await fetch(validatedUrl, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${accessToken}`,

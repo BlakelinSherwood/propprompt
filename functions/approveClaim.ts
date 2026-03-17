@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
       const user = await base44.auth.me();
       isAdmin = user?.role === 'admin' || user?.role === 'platform_owner';
     } catch (_) {
-      // Called from automation — allowed via service role logic below
+      // Auth failed — deny access
       isAdmin = false;
     }
     if (!isAdmin) return Response.json({ error: 'Forbidden' }, { status: 403 });
@@ -122,7 +122,6 @@ Deno.serve(async (req) => {
         stripeCustomerId = customerId;
       } catch (stripeErr) {
         console.error('[approveClaim] Stripe error:', stripeErr.message);
-        // Only continue without Stripe if payment method was not provided
         if (claim.stripe_payment_method_id) {
           return Response.json({
             error: `Payment failed: ${stripeErr.message}. Claim not approved.`,

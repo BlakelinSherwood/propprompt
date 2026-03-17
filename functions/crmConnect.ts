@@ -1,5 +1,20 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
+async function encryptKey(plaintext) {
+  const raw = Deno.env.get("ENCRYPTION_KEY");
+  if (!raw) throw new Error("ENCRYPTION_KEY required");
+  const key = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(raw.slice(0, 32).padEnd(32, "0")),
+    { name: "AES-GCM" }, false, ["encrypt"]
+  );
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, new TextEncoder().encode(plaintext));
+  const combined = new Uint8Array(iv.length + new Uint8Array(encrypted).length);
+  combined.set(iv);
+  combined.set(new Uint8Array(encrypted), iv.length);
+  return btoa(String.fromCharCode(...combined));
+}
+
 /**
  * Save / update a CRM connection for the current user.
  * For API-key based CRMs (FUB, kvCORE, Lofty): accepts apiKey + optional instanceUrl.

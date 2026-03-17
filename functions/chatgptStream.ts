@@ -96,17 +96,11 @@ Deno.serve(async (req) => {
             status: "complete", output_text: fullOutput, completed_at: new Date().toISOString(),
             ai_model: model, intake_data: { ...analysis.intake_data, api_key_source: keySource },
           });
-
-          // Deduct quota
           try {
-            await base44.functions.invoke("deductAnalysisQuota", {
-              analysisId,
-              orgId: analysis.org_id,
-            });
+            await base44.functions.invoke("deductAnalysisQuota", { analysisId, orgId: analysis.org_id });
           } catch (e) {
             console.warn("[chatgptStream] quota deduction failed:", e.message);
           }
-
           send({ done: true, keySource, model });
           controller.close();
           return;
@@ -174,17 +168,11 @@ Deno.serve(async (req) => {
           status: "complete", output_text: fullOutput, completed_at: new Date().toISOString(),
           ai_model: model, intake_data: { ...analysis.intake_data, api_key_source: keySource },
         });
-
-        // Deduct quota
         try {
-          await base44.functions.invoke("deductAnalysisQuota", {
-            analysisId,
-            orgId: analysis.org_id,
-          });
+          await base44.functions.invoke("deductAnalysisQuota", { analysisId, orgId: analysis.org_id });
         } catch (e) {
           console.warn("[chatgptStream] quota deduction failed:", e.message);
         }
-
         send({ done: true, keySource, model });
 
       } catch (err) {

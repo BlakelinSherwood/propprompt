@@ -73,11 +73,6 @@ export default function NewAnalysis() {
         setSubmitting(false);
         return;
       }
-
-      // Select Claude model based on analysis type and modules
-      const hasAddons = intake.selected_modules && intake.selected_modules.length > 0;
-      const { platform, model } = selectAIModel(intake.assessment_type, hasAddons);
-
       const analysis = await base44.entities.Analysis.create({
         run_by_email: user.email,
         on_behalf_of_email: intake.on_behalf_of_email || null,
@@ -85,8 +80,8 @@ export default function NewAnalysis() {
         assessment_type: intake.assessment_type,
         property_type: intake.property_type,
         location_class: intake.location_class,
-        ai_platform: platform,
-        ai_model: model,
+        ai_platform: intake.ai_platform,
+        ai_model: intake.ai_model || null,
         output_format: intake.output_format,
         status: "draft",
         intake_data: {
@@ -95,7 +90,6 @@ export default function NewAnalysis() {
           drive_sync: intake.drive_sync,
         },
         drive_sync_status: intake.drive_sync ? "pending" : "not_synced",
-        selected_modules: intake.selected_modules || [],
       });
       navigate(`/AnalysisRun?id=${analysis.id}`);
     } catch (err) {
