@@ -21,6 +21,7 @@ import TeamAdmin from './pages/TeamAdmin';
 import AccountSettings from './pages/AccountSettings';
 import AgentBranding from './pages/AgentBranding';
 import PricingAdmin from './pages/PricingAdmin';
+import PlatformSettings from './pages/admin/PlatformSettings';
 import Territories from './pages/Territories';
 import Claim from './pages/Claim';
 import TopupPage from './pages/TopupPage';
@@ -36,7 +37,6 @@ import TrainingAdmin from './pages/admin/TrainingAdmin';
 import EasternMA from './pages/admin/territories/EasternMA';
 import DataQuality from './pages/admin/DataQuality';
 import AlertSettings from './pages/AlertSettings';
-import PlatformSettings from './pages/admin/PlatformSettings';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -83,11 +83,11 @@ const AuthenticatedApp = () => {
         <Route path="/AccountSettings" element={<AccountSettings />} />
         <Route path="/settings/branding" element={<AgentBranding />} />
         <Route path="/admin/pricing" element={<PricingAdmin />} />
+        <Route path="/admin/settings" element={<PlatformSettings />} />
         <Route path="/admin/claims" element={<ClaimsAdmin />} />
         <Route path="/admin/training" element={<TrainingAdmin />} />
         <Route path="/admin/data-quality" element={<DataQuality />} />
         <Route path="/admin/territories/eastern-ma" element={<EasternMA />} />
-        <Route path="/admin/platforms" element={<PlatformSettings />} />
         <Route path="/account/alert-settings" element={<AlertSettings />} />
         <Route path="/training" element={<Training />} />
         <Route path="/training/:videoId" element={<TrainingVideo />} />
