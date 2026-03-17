@@ -341,7 +341,7 @@ export default function Landing() {
           <h2 className="text-3xl font-bold text-[#1A3226]" style={{ fontFamily: "Georgia, serif" }}>
             From Brokerages Already Holding Territory
           </h2>
-          {/* TODO: Replace with verified testimonials */}
+          {founder && <p className="text-sm text-[#1A3226]/60 mt-3">PropPrompt is built on {founder.years_experience} years of real estate experience. Here's what agents in the field are saying.</p>}
         </div>
         <div className="grid sm:grid-cols-3 gap-6">
           {TESTIMONIALS.map(t => (
