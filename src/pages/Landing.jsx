@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import {
   ArrowRight, Check, Star, MapPin, Lock, Play,
-  ChevronDown, Mail, Shield, Zap, TrendingUp
+  ChevronDown, Mail, Shield, Zap, TrendingUp, Home
 } from "lucide-react";
 import { usePricing } from "@/components/pricing/usePricing";
+import { useFounderProfile } from "@/lib/useFounderProfile";
 import HeroMap from "@/components/landing/HeroMap";
 import UrgencyStrip from "@/components/landing/UrgencyStrip";
 import PricingSection from "@/components/landing/PricingSection";
