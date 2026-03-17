@@ -195,72 +195,29 @@ export default function Landing() {
 
       {/* Territory Model */}
       <section className="max-w-6xl mx-auto px-6 py-20">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
+        <div className="grid lg:grid-cols-2 gap-12 items-start">
           <div className="space-y-5">
             <p className="text-[#B8982F] text-xs font-semibold uppercase tracking-widest">Exclusive Territory Model</p>
             <h2 className="text-3xl font-bold text-[#1A3226]" style={{ fontFamily: "Georgia, serif" }}>
               The Franchise Model for Real Estate AI
             </h2>
             <p className="text-[#1A3226]/70 text-sm leading-relaxed">
-              Once you hold Portsmouth NH, no other brokerage in Portsmouth gets PropPrompt. Your territory is your competitive moat — protected by contract, not just by price.
+              Once a brokerage claims a PropPrompt territory, it's theirs. No other agent in that town gets access to the platform. No shared insights, no competing on the same data.
             </p>
-            <ul className="space-y-3">
-              {[
-                "Your town is yours alone — no competitor access",
-                "All analyses branded to your brokerage",
-                "Exclusive prompt library calibrated to your market",
-                "Territory lock is contractual, not just first-come",
-              ].map(f => (
-                <li key={f} className="flex items-start gap-2.5 text-sm text-[#1A3226]/70">
-                  <Shield className="w-4 h-4 text-[#B8982F] flex-shrink-0 mt-0.5" />{f}
-                </li>
-              ))}
-            </ul>
-            <a href="/app/Territories" className="inline-flex items-center gap-2 text-sm font-semibold text-[#1A3226] hover:text-[#B8982F] transition-colors">
-              See full territory map → 
-            </a>
-
-            {/* MA note */}
-            <div className="rounded-xl border border-[#B8982F]/30 bg-[#B8982F]/5 p-4 space-y-2">
-              <p className="text-sm text-[#1A3226]/80 leading-relaxed">
-                <span className="font-semibold text-[#1A3226]">Eastern Massachusetts</span> is already active across 351 towns covering 4.5 million residents — held by our Founding Partner.
-              </p>
-              <p className="text-sm text-[#1A3226]/80 leading-relaxed">
-                <span className="font-semibold text-[#22c55e]">Western Massachusetts, the Cape, and the Pioneer Valley</span> are fully open for subscription today.
-              </p>
-            </div>
+            <p className="text-[#1A3226]/70 text-sm leading-relaxed">
+              In larger cities, a limited number of seats are available based on population — but each seat is exclusive. When they're gone, they're gone.
+            </p>
+            <p className="text-[#1A3226]/70 text-sm leading-relaxed">
+              This isn't a subscription you sign up for and forget. It's a competitive position you hold.
+            </p>
           </div>
 
-          {/* Static SVG mini-map */}
-          <div className="bg-[#1A3226] rounded-3xl p-6 aspect-square max-w-sm mx-auto w-full relative overflow-hidden">
-            <svg viewBox="0 0 360 360" className="w-full h-full" fill="none">
-              {/* ME — accurate northeast shape */}
-              <path d="M170,35 Q205,38 250,50 Q270,55 280,75 Q285,100 278,135 Q273,160 258,170 Q240,178 225,185 Q210,190 200,210 Q188,230 175,235 Q160,240 150,230 Q142,215 138,190 Q135,160 133,130 Q132,100 138,75 Q148,50 170,35 Z"
-                fill="#B8982F" fillOpacity="0.3" stroke="#B8982F" strokeWidth="1.5" strokeLinecap="round" />
-              {/* NH — triangular shape */}
-              <path d="M115,170 Q138,180 160,190 Q172,195 175,220 Q175,255 162,285 Q150,300 125,305 Q95,303 82,285 Q75,268 75,240 Q78,205 88,185 Q100,172 115,170 Z"
-                fill="#ef4444" fillOpacity="0.35" stroke="#ef4444" strokeWidth="1.5" strokeLinecap="round" />
-              {/* VT — tall narrow shape */}
-              <path d="M80,170 Q92,177 102,188 Q108,198 105,230 Q100,270 88,295 Q78,308 55,312 Q42,305 38,285 Q35,255 38,220 Q42,190 52,175 Q65,165 80,170 Z"
-                fill="#22c55e" fillOpacity="0.3" stroke="#22c55e" strokeWidth="1.5" strokeLinecap="round" />
-              {/* MA — southern shape */}
-              <path d="M90,295 Q125,300 165,305 Q178,308 178,325 Q172,345 148,355 Q115,360 80,350 Q55,342 48,325 Q52,308 90,295 Z"
-                fill="#f59e0b" fillOpacity="0.35" stroke="#f59e0b" strokeWidth="1.5" strokeLinecap="round" />
-              
-              {/* Labels */}
-              <text x="165" y="105" fill="white" fontSize="11" fontFamily="sans-serif" fontWeight="bold" textAnchor="middle">ME</text>
-              <text x="110" y="225" fill="white" fontSize="11" fontFamily="sans-serif" fontWeight="bold" textAnchor="middle">NH</text>
-              <text x="55" y="230" fill="white" fontSize="11" fontFamily="sans-serif" fontWeight="bold" textAnchor="middle">VT</text>
-              <text x="125" y="335" fill="white" fontSize="11" fontFamily="sans-serif" fontWeight="bold" textAnchor="middle">MA</text>
-
-              {/* Legend dots */}
-              <circle cx="20" cy="10" r="5" fill="#22c55e" fillOpacity="0.7" />
-              <text x="30" y="14" fill="white" fontSize="8" fontFamily="sans-serif" fillOpacity="0.7">Available</text>
-              <circle cx="100" cy="10" r="5" fill="#ef4444" fillOpacity="0.7" />
-              <text x="110" y="14" fill="white" fontSize="8" fontFamily="sans-serif" fillOpacity="0.7">Claimed</text>
-              <circle cx="170" cy="10" r="5" fill="#f59e0b" fillOpacity="0.7" />
-              <text x="180" y="14" fill="white" fontSize="8" fontFamily="sans-serif" fillOpacity="0.7">Pending</text>
-            </svg>
+          {/* Mapbox map */}
+          <div>
+            <TerritoryLandingMap />
+            <div className="text-center mt-6">
+              <p className="text-xs text-[#1A3226]/60 mb-3">Four states. Thousands of territories. Most still available.</p>
+            </div>
           </div>
         </div>
       </section>
