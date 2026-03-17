@@ -31,13 +31,14 @@ export default function ClaimsAdmin() {
 
   const loadClaims = useCallback(async () => {
     try {
-      const [allClaims, territories, states, pools, bundles, buyouts] = await Promise.all([
+      const [allClaims, territories, states, pools, bundles, buyouts, released] = await Promise.all([
         base44.entities.TerritoryClaimRequest.list('-created_date', 200),
         base44.entities.Territory.list('-updated_date', 500),
         base44.entities.State.list(),
         base44.entities.PopulationPool.list(),
         base44.entities.TerritoryBundle.list(),
         base44.entities.FullBuyoutSubscription.list(),
+        base44.entities.ReleasedTerritory.list('-created_date', 200),
       ]);
 
       const stateMap = Object.fromEntries(states.map(s => [s.id, s]));
@@ -78,7 +79,12 @@ export default function ClaimsAdmin() {
           monthlyValue = bo?.monthly_price?.toFixed(2);
         }
 
-        return { ...c, _type: type, _territorySummary: summary, _monthlyValue: monthlyValue };
+        // Right of first refusal check
+        const releasedRecord = type === 'single' && c.territory_id
+          ? released.find(r => r.territory_id === c.territory_id && new Date(r.right_of_refusal_expires_at) > new Date())
+          : null;
+
+        return { ...c, _type: type, _territorySummary: summary, _monthlyValue: monthlyValue, _releasedRecord: releasedRecord || null };
       });
 
       setClaims(enriched);
