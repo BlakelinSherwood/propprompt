@@ -46,8 +46,9 @@ export default function Training() {
       } catch {}
 
       try {
-        const prog = await base44.entities.TrainingProgress.filter({ user_id: me.id });
-        setCompletedIds(new Set((prog || []).filter(p => p.completed_at).map(p => p.video_id)));
+        const prog = await base44.entities.TrainingProgress.filter({});
+        const userProgress = (prog || []).filter(p => p.user_id === me.id && p.completed_at);
+        setCompletedIds(new Set(userProgress.map(p => p.video_id)));
       } catch {}
 
       setModules(mods);
