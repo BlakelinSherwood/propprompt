@@ -8,6 +8,9 @@ export default defineConfig({
     base44VitePlugin(),
     react(),
   ],
+  server: {
+    allowedHosts: true,
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
