@@ -34,9 +34,13 @@ export default function Layout() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [showPrivacyNotice, setShowPrivacyNotice] = useState(false);
 
   useEffect(() => {
-    base44.auth.me().then(setUser).catch(() => {});
+    base44.auth.me().then((me) => {
+      setUser(me);
+      if (!me?.privacy_notice_accepted_at) setShowPrivacyNotice(true);
+    }).catch(() => {});
   }, []);
 
   const isAdmin = user?.role === "platform_owner" || user?.role === "brokerage_admin" || user?.role === "team_lead";
@@ -64,7 +68,15 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen bg-[#FAF8F4]">
-      <PrivacyNoticeModal user={user} />
+      {showPrivacyNotice && (
+        <PrivacyNoticeModal
+          user={user}
+          onAccepted={() => {
+            setShowPrivacyNotice(false);
+            setUser((u) => ({ ...u, privacy_notice_accepted_at: new Date().toISOString() }));
+          }}
+        />
+      )}
       <style>{`
         :root {
           --pp-green: #1A3226;
