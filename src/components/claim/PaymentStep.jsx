@@ -4,6 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { Lock, Loader2 } from "lucide-react";
+import PaymentTrustBlock from "./PaymentTrustBlock";
 
 function CardForm({ clientSecret, setupIntentId, onSuccess, onBack, summary, autoApproveHours }) {
   const stripe = useStripe();
