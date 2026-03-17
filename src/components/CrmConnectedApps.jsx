@@ -53,8 +53,12 @@ export default function CrmConnectedApps() {
 
   const load = async () => {
     setLoading(true);
-    const res = await base44.functions.invoke("crmConnect", { action: "list" });
-    setConnections(res.data?.connections || []);
+    try {
+      const res = await base44.functions.invoke("crmConnect", { action: "list" });
+      setConnections(res.data?.connections || []);
+    } catch (e) {
+      setConnections([]);
+    }
     setLoading(false);
   };
 
