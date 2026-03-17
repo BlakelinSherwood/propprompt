@@ -134,7 +134,7 @@ export default function Layout() {
         <aside className="hidden lg:flex flex-col w-56 min-h-[calc(100vh-4rem)] bg-[#1A3226]/[0.03] border-r border-[#1A3226]/10">
           <nav className="flex-1 px-3 py-6 space-y-1">
             {navItems.map((item) => {
-              const active = location.pathname === item.path;
+              const active = location.pathname === item.path || (item.path === '/training' && location.pathname.startsWith('/training'));
               return (
                 <Link
                   key={item.path}
