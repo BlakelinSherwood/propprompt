@@ -68,35 +68,65 @@ export default function Step2Assessment({ intake, update, onNext, onBack }) {
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
-        {ASSESSMENT_TYPES.map((a) => {
+        {ASSESSMENT_TYPES.filter(a => a.id !== 'custom').map((a) => {
           const selected = intake.assessment_type === a.id;
           return (
             <button
               key={a.id}
               onClick={() => update({ assessment_type: a.id })}
               className={`text-left rounded-xl border-2 p-4 transition-all
-                ${selected ? "border-[#B8982F] bg-[#B8982F]/5" : "border-[#1A3226]/10 hover:border-[#1A3226]/20"}`}
+                ${selected ? "border-[#1A3226] bg-[#1A3226]/5" : "border-[#1A3226]/10 hover:border-[#1A3226]/20"}`}
             >
               <div className="flex items-start gap-3">
                 <span className="text-2xl leading-none mt-0.5">{a.icon}</span>
                 <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-sm font-semibold text-[#1A3226]">{a.title}</span>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <span className="text-sm font-semibold text-[#1A3226]">{a.title}</span>
+                      {a.sublabel && (
+                        <p className="text-[10px] text-[#1A3226]/50 mt-0.5">{a.sublabel}</p>
+                      )}
+                    </div>
                     {a.badge && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#1A3226]/5 text-[#1A3226]/50">
+                      <span className={`text-[9px] px-2 py-1 rounded flex-shrink-0 font-medium
+                        ${a.id === 'client_portfolio' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
                         {a.badge}
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-[#1A3226]/55 leading-relaxed">{a.description}</p>
+                  <p className="text-xs text-[#1A3226]/55 leading-relaxed mt-1">{a.description}</p>
                   <p className="text-[10px] text-[#B8982F] mt-2 font-medium">{a.time}</p>
                 </div>
-                <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 mt-0.5
-                  ${selected ? "border-[#B8982F] bg-[#B8982F]" : "border-[#1A3226]/20"}`} />
+                <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 mt-1
+                  ${selected ? "border-[#1A3226] bg-[#1A3226]" : "border-[#1A3226]/20"}`} />
               </div>
             </button>
           );
         })}
+      </div>
+
+      {/* Custom Analysis - Full Width */}
+      <div className="mb-8">
+        <button
+          onClick={() => update({ assessment_type: 'custom' })}
+          className={`w-full text-left rounded-xl border-2 p-4 transition-all
+            ${intake.assessment_type === 'custom' ? "border-[#1A3226] bg-[#1A3226]/5" : "border-[#1A3226]/10 hover:border-[#1A3226]/20"}`}
+        >
+          <div className="flex items-start gap-3">
+            <span className="text-2xl leading-none mt-0.5">✏️</span>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-sm font-semibold text-[#1A3226]">Custom Analysis</span>
+                <span className="text-[9px] px-2 py-1 rounded bg-blue-100 text-blue-700 font-medium">Advanced</span>
+              </div>
+              <p className="text-[10px] text-[#1A3226]/50 mt-0.5 mb-1">Compose your own report from any combination of modules</p>
+              <p className="text-xs text-[#1A3226]/55 leading-relaxed">Build a custom report by combining any available analysis modules. For agents running hybrid scenarios — an investor who also wants rental upside, a seller considering rent-and-hold, a buyer comparing multiple markets.</p>
+              <p className="text-[10px] text-[#B8982F] mt-2 font-medium">Varies</p>
+            </div>
+            <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 mt-1
+              ${intake.assessment_type === 'custom' ? "border-[#1A3226] bg-[#1A3226]" : "border-[#1A3226]/20"}`} />
+          </div>
+        </button>
       </div>
 
       <WizardNav step={2} onNext={onNext} onBack={onBack} canNext={!!intake.assessment_type} />
