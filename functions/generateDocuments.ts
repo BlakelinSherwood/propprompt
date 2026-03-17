@@ -210,7 +210,7 @@ async function generatePdf(base44, analysis, branding) {
   addAgentFooter(doc, branding, pageWidth, pageHeight);
 
   const arrayBuffer = doc.output('arraybuffer');
-  const address = analysis.intake_data?.address || analysisId;
+  const address = analysis.intake_data?.address || analysis.id;
   const safeFilename = `${assessmentLabel.replace(/\s+/g, '_')}_${Date.now()}.pdf`;
 
   return { bytes: arrayBuffer, mimeType: 'application/pdf', filename: safeFilename };

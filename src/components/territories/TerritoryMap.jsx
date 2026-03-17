@@ -61,6 +61,10 @@ export default function TerritoryMap({
     };
 
     initMap();
+
+    return () => {
+      if (map.current) map.current.remove();
+    };
   }, []);
 
   useEffect(() => {

@@ -44,6 +44,7 @@ Deno.serve(async (req) => {
     const topup = await base44.asServiceRole.entities.TopupPack.create({
       subscription_id: subscription_id || null,
       bundle_id: bundle_id || null,
+      pool_id: pool_id || null,
       analyses_purchased: analyses,
       analyses_remaining: analyses,
       price_paid: pi.amount / 100,
