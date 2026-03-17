@@ -7,6 +7,7 @@ import WelcomeHero from "../components/WelcomeHero";
 import TrainingProgressWidget from "../components/training/TrainingProgressWidget";
 import FairHousingBanner from "../components/FairHousingBanner";
 import PrivacyNoticeModal from "../components/PrivacyNoticeModal";
+import OnboardingWelcomeModal from "../components/OnboardingWelcomeModal";
 
 const ROLE_LABELS = {
   platform_owner: "Platform Owner",
