@@ -22,15 +22,8 @@ export default function UrgencyStrip() {
 
   return (
     <div className="bg-[#B8982F] text-[#1A3226]">
-      <div className="max-w-6xl mx-auto px-6 py-2.5 flex flex-wrap items-center justify-center gap-x-6 gap-y-1 text-xs font-semibold">
-        <span className="flex items-center gap-1.5">
-          <Zap className="w-3.5 h-3.5" />
-          {stats.claimed !== null ? stats.claimed : '—'} territories claimed
-        </span>
-        <span className="hidden sm:block text-[#1A3226]/30">·</span>
-        <span>{stats.available !== null ? stats.available : '—'} towns available across ME, NH, VT &amp; MA</span>
-        <span className="hidden sm:block text-[#1A3226]/30">·</span>
-        <span className="uppercase tracking-wide text-[10px]">Territories are exclusive — once claimed, they're gone</span>
+      <div className="max-w-6xl mx-auto px-6 py-3 text-center text-xs sm:text-sm font-semibold">
+        <span>{stats.claimed !== null ? stats.claimed : '—'} territories claimed</span> · <span>{stats.available !== null ? stats.available : '—'} towns available across ME, NH, VT &amp; MA</span> · Claim yours before a competitor does
       </div>
     </div>
   );
