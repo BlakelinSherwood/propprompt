@@ -20,7 +20,7 @@ import BrokerageAdmin from './pages/BrokerageAdmin';
 import TeamAdmin from './pages/TeamAdmin';
 import AccountSettings from './pages/AccountSettings';
 import AgentBranding from './pages/AgentBranding';
-import PricingAdmin from './pages/admin/PricingAdmin';
+import PricingAdmin from './pages/PricingAdmin';
 import BrokerageBranding from './pages/BrokerageBranding';
 import TeamBranding from './pages/TeamBranding';
 
