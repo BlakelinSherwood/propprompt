@@ -1,123 +1,165 @@
-import { useState, useEffect, useCallback } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
-import { ArrowLeft, Clock, CheckCircle, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ArrowLeft, ExternalLink, Clock } from "lucide-react";
 import ExportPanel from "../components/ExportPanel";
 
-const LABELS = {
-  ai_platform: { claude: "Claude", chatgpt: "ChatGPT", gemini: "Gemini", perplexity: "Perplexity", grok: "Grok" },
-  assessment_type: {
-    listing_pricing: "Listing Pricing Analysis",
-    buyer_intelligence: "Buyer Intelligence Report",
-    investment_analysis: "Investment Analysis",
-    cma: "CMA",
-    rental_analysis: "Rental Market Analysis",
-    custom: "Custom",
-  },
-  output_format: { narrative: "Narrative", structured: "Structured", bullets: "Bullets" },
+const PLATFORM_LABELS = { claude: "Claude", chatgpt: "ChatGPT", gemini: "Gemini", perplexity: "Perplexity", grok: "Grok" };
+const ASSESSMENT_LABELS = {
+  listing_pricing: "Listing Pricing Analysis",
+  buyer_intelligence: "Buyer Intelligence Report",
+  investment_analysis: "Investment Analysis",
+  cma: "Comparative Market Analysis",
+  rental_analysis: "Rental Analysis",
 };
-
-const STATUS_CONFIG = {
-  draft:       { label: "Draft",       icon: Clock,         className: "bg-amber-50 text-amber-700" },
-  in_progress: { label: "In Progress", icon: Clock,         className: "bg-blue-50 text-blue-700" },
-  complete:    { label: "Complete",    icon: CheckCircle,   className: "bg-emerald-50 text-emerald-700" },
-  failed:      { label: "Failed",      icon: AlertCircle,   className: "bg-red-50 text-red-700" },
-  archived:    { label: "Archived",    icon: Clock,         className: "bg-gray-50 text-gray-500" },
+const FORMAT_LABELS = { narrative: "Narrative", structured: "Structured", bullets: "Bullet Points" };
+const STATUS_STYLES = {
+  draft: "bg-gray-100 text-gray-600",
+  in_progress: "bg-yellow-50 text-yellow-700",
+  complete: "bg-emerald-50 text-emerald-700",
+  failed: "bg-red-50 text-red-600",
+  archived: "bg-gray-50 text-gray-400",
 };
 
 export default function AnalysisDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [analysis, setAnalysis] = useState(null);
+  const [orgPlan, setOrgPlan] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const loadAnalysis = useCallback(() => {
-    base44.entities.Analysis.filter({ id }).then((r) => {
-      setAnalysis(r[0] || null);
-      setLoading(false);
-    });
-  }, [id]);
+  useEffect(() => {
+    async function load() {
+      const records = await base44.entities.Analysis.filter({ id });
+      const rec = records[0];
+      setAnalysis(rec || null);
 
-  useEffect(() => { loadAnalysis(); }, [loadAnalysis]);
+      // Determine org plan for tier gating
+      const me = await base44.auth.me().catch(() => null);
+      if (me) {
+        const memberships = await base44.entities.OrgMembership.filter({ user_email: me.email, status: "active" });
+        if (memberships.length > 0) {
+          const orgs = await base44.entities.Organization.filter({ id: memberships[0].org_id });
+          setOrgPlan(orgs[0]?.subscription_plan || null);
+        }
+      }
+      setLoading(false);
+    }
+    if (id) load();
+  }, [id]);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-[#1A3226]/20 border-t-[#1A3226] rounded-full animate-spin" />
+      <div className="flex items-center justify-center min-h-64">
+        <div className="w-7 h-7 border-4 border-[#1A3226]/20 border-t-[#1A3226] rounded-full animate-spin" />
       </div>
     );
   }
 
   if (!analysis) {
     return (
-      <div className="text-center py-20 text-[#1A3226]/40">
-        Analysis not found.{" "}
-        <Link to="/Dashboard" className="text-[#B8982F] underline">Go home</Link>
+      <div className="text-center py-16">
+        <p className="text-[#1A3226]/50 mb-4">Analysis not found.</p>
+        <Link to="/Analyses" className="text-[#1A3226] underline text-sm">Back to Analyses</Link>
       </div>
     );
   }
 
-  const statusCfg = STATUS_CONFIG[analysis.status] || STATUS_CONFIG.draft;
-  const StatusIcon = statusCfg.icon;
+  const address = analysis.intake_data?.address;
+  const isComplete = analysis.status === "complete";
 
   return (
-    <div className="max-w-3xl mx-auto space-y-5">
-      <div className="flex items-center gap-3">
-        <Link to="/Analyses">
-          <Button variant="ghost" size="sm" className="text-[#1A3226]/50 hover:text-[#1A3226] gap-1">
-            <ArrowLeft className="w-4 h-4" /> Back
-          </Button>
-        </Link>
-      </div>
+    <div className="max-w-3xl mx-auto space-y-6">
+      {/* Back */}
+      <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="text-[#1A3226]/60 hover:text-[#1A3226] -ml-2">
+        <ArrowLeft className="w-4 h-4 mr-1" /> Back
+      </Button>
 
-      {/* Main info card */}
-      <div className="rounded-2xl border border-[#1A3226]/10 bg-white p-6 lg:p-8">
-        <div className="flex items-start justify-between mb-6">
+      {/* Header card */}
+      <div className="rounded-2xl border border-[#1A3226]/10 bg-white p-6">
+        <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-[#B8982F] text-xs font-medium uppercase tracking-widest mb-1">Analysis</p>
-            <h1 className="text-xl font-semibold text-[#1A3226]" style={{ fontFamily: "Georgia, serif" }}>
-              {LABELS.assessment_type[analysis.assessment_type] || analysis.assessment_type}
+            <h1 className="text-xl font-semibold text-[#1A3226]">
+              {ASSESSMENT_LABELS[analysis.assessment_type] || analysis.assessment_type}
             </h1>
-            <p className="text-sm text-[#1A3226]/50 mt-1">{analysis.intake_data?.address}</p>
+            {address && (
+              <p className="text-sm text-[#1A3226]/60 mt-1">{address}</p>
+            )}
           </div>
-          <span className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium ${statusCfg.className}`}>
-            <StatusIcon className="w-3 h-3" />
-            {statusCfg.label}
+          <span className={`text-xs px-2.5 py-1 rounded-full font-medium flex-shrink-0 ${STATUS_STYLES[analysis.status] || "bg-gray-100 text-gray-600"}`}>
+            {analysis.status}
           </span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
+        {/* Metadata grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-5 pt-5 border-t border-[#1A3226]/8">
           {[
-            { label: "Platform",      value: LABELS.ai_platform[analysis.ai_platform] },
-            { label: "Model",         value: analysis.ai_model || "—" },
-            { label: "Format",        value: LABELS.output_format[analysis.output_format] },
-            { label: "Property Type", value: analysis.property_type?.replace(/_/g, " ") },
-            { label: "Location Class",value: analysis.location_class?.replace(/_/g, " ") },
-            { label: "Client Role",   value: analysis.intake_data?.client_relationship?.replace(/_/g, " ") || "—" },
-          ].map((item) => (
-            <div key={item.label} className="rounded-xl bg-[#FAF8F4] p-3">
-              <p className="text-[10px] text-[#1A3226]/40 uppercase tracking-wider mb-1">{item.label}</p>
-              <p className="text-sm font-medium text-[#1A3226] capitalize">{item.value}</p>
+            ["AI Platform", PLATFORM_LABELS[analysis.ai_platform] || analysis.ai_platform],
+            ["Property Type", analysis.property_type?.replace(/_/g, " ")],
+            ["Output Format", FORMAT_LABELS[analysis.output_format] || analysis.output_format],
+            ["Location Class", analysis.location_class?.replace(/_/g, " ")],
+            ["Created", analysis.created_date ? new Date(analysis.created_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"],
+            analysis.completed_at && ["Completed", new Date(analysis.completed_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })],
+          ].filter(Boolean).map(([label, value]) => (
+            <div key={label}>
+              <p className="text-[10px] uppercase tracking-wider text-[#1A3226]/40 mb-0.5">{label}</p>
+              <p className="text-sm text-[#1A3226] capitalize">{value || "—"}</p>
             </div>
           ))}
         </div>
-
-        {analysis.status !== "complete" && (
-          <div className="rounded-xl border border-[#B8982F]/30 bg-[#B8982F]/5 p-5">
-            <p className="text-sm font-medium text-[#1A3226] mb-2">Next Step: Run Your Analysis</p>
-            <p className="text-xs text-[#1A3226]/60 leading-relaxed">
-              Your intake has been saved. Use the{" "}
-              <Link to={`/AnalysisRun?id=${analysis.id}`} className="text-[#B8982F] font-medium underline">
-                Analysis Run
-              </Link>{" "}
-              page to generate your AI-powered report.
-            </p>
-          </div>
-        )}
       </div>
 
-      {/* Export panel — shown once analysis exists */}
-      <ExportPanel analysis={analysis} onExported={loadAnalysis} />
+      {/* Run / View output */}
+      {!isComplete ? (
+        <div className="rounded-xl border border-[#B8982F]/30 bg-[#B8982F]/5 p-5 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-[#1A3226]">Ready to run this analysis</p>
+            <p className="text-xs text-[#1A3226]/50 mt-0.5">
+              This will use <strong>{PLATFORM_LABELS[analysis.ai_platform]}</strong> to generate your report.
+            </p>
+          </div>
+          <Button
+            onClick={() => navigate(`/AnalysisRun?id=${analysis.id}&orgId=${analysis.org_id}`)}
+            className="flex-shrink-0 bg-[#1A3226] text-white hover:bg-[#1A3226]/90"
+          >
+            Run Analysis →
+          </Button>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-5 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <Clock className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+            <p className="text-sm text-emerald-700 font-medium">Analysis complete</p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate(`/AnalysisRun?id=${analysis.id}&orgId=${analysis.org_id}`)}
+            className="flex-shrink-0 border-emerald-300 text-emerald-700 hover:bg-emerald-100 gap-1"
+          >
+            View Output <ExternalLink className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      )}
+
+      {/* Export panel — only when complete */}
+      {isComplete && (
+        <ExportPanel analysis={analysis} orgPlan={orgPlan} />
+      )}
+
+      {/* Prompt assembly guidance (for manual copy mode) */}
+      {analysis.ai_platform && !isComplete && (
+        <div className="rounded-xl border border-[#1A3226]/10 bg-white p-5">
+          <h3 className="text-sm font-semibold text-[#1A3226] mb-2">How to run this analysis manually</h3>
+          <ol className="space-y-2 text-sm text-[#1A3226]/70 list-decimal list-inside">
+            <li>Click "Run Analysis" above to open the analysis runner.</li>
+            <li>Copy the assembled prompt from the runner page.</li>
+            <li>Paste it into <strong>{PLATFORM_LABELS[analysis.ai_platform]}</strong> and run.</li>
+            <li>Paste the AI response back into PropPrompt to save and export your report.</li>
+          </ol>
+        </div>
+      )}
     </div>
   );
 }

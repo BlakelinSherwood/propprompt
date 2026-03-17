@@ -14,173 +14,222 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { analysisId, toEmail, subject: customSubject, includePdf = false, contactName = '' } = await req.json();
-    if (!analysisId) return Response.json({ error: 'analysisId required' }, { status: 400 });
-    if (!toEmail) return Response.json({ error: 'toEmail required' }, { status: 400 });
+    const { analysisId, toEmail, subject, contactName, includePdf } = await req.json();
+    if (!analysisId || !toEmail) {
+      return Response.json({ error: 'analysisId and toEmail required' }, { status: 400 });
+    }
 
-    const [analyses, brandingRes] = await Promise.all([
-      base44.asServiceRole.entities.Analysis.filter({ id: analysisId }),
-      base44.functions.invoke('resolveBranding', { analysisId }),
-    ]);
-
+    // Load analysis
+    const analyses = await base44.asServiceRole.entities.Analysis.filter({ id: analysisId });
     const analysis = analyses[0];
     if (!analysis) return Response.json({ error: 'Analysis not found' }, { status: 404 });
 
-    const branding = brandingRes?.data?.branding;
-    const address = analysis.intake_data?.address || 'the subject property';
-    const assessmentLabel = ASSESSMENT_LABELS[analysis.assessment_type] || 'Analysis';
-    const subject = customSubject || `Your ${assessmentLabel} — ${address}`;
-    const top3 = extractTop3Conclusions(analysis.output_text || '');
-    const pdfUrl = analysis.output_pdf_url || null;
+    // Resolve branding
+    let branding = {};
+    try {
+      const bRes = await base44.functions.invoke('resolveBranding', { analysisId });
+      branding = bRes?.data?.branding || {};
+    } catch (e) {
+      console.warn('[sendAnalysisEmail] branding resolve failed:', e.message);
+    }
+
+    const pri = branding.primary_color || '#333333';
+    const acc = branding.accent_color || '#666666';
+    const address = analysis.intake_data?.address || '';
+    const assessLabel = ASSESSMENT_LABELS[analysis.assessment_type] || 'Analysis';
+    const emailSubject = subject || `Your ${assessLabel} — ${address}`;
+    const pdfUrl = analysis.output_pdf_url || analysis.pdf_url || null;
+
+    // Extract top 3 conclusions from output_text
+    const conclusions = extractConclusions(analysis.output_text || '', 3);
+
+    // App base URL for "View Full Analysis" link
+    const appBaseUrl = Deno.env.get('APP_BASE_URL') || 'https://app.propprompt.com';
+    const analysisUrl = `${appBaseUrl}/Analysis/${analysisId}`;
 
     const html = buildEmailHtml({
-      branding, assessmentLabel, address, top3,
-      contactName, includePdf, pdfUrl, analysisId,
+      branding,
+      pri,
+      acc,
+      contactName: contactName || '',
+      assessLabel,
+      address,
+      conclusions,
+      analysisUrl,
+      includePdf: !!includePdf,
+      pdfUrl,
+      intake: analysis.intake_data || {},
     });
 
+    // Send via built-in email integration
     await base44.asServiceRole.integrations.Core.SendEmail({
       to: toEmail,
-      subject,
+      subject: emailSubject,
       body: html,
-      from_name: branding?.org_name || branding?.agent_name || 'PropPrompt Analysis',
+      from_name: branding.agent_name || branding.org_name || 'PropPrompt',
     });
 
-    // Log to AnalysisEmail audit table
+    // Log the send
     await base44.asServiceRole.entities.AnalysisEmail.create({
       analysis_id: analysisId,
       sent_to: toEmail,
       sent_at: new Date().toISOString(),
-      subject,
+      subject: emailSubject,
       included_pdf: !!includePdf,
       sent_by_email: user.email,
     });
 
+    // Update analysis export tracking
+    await base44.asServiceRole.entities.Analysis.update(analysisId, {
+      last_exported_at: new Date().toISOString(),
+      last_export_format: 'email',
+    });
+
     console.log(`[sendAnalysisEmail] sent to ${toEmail} for analysis ${analysisId}`);
-    return Response.json({ success: true });
-  } catch (error) {
-    console.error('[sendAnalysisEmail] error:', error.message, error.stack);
-    return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ success: true, sentTo: toEmail, subject: emailSubject });
+
+  } catch (err) {
+    console.error('[sendAnalysisEmail] error:', err.message, err.stack);
+    return Response.json({ error: err.message }, { status: 500 });
   }
 });
 
-/** Pull the first 3 meaningful bullet points / numbered items from output_text */
-function extractTop3Conclusions(text) {
-  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-  const bullets = lines
-    .filter(l => /^[-•*]|^\d+\./.test(l) || (l.length > 20 && l.length < 200))
-    .map(l => l.replace(/^[-•*\d.]\s*/, '').replace(/\*\*/g, '').trim())
-    .filter(l => l.length > 15)
-    .slice(0, 3);
-  return bullets.length ? bullets : [];
-}
+// ─── HTML email builder ───────────────────────────────────────────────────────
 
-function buildEmailHtml({ branding, assessmentLabel, address, top3, contactName, includePdf, pdfUrl, analysisId }) {
-  const b = branding || {};
-  const pri = (b.primary_color || '#333333');
-  const acc = (b.accent_color  || '#666666');
-  const bg  = (b.background_color || '#FFFFFF');
-  const style = b.signature_style || 'name_title_contact';
+function buildEmailHtml({ branding, pri, acc, contactName, assessLabel, address, conclusions, analysisUrl, includePdf, pdfUrl, intake }) {
+  const hasLogo = !!branding.org_logo_url;
+  const hasHeadshot = branding.signature_style === 'full_with_headshot' && !!branding.agent_headshot_url;
+  const contactLine = [branding.agent_phone, branding.agent_email].filter(Boolean).join(' | ');
+  const orgFooter = [branding.org_address, branding.org_phone, branding.org_website].filter(Boolean).join('  ·  ');
 
-  // Header
-  const logoHtml = b.org_logo_url
-    ? `<img src="${b.org_logo_url}" alt="${b.org_name || ''}" height="44" style="max-height:44px;display:block" />`
+  const headerLogoCell = hasLogo
+    ? `<td style="padding:13px 16px;"><img src="${branding.org_logo_url}" alt="${branding.org_name || ''}" style="max-height:44px;display:block;"></td>`
     : '';
-  const headerInner = b.org_logo_url
-    ? `<table width="100%" cellpadding="0" cellspacing="0"><tr>
-        <td style="vertical-align:middle">${logoHtml}</td>
-        <td style="text-align:right;vertical-align:middle;color:#FFFFFF;font-size:14px;font-weight:bold;font-family:Georgia,serif">${b.org_name || ''}</td>
-       </tr></table>`
-    : `<p style="text-align:center;color:#FFFFFF;font-weight:bold;font-size:16px;font-family:Georgia,serif;margin:0">${b.org_name || ''}</p>`;
+  const headerNameStyle = hasLogo
+    ? `text-align:right;padding:13px 16px;color:#FFFFFF;font-size:15px;font-weight:bold;font-family:Georgia,serif;`
+    : `text-align:center;padding:13px 16px;color:#FFFFFF;font-size:17px;font-weight:bold;font-family:Georgia,serif;`;
 
-  // Greeting
-  const greeting = contactName ? `<p style="color:#1A1A1A;font-size:14px;margin:0 0 10px">Hi ${contactName},</p>` : '';
+  const conclusionRows = conclusions.map(c =>
+    `<tr><td style="padding:6px 0;font-size:14px;color:#333333;font-family:Arial,sans-serif;border-bottom:1px solid #EEEEEE;">• ${c}</td></tr>`
+  ).join('');
 
-  // Intro
-  const intro = `<p style="color:#444;font-size:13px;margin:0 0 20px">Please find your <strong>${assessmentLabel}</strong> for <strong>${address}</strong> below.</p>`;
-
-  // Key findings
-  const findingsRows = `
-    <tr><td style="padding:7px 0;border-bottom:1px solid #F0F0F0;color:#555;font-size:12px;width:35%">Property</td>
-        <td style="padding:7px 0;border-bottom:1px solid #F0F0F0;color:#1A1A1A;font-size:12px;font-weight:600">${address}</td></tr>
-    <tr><td style="padding:7px 0;border-bottom:1px solid #F0F0F0;color:#555;font-size:12px">Analysis Type</td>
-        <td style="padding:7px 0;border-bottom:1px solid #F0F0F0;color:#1A1A1A;font-size:12px;font-weight:600">${assessmentLabel}</td></tr>
-    ${top3.map(c => `
-    <tr><td colspan="2" style="padding:7px 0;border-bottom:1px solid #F0F0F0;color:#1A1A1A;font-size:12px">
-      <span style="color:${acc};margin-right:8px">▸</span>${c}
-    </td></tr>`).join('')}
-  `;
-
-  // PDF note
-  const pdfNote = includePdf
-    ? `<p style="color:#555;font-size:12px;margin:0 0 20px;padding:10px 14px;background:#F9F9F9;border-radius:4px">📎 Your PDF is attached.</p>`
+  const greetingLine = contactName
+    ? `<p style="font-size:16px;color:#1A1A1A;font-family:Arial,sans-serif;margin:0 0 12px;">Hi ${contactName},</p>`
     : '';
 
-  // Signature
-  const headshotHtml = (style === 'full_with_headshot' && b.agent_headshot_url)
-    ? `<img src="${b.agent_headshot_url}" width="48" height="48" style="border-radius:50%;float:left;margin:0 14px 8px 0" />`
+  const headshotHtml = hasHeadshot
+    ? `<img src="${branding.agent_headshot_url}" width="48" height="48" style="border-radius:50%;object-fit:cover;display:inline-block;vertical-align:middle;margin-right:12px;">`
     : '';
 
-  const sigLines = [];
-  if (b.agent_name) sigLines.push(`<p style="font-weight:bold;color:#1A1A1A;font-size:14px;margin:0 0 3px">${b.agent_name}</p>`);
-  if (style !== 'name_only' && b.agent_title) sigLines.push(`<p style="color:#555;font-size:12px;margin:0 0 3px">${b.agent_title}</p>`);
-  if (['name_title_contact', 'full_with_headshot'].includes(style)) {
-    const contact = [b.agent_phone, b.agent_email].filter(Boolean).join('  |  ');
-    if (contact) sigLines.push(`<p style="color:#555;font-size:12px;margin:0 0 3px">${contact}</p>`);
-    if (b.agent_license) sigLines.push(`<p style="color:#888;font-size:11px;margin:0">License: ${b.agent_license}</p>`);
-  }
-  if (b.agent_tagline) sigLines.push(`<p style="color:#999;font-size:11px;font-style:italic;margin:5px 0 0">${b.agent_tagline}</p>`);
+  const sigNameStyle = `font-size:15px;font-weight:bold;color:#1A1A1A;font-family:Arial,sans-serif;display:inline-block;vertical-align:middle;`;
 
-  const footerInfo = [b.org_address, b.org_phone, b.org_website].filter(Boolean).join('  ·  ');
+  const pdfNote = includePdf && pdfUrl
+    ? `<p style="font-size:13px;color:#555555;font-family:Arial,sans-serif;margin:16px 0 0;padding:10px 14px;background:#F9F9F9;border-left:3px solid ${acc};border-radius:3px;">📎 Your PDF report is attached to this email.</p>`
+    : '';
+
+  const priceRange = intake.price_range || intake.suggested_price || '';
 
   return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#F0EEE9;font-family:Arial,Helvetica,sans-serif">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#F0EEE9">
-<tr><td align="center" style="padding:24px 10px">
-<table cellpadding="0" cellspacing="0" style="background:${bg};max-width:600px;width:100%;border-radius:4px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.07)">
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>${assessLabel}</title></head>
+<body style="margin:0;padding:0;background:#F0F0F0;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#F0F0F0;padding:24px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#FFFFFF;border-radius:6px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
 
   <!-- HEADER -->
-  <tr><td style="background:${pri};padding:13px 20px;height:70px;vertical-align:middle">
-    ${headerInner}
-  </td></tr>
-  <!-- ACCENT LINE -->
-  <tr><td style="background:${acc};height:3px;font-size:1px;line-height:1px">&nbsp;</td></tr>
+  <tr>
+    <td style="background:${pri};border-bottom:3px solid ${acc};">
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          ${headerLogoCell}
+          <td style="${headerNameStyle}">${branding.org_name || ''}</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
 
   <!-- BODY -->
-  <tr><td style="padding:28px 32px">
-    ${greeting}
-    ${intro}
+  <tr>
+    <td style="padding:32px 36px;background:#FFFFFF;">
+      ${greetingLine}
+      <p style="font-size:15px;color:#333333;font-family:Arial,sans-serif;margin:0 0 24px;line-height:1.6;">
+        Please find your <strong>${assessLabel}</strong> for <strong>${address}</strong> below.
+      </p>
 
-    <!-- Key findings -->
-    <p style="color:${pri};font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:1.5px;margin:0 0 8px">Key Findings</p>
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px">
-      ${findingsRows}
-    </table>
+      <!-- Key Findings Block -->
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+        <tr>
+          <td style="background:${pri};padding:10px 16px;border-radius:4px 4px 0 0;">
+            <span style="color:#FFFFFF;font-size:13px;font-weight:bold;font-family:Arial,sans-serif;letter-spacing:0.5px;text-transform:uppercase;">Key Findings</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="border:1px solid #E8E8E8;border-top:none;padding:16px;border-radius:0 0 4px 4px;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr><td style="padding:6px 0;font-size:14px;color:#333333;font-family:Arial,sans-serif;border-bottom:1px solid #EEEEEE;"><strong>Property:</strong> ${address}</td></tr>
+              <tr><td style="padding:6px 0;font-size:14px;color:#333333;font-family:Arial,sans-serif;border-bottom:1px solid #EEEEEE;"><strong>Analysis Type:</strong> ${assessLabel}</td></tr>
+              ${priceRange ? `<tr><td style="padding:6px 0;font-size:14px;color:#333333;font-family:Arial,sans-serif;border-bottom:1px solid #EEEEEE;"><strong>Recommended Price Range:</strong> ${priceRange}</td></tr>` : ''}
+              ${conclusionRows}
+            </table>
+          </td>
+        </tr>
+      </table>
 
-    ${pdfNote}
+      <!-- CTA Button -->
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+        <tr>
+          <td align="center">
+            <a href="${analysisUrl}" style="display:inline-block;background:${pri};color:#FFFFFF;font-size:14px;font-weight:bold;font-family:Arial,sans-serif;text-decoration:none;padding:13px 32px;border-radius:6px;">View Full Analysis →</a>
+          </td>
+        </tr>
+      </table>
 
-    <!-- CTA -->
-    <p style="text-align:center;margin:28px 0 8px">
-      <a href="#" style="background:${pri};color:#FFFFFF;text-decoration:none;padding:12px 30px;border-radius:5px;font-size:14px;font-weight:bold;display:inline-block;font-family:Georgia,serif">View Full Analysis</a>
-    </p>
-  </td></tr>
+      ${pdfNote}
 
-  <!-- SIGNATURE -->
-  <tr><td style="padding:18px 32px 22px;border-top:2px solid ${acc}">
-    ${headshotHtml}
-    ${sigLines.join('')}
-    <div style="clear:both"></div>
-  </td></tr>
+      <!-- SIGNATURE BLOCK -->
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:32px;border-top:2px solid ${acc};">
+        <tr>
+          <td style="padding:20px 0 0;">
+            <div style="margin-bottom:6px;">${headshotHtml}<span style="${sigNameStyle}">${branding.agent_name || ''}</span></div>
+            ${branding.agent_title ? `<p style="margin:3px 0;font-size:13px;color:#555555;font-family:Arial,sans-serif;">${branding.agent_title}</p>` : ''}
+            ${contactLine ? `<p style="margin:3px 0;font-size:13px;color:#555555;font-family:Arial,sans-serif;">${contactLine}</p>` : ''}
+            ${branding.agent_tagline ? `<p style="margin:6px 0 0;font-size:13px;color:#777777;font-style:italic;font-family:Arial,sans-serif;">${branding.agent_tagline}</p>` : ''}
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
 
   <!-- FOOTER -->
-  <tr><td style="background:#F5F5F5;padding:14px 32px;text-align:center;border-top:1px solid #E8E8E8">
-    ${footerInfo ? `<p style="color:#999;font-size:11px;margin:0 0 5px">${footerInfo}</p>` : ''}
-    <p style="color:#BBBBBB;font-size:10px;margin:0 0 4px">Sent via PropPrompt™</p>
-    <p style="color:#BBBBBB;font-size:10px;margin:0"><a href="#" style="color:#BBBBBB;text-decoration:underline">Unsubscribe</a></p>
-  </td></tr>
+  <tr>
+    <td style="background:#F5F5F5;padding:20px 36px;text-align:center;">
+      ${orgFooter ? `<p style="margin:0 0 6px;font-size:12px;color:#888888;font-family:Arial,sans-serif;">${orgFooter}</p>` : ''}
+      <p style="margin:0 0 6px;font-size:11px;color:#AAAAAA;font-family:Arial,sans-serif;">Sent via PropPrompt™</p>
+      <p style="margin:0;font-size:11px;font-family:Arial,sans-serif;"><a href="${analysisUrl}?unsubscribe=1" style="color:#AAAAAA;text-decoration:underline;">Unsubscribe</a></p>
+    </td>
+  </tr>
 
 </table>
 </td></tr>
 </table>
-</body></html>`;
+</body>
+</html>`;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function extractConclusions(text, max) {
+  if (!text) return [];
+  // Grab lines that look like conclusions: bullet points, numbered items, or bold lines
+  const lines = text.split('\n');
+  const hits = [];
+  for (const line of lines) {
+    const clean = line.replace(/^\s*[-*•\d.]+\s*/, '').replace(/\*\*/g, '').trim();
+    if (clean.length > 20 && clean.length < 200) {
+      hits.push(clean);
+    }
+    if (hits.length >= max) break;
+  }
+  return hits;
 }
