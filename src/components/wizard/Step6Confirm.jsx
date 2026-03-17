@@ -121,14 +121,12 @@ export default function Step6Confirm({ intake, update, user, orgMembers, submitt
       )}
 
       {/* API Mode Indicator */}
-      <div className="rounded-xl border border-[#1A3226]/10 p-4 mb-8 flex items-start gap-3">
-        <Zap className="w-4 h-4 text-[#B8982F] mt-0.5 flex-shrink-0" />
+      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 mb-8 flex items-start gap-3">
+        <Zap className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
         <div>
-          <p className="text-xs font-medium text-[#1A3226]">Analysis Mode: Manual Copy</p>
-          <p className="text-xs text-[#1A3226]/50 mt-0.5">
-            After launching, PropPrompt will assemble and display your calibrated prompt. Copy it into{" "}
-            <span className="capitalize font-medium">{LABELS.ai_platform[intake.ai_platform] || intake.ai_platform}</span> to run the analysis.
-            Direct API integration is coming in a future release.
+          <p className="text-xs font-medium text-emerald-900">Direct API Integration</p>
+          <p className="text-xs text-emerald-700 mt-0.5">
+            Your prompts are secured server-side. All analysis runs through encrypted backend APIs — you never see or touch the actual prompts.
           </p>
         </div>
       </div>
