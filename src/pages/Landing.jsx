@@ -82,6 +82,7 @@ function FAQItem({ q, a }) {
 
 export default function Landing() {
   const { pricing, loading: pricingLoading } = usePricing();
+  const { founder, loading: founderLoading } = useFounderProfile();
   const [waitlistEmail, setWaitlistEmail] = useState('');
   const [waitlistSent, setWaitlistSent] = useState(false);
 
