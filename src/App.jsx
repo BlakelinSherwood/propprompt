@@ -21,6 +21,7 @@ import TeamAdmin from './pages/TeamAdmin';
 import AccountSettings from './pages/AccountSettings';
 import AgentBranding from './pages/AgentBranding';
 import PricingAdmin from './pages/PricingAdmin';
+import Territories from './pages/Territories';
 import BrokerageBranding from './pages/BrokerageBranding';
 import TeamBranding from './pages/TeamBranding';
 
