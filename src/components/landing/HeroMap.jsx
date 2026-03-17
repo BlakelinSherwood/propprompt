@@ -11,6 +11,9 @@ const MARKERS = [
   { x: 110, y: 300, label: "Brattleboro, VT", color: "#f59e0b", delay: 2.8 },
   { x: 240, y: 100, label: "Bangor, ME", color: "#B8982F", delay: 3.2 },
   { x: 165, y: 145, label: "Laconia, NH", color: "#f59e0b", delay: 3.6 },
+  { x: 120, y: 330, label: "Boston, MA", color: "#ef4444", delay: 4.0 },
+  { x: 90, y: 320, label: "Worcester, MA", color: "#B8982F", delay: 4.4 },
+  { x: 75, y: 345, label: "Springfield, MA", color: "#B8982F", delay: 4.8 },
 ];
 
 export default function HeroMap() {
@@ -34,6 +37,9 @@ export default function HeroMap() {
           fill="#1A3226" stroke="#B8982F" strokeWidth="0.8" strokeOpacity="0.4" fillOpacity="0.3" />
         {/* VT outline */}
         <path d="M60,185 L80,200 L80,230 L90,270 L70,290 L40,270 L30,230 L35,200 L50,190 Z"
+          fill="#1A3226" stroke="#B8982F" strokeWidth="0.8" strokeOpacity="0.4" fillOpacity="0.3" />
+        {/* MA outline */}
+        <path d="M70,295 L155,290 L165,305 L145,330 L110,340 L65,335 L55,320 L65,305 Z"
           fill="#1A3226" stroke="#B8982F" strokeWidth="0.8" strokeOpacity="0.4" fillOpacity="0.3" />
         {/* Grid lines */}
         {[80, 120, 160, 200, 240, 280].map(y => (

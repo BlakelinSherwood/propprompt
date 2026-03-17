@@ -1,6 +1,6 @@
 import { Search } from "lucide-react";
 
-const STATE_OPTS = ["all", "ME", "NH", "VT"];
+const STATE_OPTS = ["all", "ME", "NH", "VT", "MA"];
 const STATUS_OPTS = [
   { value: "all", label: "All Statuses" },
   { value: "available", label: "Available" },

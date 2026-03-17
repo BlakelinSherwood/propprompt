@@ -5,7 +5,6 @@ const LEGEND = [
   { color: "#ef4444", label: "Fully Claimed / Buyout" },
   { color: "#6366f1", label: "Pool Member" },
   { color: "#1e293b", label: "Reserved" },
-  { color: "#94a3b8", label: "Coming Soon" },
 ];
 
 export default function TerritoryLegend() {

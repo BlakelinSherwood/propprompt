@@ -48,24 +48,13 @@ export default function TerritoryPopupContent({ territory: t, state, county, pri
     </div>
   );
 
-  // Coming soon
-  if (t.status === "coming_soon") {
-    return (
-      <div className="p-3 w-64">
-        {header}
-        <p className="text-xs text-[#1A3226]/60 mb-2">PropPrompt is coming to this state soon.</p>
-        {btn("Join Waitlist", `/waitlist?territory_id=${t.id}`)}
-      </div>
-    );
-  }
-
   // Reserved
   if (t.status === "reserved") {
     return (
       <div className="p-3 w-64">
         {header}
-        <span className="inline-block text-[10px] bg-[#1e293b] text-white px-2 py-0.5 rounded-full mb-2">Founding Partner Territory</span>
-        <p className="text-xs text-[#1A3226]/60">This territory is reserved.</p>
+        <span className="inline-block text-[10px] bg-[#1e293b] text-white px-2 py-0.5 rounded-full mb-2">Founding Partner Territory — Reserved</span>
+        <p className="text-xs text-[#1A3226]/60">This territory is held by a PropPrompt Founding Partner and is not available for general subscription.</p>
       </div>
     );
   }
