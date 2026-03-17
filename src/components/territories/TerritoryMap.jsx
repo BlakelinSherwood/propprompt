@@ -4,8 +4,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import TerritoryLegend from "./TerritoryLegend";
 import TerritoryPopupContent from "./TerritoryPopupContent";
 import { createRoot } from "react-dom/client";
-
-mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
+import { base44 } from "@/api/base44Client";
 
 function getColor(t) {
   if (t.status === "coming_soon") return "#94a3b8";
@@ -43,13 +42,25 @@ export default function TerritoryMap({
 
   useEffect(() => {
     if (map.current) return;
-    map.current = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: "mapbox://styles/mapbox/light-v11",
-      center: [-69.5, 44.5],
-      zoom: 6,
-    });
-    map.current.addControl(new mapboxgl.NavigationControl(), "top-right");
+
+    const initMap = async () => {
+      try {
+        const { data } = await base44.functions.invoke('getMapboxToken', {});
+        mapboxgl.accessToken = data.token;
+
+        map.current = new mapboxgl.Map({
+          container: mapContainer.current,
+          style: "mapbox://styles/mapbox/light-v11",
+          center: [-69.5, 44.5],
+          zoom: 6,
+        });
+        map.current.addControl(new mapboxgl.NavigationControl(), "top-right");
+      } catch (err) {
+        console.error("Failed to initialize map:", err);
+      }
+    };
+
+    initMap();
   }, []);
 
   useEffect(() => {
