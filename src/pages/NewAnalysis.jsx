@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
 import WizardProgress from "../components/wizard/WizardProgress";
 import Step1Platform from "../components/wizard/Step1Platform";
@@ -32,24 +33,23 @@ const INITIAL_INTAKE = {
 };
 
 export default function NewAnalysis() {
+  const { user } = useAuth();
   const [step, setStep] = useState(1);
   const [intake, setIntake] = useState(INITIAL_INTAKE);
-  const [user, setUser] = useState(null);
   const [orgMembers, setOrgMembers] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     async function load() {
-      const me = await base44.auth.me();
-      setUser(me);
+      if (!user) return;
       if (me.role === "assistant" || me.role === "team_lead") {
         const members = await base44.entities.User.list();
         setOrgMembers(members.filter((m) => m.email !== me.email && ["agent", "team_agent"].includes(m.role)));
       }
     }
     load();
-  }, []);
+  }, [user]);
 
   function update(fields) {
     setIntake((prev) => ({ ...prev, ...fields }));

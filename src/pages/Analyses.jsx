@@ -1,17 +1,11 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { useAuth } from "@/lib/AuthContext";
 import { Link } from "react-router-dom";
 import { Plus, FileText, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { STATUS_STYLES } from "@/lib/constants";
 import PrivateToggle from "../components/PrivateToggle";
-
-const STATUS_STYLES = {
-  draft: "bg-[#1A3226]/5 text-[#1A3226]/50",
-  in_progress: "bg-amber-50 text-amber-600",
-  complete: "bg-emerald-50 text-emerald-700",
-  failed: "bg-red-50 text-red-600",
-  archived: "bg-gray-100 text-gray-400",
-};
+import { base44 } from "@/api/base44Client";
 
 const TYPE_LABELS = {
   listing_pricing: "Listing Pricing",
@@ -23,15 +17,14 @@ const TYPE_LABELS = {
 };
 
 export default function Analyses() {
+  const { user, isLoading: authLoading } = useAuth();
   const [analyses, setAnalyses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [orgAllowsPrivate, setOrgAllowsPrivate] = useState(false);
-  const [user, setUser] = useState(null);
 
   useEffect(() => {
     async function load() {
-      const me = await base44.auth.me();
-      setUser(me);
+      if (!user) return;
 
       const [data] = await Promise.all([
         base44.entities.Analysis.list("-created_date", 50),
@@ -51,9 +44,9 @@ export default function Analyses() {
       setLoading(false);
     }
     load();
-  }, []);
+  }, [user]);
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="w-8 h-8 border-4 border-[#1A3226]/20 border-t-[#1A3226] rounded-full animate-spin" />

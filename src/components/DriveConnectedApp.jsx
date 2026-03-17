@@ -43,10 +43,16 @@ export default function DriveConnectedApp() {
     }
     // Open OAuth in popup
     const popup = window.open(res.data.auth_url, "google_oauth", "width=500,height=650");
-    // Poll for close or success message
+    if (!popup) {
+      alert("Popup was blocked. Please allow popups for this site and try again.");
+      setConnecting(false);
+      return;
+    }
+    const maxWait = Date.now() + 5 * 60 * 1000; // 5 minutes max
     const timer = setInterval(async () => {
-      if (popup?.closed) {
+      if (popup.closed || Date.now() > maxWait) {
         clearInterval(timer);
+        if (Date.now() > maxWait && !popup.closed) popup.close();
         setConnecting(false);
         await load();
       }

@@ -22,7 +22,7 @@ export default function AnalysisPrivateToggle({ analysis, orgAllowsPrivate, onTo
 
     // Log to privacy audit
     await base44.functions.invoke("logPrivacyEvent", {
-      event_type: newValue ? "analysis_deleted" : "data_export_delivered", // closest available types
+      event_type: newValue ? "marked_private" : "marked_public",
       entity_type: "Analysis",
       entity_id: analysis.id,
       org_id: analysis.org_id,

@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { useAuth } from "@/lib/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { Check, Zap, Building2, Users, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { base44 } from "@/api/base44Client";
 
 const PLANS = [
   {
@@ -41,7 +42,7 @@ const OVERAGE_PACKS = [
 ];
 
 export default function Billing() {
-  const [user, setUser] = useState(null);
+  const { user, isLoading: authLoading } = useAuth();
   const [org, setOrg] = useState(null);
   const [quota, setQuota] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -55,8 +56,7 @@ export default function Billing() {
     if (params.get("canceled")) setMessage({ type: "info", text: "Checkout canceled — no charge was made." });
 
     async function load() {
-      const me = await base44.auth.me();
-      setUser(me);
+      if (!user) return;
       const memberships = await base44.entities.OrgMembership.filter({ user_email: me.email, status: "active" });
       if (memberships.length > 0) {
         const orgId = memberships[0].org_id;
@@ -68,7 +68,7 @@ export default function Billing() {
       setLoading(false);
     }
     load();
-  }, []);
+  }, [user]);
 
   async function checkout(priceId) {
     // Block if running in iframe (Base44 preview)
@@ -89,7 +89,7 @@ export default function Billing() {
     }
   }
 
-  if (loading) return (
+  if (authLoading || loading) return (
     <div className="flex items-center justify-center h-64">
       <div className="w-8 h-8 border-4 border-[#1A3226]/20 border-t-[#1A3226] rounded-full animate-spin" />
     </div>

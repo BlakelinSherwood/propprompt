@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { useState } from "react";
+import { useAuth } from "@/lib/AuthContext";
 import { Settings, Plug, Palette } from "lucide-react";
 import CrmConnectedApps from "../components/CrmConnectedApps";
 import DriveConnectedApp from "../components/DriveConnectedApp";
@@ -11,12 +11,8 @@ const TABS = [
 ];
 
 export default function AccountSettings() {
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const [tab, setTab] = useState("connected");
-
-  useEffect(() => {
-    base44.auth.me().then(setUser).catch(() => {});
-  }, []);
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
