@@ -223,16 +223,19 @@ export default function Landing() {
 
           {/* Static SVG mini-map */}
           <div className="bg-[#1A3226] rounded-3xl p-6 aspect-square max-w-sm mx-auto w-full relative overflow-hidden">
-            <svg viewBox="0 0 300 300" className="w-full h-full" fill="none">
-              {/* ME */}
-              <path d="M120,20 L240,25 L255,65 L235,95 L245,130 L215,148 L200,175 L165,182 L148,205 L130,195 L110,165 L80,148 L65,110 L72,65 Z"
-                fill="#B8982F" fillOpacity="0.25" stroke="#B8982F" strokeWidth="1.5" />
-              {/* NH */}
-              <path d="M82,150 L115,168 L133,198 L128,248 L98,260 L72,238 L62,195 L65,165 Z"
-                fill="#ef4444" fillOpacity="0.3" stroke="#ef4444" strokeWidth="1.5" />
-              {/* VT */}
-              <path d="M35,152 L62,165 L65,195 L72,238 L52,255 L25,235 L18,192 L22,162 Z"
-                fill="#22c55e" fillOpacity="0.25" stroke="#22c55e" strokeWidth="1.5" />
+            <svg viewBox="0 0 350 350" className="w-full h-full" fill="none">
+              {/* ME accurate outline */}
+              <path d="M165,30 Q200,35 245,45 Q265,50 275,70 Q280,90 275,125 Q270,150 255,160 Q240,168 225,174 Q210,180 200,195 Q190,210 180,220 Q165,230 155,225 Q145,210 140,190 Q135,165 130,140 Q128,115 130,90 Q135,65 145,50 Q155,38 165,30 Z"
+                fill="#B8982F" fillOpacity="0.3" stroke="#B8982F" strokeWidth="1.5" />
+              {/* NH accurate outline */}
+              <path d="M110,160 Q130,170 155,180 Q165,185 170,205 Q172,240 160,275 Q150,290 125,295 Q100,295 85,280 Q75,265 75,235 Q78,205 85,185 Q95,165 110,160 Z"
+                fill="#ef4444" fillOpacity="0.35" stroke="#ef4444" strokeWidth="1.5" />
+              {/* VT accurate outline */}
+              <path d="M75,160 Q85,165 95,175 Q100,185 95,220 Q90,260 80,280 Q70,295 50,300 Q40,295 35,275 Q32,245 35,215 Q40,185 50,170 Q60,160 75,160 Z"
+                fill="#22c55e" fillOpacity="0.3" stroke="#22c55e" strokeWidth="1.5" />
+              {/* MA accurate outline */}
+              <path d="M85,280 Q115,285 160,290 Q170,295 168,310 Q160,330 140,340 Q110,345 75,335 Q50,327 45,310 Q50,295 85,280 Z"
+                fill="#f59e0b" fillOpacity="0.35" stroke="#f59e0b" strokeWidth="1.5" />
               {/* Labels */}
               <text x="155" y="90" fill="white" fontSize="10" fontFamily="sans-serif" fontWeight="bold" textAnchor="middle">ME</text>
               <text x="98" y="210" fill="white" fontSize="10" fontFamily="sans-serif" fontWeight="bold" textAnchor="middle">NH</text>
