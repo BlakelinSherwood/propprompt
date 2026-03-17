@@ -23,6 +23,7 @@ import AgentBranding from './pages/AgentBranding';
 import PricingAdmin from './pages/PricingAdmin';
 import Territories from './pages/Territories';
 import Claim from './pages/Claim';
+import ClaimsAdmin from './pages/admin/ClaimsAdmin';
 import ClaimSubmitted from './pages/ClaimSubmitted';
 import BrokerageBranding from './pages/BrokerageBranding';
 import TeamBranding from './pages/TeamBranding';
@@ -73,6 +74,7 @@ const AuthenticatedApp = () => {
         <Route path="/AccountSettings" element={<AccountSettings />} />
         <Route path="/settings/branding" element={<AgentBranding />} />
         <Route path="/admin/pricing" element={<PricingAdmin />} />
+        <Route path="/admin/claims" element={<ClaimsAdmin />} />
         <Route path="/territories" element={<Territories />} />
         <Route path="/claim" element={<Claim />} />
         <Route path="/claim/submitted" element={<ClaimSubmitted />} />
