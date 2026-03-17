@@ -91,7 +91,7 @@ const AuthenticatedApp = () => {
         <Route path="/account/alert-settings" element={<AlertSettings />} />
         <Route path="/training" element={<Training />} />
         <Route path="/training/:videoId" element={<TrainingVideo />} />
-        <Route path="/Territories" element={<Territories />} />
+        <Route path="/territories" element={<Territories />} />
         <Route path="/account/topup" element={<TopupPage />} />
         <Route path="/account/bundle/:bundle_id" element={<BundleManagement />} />
         <Route path="/account/pool/:pool_id" element={<PoolManagement />} />
