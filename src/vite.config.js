@@ -5,8 +5,8 @@ import path from 'path'
 
 export default defineConfig({
   plugins: [
-    react(),
     base44VitePlugin(),
+    react(),
   ],
   resolve: {
     alias: {
