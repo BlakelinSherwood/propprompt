@@ -15,7 +15,7 @@ import AnalysisDetail from './pages/AnalysisDetail';
 import AnalysisRun from './pages/AnalysisRun';
 import Analyses from './pages/Analyses';
 import Billing from './pages/Billing';
-import Landing from './pages/Landing';
+import Landing from './pages/Landing.jsx';
 import BrokerageAdmin from './pages/BrokerageAdmin';
 import TeamAdmin from './pages/TeamAdmin';
 import AccountSettings from './pages/AccountSettings';
