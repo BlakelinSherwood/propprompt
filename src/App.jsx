@@ -34,6 +34,7 @@ import Training from './pages/Training';
 import TrainingVideo from './pages/TrainingVideo';
 import TrainingAdmin from './pages/admin/TrainingAdmin';
 import EasternMA from './pages/admin/territories/EasternMA';
+import DataQuality from './pages/admin/DataQuality';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -83,6 +84,7 @@ const AuthenticatedApp = () => {
         <Route path="/admin/pricing" element={<PricingAdmin />} />
         <Route path="/admin/claims" element={<ClaimsAdmin />} />
         <Route path="/admin/training" element={<TrainingAdmin />} />
+        <Route path="/admin/data-quality" element={<DataQuality />} />
         <Route path="/admin/territories/eastern-ma" element={<EasternMA />} />
         <Route path="/training" element={<Training />} />
         <Route path="/training/:videoId" element={<TrainingVideo />} />
