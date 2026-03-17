@@ -8,14 +8,14 @@
 
 ## Executive Summary
 
-The PropPrompt codebase is a sophisticated real-estate SaaS application with multi-tenant architecture, AI streaming integrations, Stripe billing, and document generation. The audit identified **72 findings** across security, correctness, performance, and code quality categories.
+The PropPrompt codebase is a sophisticated real-estate SaaS application with multi-tenant architecture, AI streaming integrations, Stripe billing, and document generation. The audit identified **85 findings** across security, correctness, performance, and code quality categories.
 
 | Severity | Count |
 |----------|-------|
-| Critical | 9     |
-| High     | 21    |
-| Medium   | 26    |
-| Low      | 16    |
+| Critical | 12    |
+| High     | 25    |
+| Medium   | 30    |
+| Low      | 18    |
 
 ---
 
@@ -65,7 +65,22 @@ This means data encrypted by one function cannot be decrypted by the other, lead
 **Issue:** `founder.founder_statement` is rendered with `dangerouslySetInnerHTML={{ __html: founder.founder_statement }}`. This field comes from a database record editable by platform owners. If any admin account is compromised, arbitrary JavaScript can be injected into the public landing page affecting all visitors.
 **Fix:** Sanitize with DOMPurify before rendering, or render as plain text/markdown.
 
-### C9. No Ownership Verification on Analysis Access in Stream Functions (Security)
+### C9. Hardcoded Mapbox API Key in Client Bundle (Security)
+**Files:** `src/components/territories/TerritoryMap.jsx:8`, `src/components/landing/HeroMap.jsx:5`
+**Issue:** Mapbox access token `pk.eyJ1IjoiYmxha2VzaGVyd29vZCIs...` is hardcoded directly in source code. This key is exposed in the client bundle, can be extracted by anyone, and used to rack up usage charges against the account.
+**Fix:** Load from an environment variable via `import.meta.env.VITE_MAPBOX_TOKEN`.
+
+### C10. Operator Precedence Bug in Loan Calculation (Bug)
+**File:** `src/components/payoff/PayoffInputCard.jsx:43`
+**Issue:** `new Date() - new Date(loanDate) / (1000 * 60 * 60 * 24 * 30)` — division binds tighter than subtraction, so `new Date(loanDate)` is divided first, then subtracted from `new Date()`. This produces wildly incorrect `monthsElapsed` values, corrupting all payoff calculations.
+**Fix:** Add parentheses: `(new Date() - new Date(loanDate)) / (1000 * 60 * 60 * 24 * 30)`.
+
+### C11. `Promise.all` Catch Handler Causes Crash (Bug)
+**File:** `src/components/landing/UrgencyStrip.jsx:11`
+**Issue:** `.catch()` on `Promise.all` returns `undefined`. The subsequent destructuring `[all, avail]` from `undefined` throws a runtime `TypeError`, crashing the component and potentially the entire page.
+**Fix:** Return a fallback array in catch: `.catch(() => [[], []])`.
+
+### C12. No Ownership Verification on Analysis Access in Stream Functions (Security)
 **Files:** `functions/claudeStream.ts:26-28`, `functions/geminiStream.ts:37-39`, `functions/grokStream.ts:21-23`, `functions/perplexityStream.ts:22-25`
 **Issue:** These streaming functions fetch an analysis by ID and process it without verifying the requesting user owns or has permission to access that analysis. Any authenticated user can stream any other user's analysis by providing its ID. Only `openaiStream.ts` (line 68-71) properly checks ownership.
 **Fix:** Add ownership check: verify `analysis.run_by_email === user.email` or user has admin role.
@@ -159,7 +174,27 @@ This means data encrypted by one function cannot be decrypted by the other, lead
 **Issue:** The Gemini API key is passed as a URL query parameter (`?key=${apiKey}`). This means it may appear in server access logs, CDN logs, and proxy logs. Other platforms correctly use headers for API key transmission.
 **Fix:** Use the `x-goog-api-key` header instead of the URL parameter.
 
-### H18. N+1 Query Pattern in BundleManagement and PoolManagement (Performance)
+### H18. PlatformAIConfig Save is Fake — No Persistence (Bug)
+**File:** `src/components/admin/platform/PlatformAIConfig.jsx:30`
+**Issue:** `handleSave` uses `setTimeout` to fake a save operation. There is no actual API call, so any changes made by the admin are silently discarded on refresh.
+**Fix:** Implement actual persistence via API call.
+
+### H19. ClaimsTable Missing Function Argument (Bug)
+**File:** `src/components/admin/claims/ClaimsTable.jsx:134`
+**Issue:** `getTerritorySummary(c)` is called with one argument, but the function signature requires a second `stateMap` argument. This produces incomplete/broken territory summary text.
+**Fix:** Pass the `stateMap` argument.
+
+### H20. SublicenseModal Fetches ALL Users Into Memory (Performance)
+**File:** `src/components/admin/sublicense/SublicenseModal.jsx:43`
+**Issue:** `base44.entities.User.list()` loads the entire user table into memory for a search dropdown. Will cause serious performance degradation as the user base grows.
+**Fix:** Use server-side filtered search with debounced input.
+
+### H21. TownsMap Markers Never Update After Initial Render (Bug)
+**File:** `src/components/admin/sublicense/TownsMap.jsx:51-53`
+**Issue:** The `useEffect` that should update markers when territories change has an empty body. Marker positions and colors never refresh after the initial render.
+**Fix:** Implement marker update logic in the effect body.
+
+### H22. N+1 Query Pattern in BundleManagement and PoolManagement (Performance)
 **Files:** `src/pages/BundleManagement.jsx`, `src/pages/PoolManagement.jsx`
 **Issue:** For each bundle/pool member, a separate API call fetches the territory individually. With many members, this creates a waterfall of network requests.
 **Fix:** Batch-fetch all territories then join client-side.
@@ -293,6 +328,26 @@ This means data encrypted by one function cannot be decrypted by the other, lead
 **Issue:** The email input only checks `!emailTo` but doesn't validate email format. Users could send to invalid addresses.
 **Fix:** Add basic email regex validation.
 
+### M23. AnalysisPrivateToggle Uses Misleading Privacy Event Types (Bug)
+**File:** `src/components/AnalysisPrivateToggle.jsx:25`
+**Issue:** When marking private, the event type logged is `"analysis_deleted"` and when marking public it is `"data_export_delivered"`. These are completely wrong event types that corrupt the audit log. The sibling `PrivateToggle.jsx` correctly uses `"marked_private"` / `"marked_public"`.
+**Fix:** Use correct event type strings.
+
+### M24. DriveConnectedApp OAuth Popup Polling Runs Indefinitely (Bug)
+**File:** `src/components/DriveConnectedApp.jsx:47-53`
+**Issue:** The `setInterval` polling for popup close has no maximum timeout. If the popup is blocked by a browser popup blocker, `popup` is `null`, `popup?.closed` is `undefined` (falsy), and the interval runs forever.
+**Fix:** Add a maximum timeout (e.g., 5 minutes) and clear the interval.
+
+### M25. PublicRecordsDisclosure Potential Infinite Re-render (Bug)
+**File:** `src/components/publicrecords/PublicRecordsDisclosure.jsx:15`
+**Issue:** `useEffect` has `onAccepted` in its dependency array. If the parent passes an inline arrow function, this causes the effect to re-fire every render, potentially triggering an infinite loop.
+**Fix:** Wrap `onAccepted` in `useCallback` at the call site, or use a ref.
+
+### M26. Hardcoded "351" Total Towns Count (Maintenance)
+**Files:** `src/components/admin/sublicense/SubStatsRow.jsx:8`, `SublicenseStatsRow.jsx:4`
+**Issue:** Total towns count is hardcoded as `"351"` rather than derived from actual data. This becomes stale as territories are added.
+**Fix:** Derive from the territories data.
+
 ### M16. Duplicate Function Logic: `chatbotChat` vs `chatbotMessage` (Code Quality)
 **Files:** `functions/chatbotChat.ts`, `functions/chatbotMessage.ts`
 **Issue:** Two functions implement nearly identical chatbot logic but with different implementations. One uses the Anthropic SDK, the other uses raw `fetch()`. One uses `base44.entities`, the other `base44.asServiceRole.entities` for rate-limiting. This creates maintenance drift and inconsistent behavior.
@@ -391,7 +446,17 @@ This means data encrypted by one function cannot be decrypted by the other, lead
 **Issue:** A `Set` is stored in React state. Sets are non-serializable and their mutations are not detectable by React's shallow comparison, which can cause missed re-renders.
 **Fix:** Use an array instead, or convert to/from Set at usage points.
 
-### L16. `confirmTopup` Missing `pool_id` Usage (Bug)
+### L16. TerritoryMap Missing Cleanup on Unmount (Memory Leak)
+**File:** `src/components/territories/TerritoryMap.jsx`
+**Issue:** The Mapbox GL map instance is never destroyed on component unmount. The `useEffect` creates the map but has no cleanup return function, leaking the map instance and its WebGL context.
+**Fix:** Return `() => map.remove()` from the useEffect.
+
+### L17. Hardcoded Brokerage Name in Sidebar (Maintenance)
+**File:** `src/components/Layout.jsx:156-158`
+**Issue:** "Sherwood & Company" and "Brokered by Compass" are hardcoded in the sidebar footer. For a multi-tenant system, these should come from the user's org data.
+**Fix:** Fetch from org settings.
+
+### L18. `confirmTopup` Missing `pool_id` Usage (Bug)
 **File:** `functions/confirmTopup.ts:17`
 **Issue:** `pool_id` is destructured from the request body but never used in the TopupPack creation. The pack won't be linked to a pool even if `pool_id` is provided.
 **Fix:** Include `pool_id` in the TopupPack creation data.
@@ -401,27 +466,32 @@ This means data encrypted by one function cannot be decrypted by the other, lead
 ## Recommendations Summary
 
 ### Immediate Actions (Critical + High)
-1. Remove hardcoded encryption key fallback (C1)
-2. Fix auth bypass in `approveClaim.ts` catch block (C5)
-3. Consolidate encryption/decryption to single utility (C2)
-4. Encrypt OAuth tokens at rest (C3)
-5. Fix `searchPublicRecords` empty request context (C4)
-6. Add CSRF token to OAuth state parameter (C7)
-7. Sanitize `dangerouslySetInnerHTML` in Landing.jsx (C8)
-8. Add ownership verification to all stream functions (C9)
-9. Validate CRM URLs against allowlist to prevent SSRF (C6)
-10. Add quota check before analysis creation (H2)
-11. Add quota deduction after analysis completion (H5)
-12. Fix `confirmTopup` replay attack with idempotency (H14)
-13. Add try/catch to all async UI handlers (H4)
-14. Fix duplicate route in App.jsx (H1)
-15. Add Stripe webhook idempotency (H7)
-16. Fix Stripe failure silently ignored in claim approval (H15)
-17. Encrypt CRM API keys at rest (H16)
-18. Move Gemini API key from URL to header (H17)
-19. Move `loadStripe()` to module scope (H19)
-20. Move BundleFlow payment logic to backend transaction (H20)
-21. Fix inconsistent admin role checks (H21, M19)
+1. Fix operator precedence bug in PayoffInputCard loan calculation (C10)
+2. Fix `Promise.all` catch crash in UrgencyStrip (C11)
+3. Remove hardcoded encryption key fallback (C1)
+4. Fix auth bypass in `approveClaim.ts` catch block (C5)
+5. Move Mapbox API key to environment variable (C9)
+6. Consolidate encryption/decryption to single utility (C2)
+7. Encrypt OAuth tokens at rest (C3)
+8. Fix `searchPublicRecords` empty request context (C4)
+9. Add CSRF token to OAuth state parameter (C7)
+10. Sanitize `dangerouslySetInnerHTML` in Landing.jsx (C8)
+11. Add ownership verification to all stream functions (C12)
+12. Validate CRM URLs against allowlist to prevent SSRF (C6)
+13. Implement actual save in PlatformAIConfig (H18)
+14. Fix ClaimsTable missing `stateMap` argument (H19)
+15. Add quota check before analysis creation (H2)
+16. Add quota deduction after analysis completion (H5)
+17. Fix `confirmTopup` replay attack with idempotency (H14)
+18. Add try/catch to all async UI handlers (H4)
+19. Fix duplicate route in App.jsx (H1)
+20. Add Stripe webhook idempotency (H7)
+21. Fix Stripe failure silently ignored in claim approval (H15)
+22. Encrypt CRM API keys at rest (H16)
+23. Move Gemini API key from URL to header (H17)
+24. Move `loadStripe()` to module scope (H23)
+25. Move BundleFlow payment logic to backend transaction (H24)
+26. Fix inconsistent admin role checks (H25, M19)
 
 ### Short-Term Improvements (Medium)
 1. Use `useAuth()` context instead of redundant `auth.me()` calls (H11)
