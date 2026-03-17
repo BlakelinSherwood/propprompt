@@ -40,8 +40,11 @@ function CardForm({ clientSecret, setupIntentId, onSuccess, onBack, summary, aut
         </p>
       </div>
 
-      {/* Order Summary */}
-      <div className="rounded-xl border border-[#1A3226]/10 bg-[#1A3226]/[0.02] p-5 space-y-2">
+      {/* Trust Block */}
+       <PaymentTrustBlock />
+
+       {/* Order Summary */}
+       <div className="rounded-xl border border-[#1A3226]/10 bg-[#1A3226]/[0.02] p-5 space-y-2">
         <p className="text-xs font-semibold text-[#1A3226]/50 uppercase tracking-wider mb-3">Order Summary</p>
         {summary.map((row, i) => (
           <div key={i} className={`flex justify-between text-sm ${row.bold ? "font-semibold text-[#1A3226]" : "text-[#1A3226]/70"} ${row.discount ? "text-emerald-600" : ""}`}>
