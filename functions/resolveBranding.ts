@@ -21,7 +21,8 @@ export async function resolveBrandingForAnalysis(base44, analysisId) {
   if (!analysis) throw new Error('Analysis not found');
 
   const orgId = analysis.org_id;
-  const runByEmail = analysis.run_by_email;
+  // Use on_behalf_of_email (attributed agent) if set, else the runner
+  const agentEmail = analysis.on_behalf_of_email || analysis.run_by_email;
 
   const orgs = await base44.asServiceRole.entities.Organization.filter({ id: orgId });
   const org = orgs[0] || {};
@@ -37,8 +38,8 @@ export async function resolveBrandingForAnalysis(base44, analysisId) {
     org.org_type === 'team'
       ? base44.asServiceRole.entities.OrgBranding.filter({ org_id: orgId })
       : Promise.resolve([]),
-    base44.asServiceRole.entities.AgentBranding.filter({ user_email: runByEmail }),
-    base44.asServiceRole.entities.User.filter({ email: runByEmail }),
+    base44.asServiceRole.entities.AgentBranding.filter({ user_email: agentEmail }),
+    base44.asServiceRole.entities.User.filter({ email: agentEmail }),
   ]);
 
   const bb = brokerageBrandingArr[0] || {};
@@ -56,10 +57,10 @@ export async function resolveBrandingForAnalysis(base44, analysisId) {
     primary_color:      tb.primary_color     || bb.primary_color     || '#333333',
     accent_color:       tb.accent_color      || bb.accent_color      || '#666666',
     background_color:   tb.background_color  || bb.background_color  || '#FFFFFF',
-    agent_name:         ab.display_name      || agentUser.full_name  || runByEmail,
+    agent_name:         ab.display_name      || agentUser.full_name  || agentEmail,
     agent_title:        ab.title             || '',
     agent_phone:        ab.direct_phone      || '',
-    agent_email:        ab.direct_email      || runByEmail,
+    agent_email:        ab.direct_email      || agentEmail,
     agent_license:      ab.license_number    || '',
     agent_tagline:      ab.personal_tagline  || '',
     agent_headshot_url: ab.headshot_url      || null,
