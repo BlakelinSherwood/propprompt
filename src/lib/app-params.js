@@ -16,12 +16,7 @@ export function isInIframe() {
   }
 }
 
-// App-level params injected by the base44 vite plugin
-export const appParams = typeof window !== 'undefined'
-  ? (window.__BASE44_APP_PARAMS__ || {})
-  : {};
-
-// Diagnostic: Log if app params are missing
-if (typeof window !== 'undefined' && !window.__BASE44_APP_PARAMS__) {
-  console.warn('[Base44 Init] window.__BASE44_APP_PARAMS__ is missing — app ID will be undefined. Check Vite plugin is active.');
-}
+// App configuration
+export const appParams = {
+  appId: '69b849e8d5f86924955e7fae',
+};
