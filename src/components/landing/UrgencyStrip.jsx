@@ -8,7 +8,7 @@ export default function UrgencyStrip() {
     const [all, avail] = await Promise.all([
       base44.entities.Territory.list('', 10000),
       base44.entities.Territory.filter({ status: 'available' }, '', 10000),
-    ]).catch(() => [[], []]);
+    ]).catch(() => { return [[], []]; });
     const claimed = all.filter(t => ['active', 'reserved', 'sublicensed'].includes(t.status)).length;
     setStats({ claimed, available: avail.length });
   };

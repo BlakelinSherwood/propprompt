@@ -10,7 +10,8 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
 async function getDecryptKey() {
-  const raw = Deno.env.get("ENCRYPTION_KEY") || "default-key-32-bytes-padded-here!!";
+  const raw = Deno.env.get("ENCRYPTION_KEY");
+  if (!raw) throw new Error("ENCRYPTION_KEY environment variable is required");
   return crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(raw.slice(0, 32).padEnd(32, "0")),

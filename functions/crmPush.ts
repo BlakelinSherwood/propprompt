@@ -6,6 +6,34 @@
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
+const ALLOWED_CRM_DOMAINS = [
+  'followupboss.com',
+  'api.followupboss.com',
+  'kvcore.com',
+  'api.kvcore.com',
+  'salesforce.com',
+  'login.salesforce.com',
+  'lofty.com',
+  'api.lofty.com',
+];
+
+function validateCrmUrl(url) {
+  try {
+    const parsed = new URL(url);
+    const domain = parsed.hostname;
+    if (!ALLOWED_CRM_DOMAINS.some(d => domain === d || domain.endsWith('.' + d))) {
+      throw new Error(`CRM URL domain not allowed: ${domain}`);
+    }
+    if (parsed.protocol !== 'https:') {
+      throw new Error('CRM URL must use HTTPS');
+    }
+    return parsed.toString();
+  } catch (e) {
+    if (e.message.startsWith('CRM URL')) throw e;
+    throw new Error(`Invalid CRM URL: ${e.message}`);
+  }
+}
+
 // Build a concise key-findings summary safe to push to CRM
 function buildKeySummary(analysis) {
   const intake = analysis.intake_data || {};
@@ -49,7 +77,8 @@ async function pushToFollowUpBoss(conn, analysis, summary) {
 async function pushToKvcore(conn, analysis, summary) {
   const instanceUrl = conn.crm_account_name || 'https://api.kvcore.com';
   const token = conn.encrypted_api_key;
-  const res = await fetch(`${instanceUrl}/api/v1/notes`, {
+  const validatedUrl = validateCrmUrl(`${instanceUrl}/api/v1/notes`);
+  const res = await fetch(validatedUrl, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -71,7 +100,8 @@ async function pushToSalesforce(conn, analysis, summary) {
   const instanceUrl = conn.crm_account_name; // store Salesforce instance URL here
 
   // Create Task record
-  const res = await fetch(`${instanceUrl}/services/data/v58.0/sobjects/Task`, {
+  const validatedUrl = validateCrmUrl(`${instanceUrl}/services/data/v58.0/sobjects/Task`);
+  const res = await fetch(validatedUrl, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${accessToken}`,

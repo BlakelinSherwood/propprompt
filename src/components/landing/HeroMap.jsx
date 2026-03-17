@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 
-mapboxgl.accessToken = "pk.eyJ1IjoiYmxha2VzaGVyd29vZCIsImEiOiJjbW10d2I0bmIxeWNyMnBvbTk2cXo2YWZuIn0.7kjas7tMHc60uLjZc19Drg";
+mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
 export default function HeroMap() {
   const mapContainer = useRef(null);

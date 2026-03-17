@@ -5,7 +5,7 @@ import TerritoryLegend from "./TerritoryLegend";
 import TerritoryPopupContent from "./TerritoryPopupContent";
 import { createRoot } from "react-dom/client";
 
-mapboxgl.accessToken = "pk.eyJ1IjoiYmxha2VzaGVyd29vZCIsImEiOiJjbW10d2I0bmIxeWNyMnBvbTk2cXo2YWZuIn0.7kjas7tMHc60uLjZc19Drg";
+mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
 function getColor(t) {
   if (t.status === "coming_soon") return "#94a3b8";
