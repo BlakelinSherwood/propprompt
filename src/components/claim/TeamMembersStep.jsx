@@ -1,72 +1,86 @@
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { X, Plus } from 'lucide-react';
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { UserPlus, X } from "lucide-react";
 
 export default function TeamMembersStep({ members, onChange, onNext, onBack, ownerEmail }) {
-  const [email, setEmail] = useState('');
-  const [role, setRole] = useState('member');
-  const [error, setError] = useState('');
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState("member");
+  const [error, setError] = useState("");
 
   const addMember = () => {
-    if (!email.trim() || !/\S+@\S+\.\S+/.test(email)) { setError('Enter a valid email'); return; }
-    if (email === ownerEmail) { setError('You are already the owner'); return; }
-    if (members.find(m => m.email === email)) { setError('Already added'); return; }
-    onChange([...members, { email, role }]);
-    setEmail(''); setError('');
+    const e = email.trim().toLowerCase();
+    if (!e.includes("@")) { setError("Enter a valid email"); return; }
+    if (e === ownerEmail) { setError("You are already the owner"); return; }
+    if (members.find(m => m.email === e)) { setError("Already added"); return; }
+    onChange([...members, { email: e, role }]);
+    setEmail("");
+    setError("");
   };
+
+  const remove = (em) => onChange(members.filter(m => m.email !== em));
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold text-[#1A3226]">Team Members</h2>
-        <p className="text-sm text-gray-500 mt-1">Optionally add team members who can use this territory. You'll be the owner.</p>
+        <h2 className="text-xl font-semibold text-[#1A3226]">Team Members</h2>
+        <p className="text-sm text-[#1A3226]/60 mt-1">Optionally invite team members to access this subscription. You can always add more later.</p>
       </div>
 
       {/* Owner badge */}
-      <div className="flex items-center gap-3 p-3 rounded-lg bg-[#1A3226]/5 border border-[#1A3226]/10">
-        <div className="w-8 h-8 rounded-full bg-[#1A3226] text-white text-xs flex items-center justify-center font-bold">
-          {ownerEmail?.[0]?.toUpperCase()}
-        </div>
-        <div className="flex-1">
+      <div className="flex items-center justify-between rounded-lg bg-[#1A3226]/5 px-4 py-3">
+        <div>
           <p className="text-sm font-medium text-[#1A3226]">{ownerEmail}</p>
-          <p className="text-xs text-gray-400">Owner</p>
+          <p className="text-xs text-[#1A3226]/50">You — Owner</p>
         </div>
+        <span className="text-xs bg-[#1A3226] text-white px-2 py-0.5 rounded-full">Owner</span>
       </div>
 
-      {/* Members list */}
-      {members.map((m, i) => (
-        <div key={m.email} className="flex items-center gap-3 p-3 rounded-lg border border-gray-200">
-          <div className="flex-1">
+      {/* Existing members */}
+      {members.map(m => (
+        <div key={m.email} className="flex items-center justify-between rounded-lg border border-[#1A3226]/10 px-4 py-3">
+          <div>
             <p className="text-sm text-[#1A3226]">{m.email}</p>
-            <p className="text-xs text-gray-400 capitalize">{m.role}</p>
+            <p className="text-xs text-[#1A3226]/50 capitalize">{m.role}</p>
           </div>
-          <button onClick={() => onChange(members.filter((_, idx) => idx !== i))} className="text-gray-300 hover:text-red-400">
+          <button onClick={() => remove(m.email)} className="text-[#1A3226]/30 hover:text-red-500 transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
       ))}
 
       {/* Add member */}
-      <div className="flex gap-2">
-        <Input
-          placeholder="colleague@brokerage.com"
-          value={email}
-          onChange={e => { setEmail(e.target.value); setError(''); }}
-          onKeyDown={e => e.key === 'Enter' && addMember()}
-          className="flex-1"
-        />
-        <select value={role} onChange={e => setRole(e.target.value)} className="border border-gray-200 rounded-md px-3 text-sm">
-          <option value="member">Member</option>
-          <option value="admin">Admin</option>
-        </select>
-        <Button variant="outline" size="sm" onClick={addMember}><Plus className="w-4 h-4" /></Button>
+      <div className="rounded-xl border border-dashed border-[#1A3226]/20 p-4 space-y-3">
+        <p className="text-xs font-medium text-[#1A3226]/60 uppercase tracking-wider">Invite a Member</p>
+        <div className="flex gap-2">
+          <Input
+            type="email"
+            placeholder="colleague@brokerage.com"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && addMember()}
+            className="flex-1"
+          />
+          <select
+            value={role}
+            onChange={e => setRole(e.target.value)}
+            className="h-9 text-sm border border-input rounded-md px-2 bg-transparent focus:outline-none focus:ring-1 focus:ring-ring"
+          >
+            <option value="member">Member</option>
+            <option value="admin">Admin</option>
+          </select>
+          <Button onClick={addMember} size="sm" variant="outline" className="gap-1.5">
+            <UserPlus className="w-4 h-4" /> Add
+          </Button>
+        </div>
+        {error && <p className="text-xs text-red-500">{error}</p>}
       </div>
-      {error && <p className="text-xs text-red-500">{error}</p>}
 
-      <div className="flex items-center justify-between pt-2">
-        <Button variant="outline" onClick={onBack}>← Back</Button>
-        <Button onClick={onNext} className="bg-[#1A3226] text-white hover:bg-[#1A3226]/90">Continue →</Button>
+      <div className="flex justify-between pt-2">
+        <Button variant="outline" onClick={onBack}>Back</Button>
+        <Button onClick={onNext} className="bg-[#1A3226] text-white hover:bg-[#1A3226]/90">
+          Continue →
+        </Button>
       </div>
     </div>
   );

@@ -1,240 +1,240 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { base44 } from '@/api/base44Client';
-import { usePricing } from '@/components/pricing/usePricing';
-import TierSelector from './TierSelector';
-import BrokerageInfoStep from './BrokerageInfoStep';
-import TeamMembersStep from './TeamMembersStep';
-import PaymentStep from './PaymentStep';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { X, Plus, AlertTriangle } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { base44 } from "@/api/base44Client";
+import { Loader2, X, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import StepHeader from "./StepHeader";
+import TierSelector from "./TierSelector";
+import BrokerageInfoStep from "./BrokerageInfoStep";
+import TeamMembersStep from "./TeamMembersStep";
+import PaymentStep from "./PaymentStep";
 
-const STEPS = ['Build Pool', 'Tier', 'Brokerage', 'Team', 'Payment'];
+const STEPS = ["Build Pool", "Tier", "Brokerage", "Team", "Payment"];
 
-export default function PoolFlow({ territoryId }) {
+function getBuckets(population, bucketSize) {
+  return Math.ceil(population / bucketSize) || 0;
+}
+
+export default function PoolFlow({ pricing, user }) {
   const navigate = useNavigate();
-  const { pricing, loading: pricingLoading } = usePricing();
   const [step, setStep] = useState(0);
-  const [allTerritories, setAllTerritories] = useState([]);
-  const [search, setSearch] = useState('');
-  const [selected, setSelected] = useState([]);
-  const [tier, setTier] = useState('starter');
-  const [brokerageInfo, setBrokerageInfo] = useState({});
-  const [teamMembers, setTeamMembers] = useState([]);
-  const [user, setUser] = useState(null);
-  const [bucketWarning, setBucketWarning] = useState(null);
+  const [selectedTowns, setSelectedTowns] = useState([]);
+  const [stateMap, setStateMap] = useState({});
+  const [countyMap, setCountyMap] = useState({});
+  const [searchQ, setSearchQ] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [pendingAdd, setPendingAdd] = useState(null); // town that would cross bucket threshold
+  const [tier, setTier] = useState("starter");
+  const [brokerage, setBrokerage] = useState({});
+  const [members, setMembers] = useState([]);
 
-  useEffect(() => {
-    base44.auth.me().then(setUser).catch(() => {});
-    base44.entities.Territory.filter({ status: 'available' }).then(ts => {
-      setAllTerritories(ts.filter(t => !t.pool_id));
-    });
-  }, []);
+  const bucketSize = parseInt(pricing?.territory_seat_size || 50000);
+  const tierPrice = parseFloat(pricing?.[`${tier}_monthly_price`] || 0);
+  const tierCap = parseInt(pricing?.[`${tier}_analyses_cap`] || 0);
 
-  useEffect(() => {
-    if (territoryId && allTerritories.length) {
-      const t = allTerritories.find(t => t.id === territoryId);
-      if (t && !selected.find(s => s.id === t.id)) setSelected([t]);
+  const totalPop = selectedTowns.reduce((s, t) => s + (t.population || 0), 0);
+  const bucketsUsed = getBuckets(totalPop, bucketSize);
+  const totalPrice = bucketsUsed * tierPrice;
+  const totalCap = bucketsUsed * tierCap;
+  const nextBucketAt = bucketsUsed * bucketSize;
+  const remaining = nextBucketAt - totalPop;
+
+  const loadMeta = async (stateId, countyId) => {
+    if (stateId && !stateMap[stateId]) {
+      const rows = await base44.entities.State.filter({ id: stateId });
+      if (rows[0]) setStateMap(m => ({ ...m, [stateId]: rows[0] }));
     }
-  }, [territoryId, allTerritories]);
-
-  const bucketSize = parseInt(pricing.pool_bucket_size || 50000);
-  const totalPop = selected.reduce((sum, t) => sum + (t.population || 0), 0);
-  const buckets = Math.max(1, Math.ceil(totalPop / bucketSize));
-  const price = parseFloat(pricing[`${tier}_monthly_price`] || 0);
-  const cap = parseInt(pricing[`${tier}_analyses_cap`] || 0);
-  const totalPrice = price * buckets;
-  const totalCap = cap * buckets;
-  const remaining = (buckets * bucketSize) - totalPop;
-
-  const filtered = allTerritories.filter(t =>
-    !selected.find(s => s.id === t.id) &&
-    t.city_town?.toLowerCase().includes(search.toLowerCase())
-  ).slice(0, 20);
-
-  const addTerritory = (t) => {
-    const newPop = totalPop + (t.population || 0);
-    const newBuckets = Math.ceil(newPop / bucketSize);
-    if (newBuckets > buckets && selected.length > 0) {
-      setBucketWarning({ territory: t, newBuckets, newPop, newPrice: price * newBuckets });
-    } else {
-      setSelected(prev => [...prev, t]);
+    if (countyId && !countyMap[countyId]) {
+      const rows = await base44.entities.County.filter({ id: countyId });
+      if (rows[0]) setCountyMap(m => ({ ...m, [countyId]: rows[0] }));
     }
-    setSearch('');
   };
 
-  const confirmAdd = () => {
-    setSelected(prev => [...prev, bucketWarning.territory]);
-    setBucketWarning(null);
+  const handleSearch = async (q) => {
+    setSearchQ(q);
+    if (q.length < 2) { setSearchResults([]); return; }
+    const results = await base44.entities.Territory.filter({ city_town: { $regex: q }, status: "available" });
+    const filtered = results.filter(r => !selectedTowns.find(s => s.id === r.id)).slice(0, 8);
+    setSearchResults(filtered);
   };
 
-  const handlePayment = async (paymentMethodId, setupIntentId) => {
-    const autoApproveAt = new Date(Date.now() + (parseInt(pricing.auto_approve_hours || 48)) * 3600000).toISOString();
+  const addTown = (town) => {
+    const newPop = totalPop + (town.population || 0);
+    const newBuckets = getBuckets(newPop, bucketSize);
+    if (newBuckets > bucketsUsed && bucketsUsed > 0) {
+      setPendingAdd({ town, newPop, newBuckets, oldBuckets: bucketsUsed });
+      return;
+    }
+    confirmAdd(town);
+  };
+
+  const confirmAdd = (town) => {
+    setSelectedTowns(t => [...t, town]);
+    loadMeta(town.state_id, town.county_id);
+    setSearchResults([]);
+    setSearchQ("");
+    setPendingAdd(null);
+  };
+
+  const removeTown = (id) => setSelectedTowns(t => t.filter(x => x.id !== id));
+
+  const buildSummary = () => {
+    const rows = [
+      { label: `Population Pool — ${selectedTowns.length} towns`, value: "" },
+      { label: `Combined population`, value: `${totalPop.toLocaleString()} residents` },
+      { label: `Buckets`, value: `${bucketsUsed} × ${bucketSize.toLocaleString()}` },
+      { label: `Tier`, value: tier.charAt(0).toUpperCase() + tier.slice(1) },
+      { label: `${bucketsUsed} buckets × $${tierPrice.toFixed(2)}`, value: `$${totalPrice.toFixed(2)}/mo`, bold: true },
+      { label: `Analyses/month`, value: `${totalCap}` },
+    ];
+    return rows;
+  };
+
+  const handlePaymentSuccess = async (paymentMethodId, setupIntentId) => {
+    const autoApproveHours = parseInt(pricing?.auto_approve_hours || 48);
+    const autoAt = new Date(Date.now() + autoApproveHours * 60 * 60 * 1000).toISOString();
+
     const pool = await base44.entities.PopulationPool.create({
-      owner_user_id: user?.id,
+      owner_user_id: user.id,
       tier,
-      total_population: totalPop,
-      bucket_count: buckets,
+      territory_ids: selectedTowns.map(t => t.id),
+      combined_population: totalPop,
+      buckets_used: bucketsUsed,
       monthly_price: totalPrice,
       analyses_cap: totalCap,
-      stripe_setup_intent_id: setupIntentId,
       stripe_payment_method_id: paymentMethodId,
+      stripe_setup_intent_id: setupIntentId,
+      status: "pending_approval",
     });
-    await Promise.all(selected.map(t =>
-      base44.entities.PopulationPoolMember.create({ pool_id: pool.id, territory_id: t.id, population_contribution: t.population || 0 })
-    ));
-    await Promise.all(selected.map(t =>
-      base44.entities.Territory.update(t.id, { status: 'pending_approval' })
-    ));
+
     await base44.entities.TerritoryClaimRequest.create({
-      pool_id: pool.id,
-      user_id: user?.id,
-      brokerage_name: brokerageInfo.brokerage_name,
-      brokerage_license: brokerageInfo.brokerage_license,
-      agent_count: parseInt(brokerageInfo.agent_count),
+      user_id: user.id,
+      brokerage_name: brokerage.brokerage_name,
+      brokerage_license: brokerage.brokerage_license,
+      agent_count: parseInt(brokerage.agent_count),
       tier_requested: tier,
-      type_requested: 'pool',
-      pool_territory_ids: selected.map(t => t.id),
+      type_requested: "multi_bundle",
       stripe_payment_method_id: paymentMethodId,
       stripe_setup_intent_id: setupIntentId,
-      status: 'pending',
-      auto_approve_at: autoApproveAt,
+      status: "pending",
+      auto_approve_at: autoAt,
     });
-    navigate('/claim/submitted', { state: { claimType: 'pool', territories: selected, tier, monthlyPrice: totalPrice, buckets } });
+
+    navigate(`/claim/submitted?type=pool&tier=${tier}&towns=${selectedTowns.length}&price=${totalPrice.toFixed(2)}`);
   };
 
-  if (pricingLoading) return <div className="flex justify-center py-12"><div className="w-6 h-6 border-4 border-[#1A3226]/20 border-t-[#1A3226] rounded-full animate-spin" /></div>;
-
   return (
-    <div className="max-w-2xl mx-auto">
-      <div className="flex items-center gap-2 mb-8">
-        {STEPS.map((s, i) => (
-          <div key={s} className="flex items-center gap-2">
-            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${i < step ? 'bg-emerald-500 text-white' : i === step ? 'bg-[#1A3226] text-white' : 'bg-gray-200 text-gray-400'}`}>
-              {i < step ? '✓' : i + 1}
-            </div>
-            <span className={`text-sm hidden sm:block ${i === step ? 'font-medium text-[#1A3226]' : 'text-gray-400'}`}>{s}</span>
-            {i < STEPS.length - 1 && <div className="w-4 h-px bg-gray-200" />}
+    <div>
+      <StepHeader steps={STEPS} current={step} />
+
+      {step === 0 && (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-xl font-semibold text-[#1A3226]">Build Your Population Pool</h2>
+            <p className="text-sm text-[#1A3226]/60 mt-1">Add towns to your pool. You pay per {bucketSize.toLocaleString()} residents — not per town.</p>
           </div>
-        ))}
-      </div>
 
-      <div className="bg-white rounded-2xl border border-gray-200 p-6 lg:p-8">
-        {step === 0 && (
-          <div className="space-y-5">
-            <div>
-              <h2 className="text-lg font-semibold text-[#1A3226]">Build Your Population Pool</h2>
-              <p className="text-sm text-gray-500 mt-1">Add small towns. Pricing is per {bucketSize.toLocaleString()} residents, not per town.</p>
-            </div>
-
-            {/* Pool meter */}
-            <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="font-medium text-[#1A3226]">{totalPop.toLocaleString()} residents</span>
-                <span className="text-orange-700">Bucket {buckets} — {remaining.toLocaleString()} until next</span>
+          {/* Pool meter */}
+          {selectedTowns.length > 0 && (
+            <div className="rounded-xl border border-[#1A3226]/10 bg-white p-5 space-y-3">
+              <div className="flex justify-between text-sm text-[#1A3226]">
+                <span className="font-medium">Combined population</span>
+                <span className="font-bold">{totalPop.toLocaleString()}</span>
               </div>
-              <div className="w-full h-2 bg-orange-200 rounded-full overflow-hidden">
-                <div className="h-full bg-orange-500 rounded-full transition-all" style={{ width: `${Math.min(100, ((totalPop % bucketSize) / bucketSize) * 100)}%` }} />
+              <div className="w-full h-3 bg-[#1A3226]/10 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-[#B8982F] rounded-full transition-all"
+                  style={{ width: `${Math.min(100, ((totalPop % bucketSize) / bucketSize) * 100 || (totalPop > 0 ? 100 : 0))}%` }}
+                />
               </div>
-              <div className="grid grid-cols-3 gap-2 text-xs text-center pt-1">
-                <div><div className="font-bold text-[#1A3226]">{buckets}</div><div className="text-gray-400">Buckets</div></div>
-                <div><div className="font-bold text-[#1A3226]">${totalPrice.toFixed(0)}/mo</div><div className="text-gray-400">{buckets} × ${price}/mo</div></div>
-                <div><div className="font-bold text-[#1A3226]">{totalCap}</div><div className="text-gray-400">Analyses/mo</div></div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs text-[#1A3226]/60">
+                <div><span className="font-semibold text-[#1A3226]">{bucketsUsed}</span> bucket{bucketsUsed !== 1 ? "s" : ""} used</div>
+                <div><span className="font-semibold text-[#1A3226]">{remaining.toLocaleString()}</span> until next bucket</div>
+                <div><span className="font-semibold text-[#1A3226]">${(bucketsUsed * parseFloat(pricing?.starter_monthly_price || 0)).toFixed(2)}</span> starter/mo</div>
+                <div><span className="font-semibold text-[#1A3226]">{bucketsUsed * parseInt(pricing?.starter_analyses_cap || 0)}</span> analyses/mo</div>
               </div>
             </div>
+          )}
 
-            {/* Search */}
-            <div className="relative">
-              <Input placeholder="Search towns by name…" value={search} onChange={e => setSearch(e.target.value)} />
-              {search && filtered.length > 0 && (
-                <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto mt-1">
-                  {filtered.map(t => (
-                    <button key={t.id} type="button" onClick={() => addTerritory(t)}
-                      className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center justify-between text-sm">
-                      <span>{t.city_town}</span>
-                      <span className="text-gray-400 text-xs">{(t.population || 0).toLocaleString()} residents</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Selected towns */}
-            <div className="space-y-2">
-              {selected.map(t => (
-                <div key={t.id} className="flex items-center justify-between p-3 rounded-lg border border-gray-200">
-                  <div>
-                    <span className="text-sm font-medium text-[#1A3226]">{t.city_town}</span>
-                    <span className="text-xs text-gray-400 ml-2">{(t.population || 0).toLocaleString()} residents</span>
-                  </div>
-                  <button onClick={() => setSelected(prev => prev.filter(s => s.id !== t.id))} className="text-gray-300 hover:text-red-400">
-                    <X className="w-4 h-4" />
+          {/* Search */}
+          <div className="relative">
+            <input
+              value={searchQ}
+              onChange={e => handleSearch(e.target.value)}
+              placeholder="Search available towns…"
+              className="w-full h-10 border border-input rounded-md px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+            {searchResults.length > 0 && (
+              <div className="absolute top-full left-0 right-0 z-10 bg-white border border-[#1A3226]/10 rounded-xl shadow-lg mt-1 overflow-hidden">
+                {searchResults.map(r => (
+                  <button key={r.id} onClick={() => addTown(r)}
+                    className="w-full text-left px-4 py-3 hover:bg-[#1A3226]/5 transition-colors border-b border-[#1A3226]/5 last:border-0">
+                    <p className="text-sm font-medium text-[#1A3226]">{r.city_town}</p>
+                    <p className="text-xs text-[#1A3226]/50">Population: {(r.population || 0).toLocaleString()}</p>
                   </button>
-                </div>
-              ))}
-              {selected.length === 0 && <p className="text-sm text-gray-400 text-center py-4">Search and add towns to your pool above.</p>}
-            </div>
-
-            <div className="flex justify-end">
-              <Button onClick={() => setStep(1)} disabled={selected.length === 0} className="bg-[#1A3226] text-white">Continue →</Button>
-            </div>
-          </div>
-        )}
-
-        {step === 1 && (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-lg font-semibold text-[#1A3226]">Select Your Tier</h2>
-              <p className="text-sm text-gray-500 mt-1">{buckets} bucket{buckets !== 1 ? 's' : ''} × selected tier price = your monthly total.</p>
-            </div>
-            <TierSelector pricing={pricing} selectedTier={tier} onChange={setTier} buckets={buckets} showBucketCalc />
-            <div className="flex justify-between">
-              <Button variant="outline" onClick={() => setStep(0)}>← Back</Button>
-              <Button onClick={() => setStep(2)} className="bg-[#1A3226] text-white">Continue →</Button>
-            </div>
-          </div>
-        )}
-
-        {step === 2 && <BrokerageInfoStep data={brokerageInfo} onChange={setBrokerageInfo} tier={tier} onBack={() => setStep(1)} onNext={() => setStep(3)} />}
-        {step === 3 && <TeamMembersStep members={teamMembers} onChange={setTeamMembers} ownerEmail={user?.email} onBack={() => setStep(2)} onNext={() => setStep(4)} />}
-        {step === 4 && (
-          <PaymentStep
-            orderLines={[
-              { label: `Population Pool — ${selected.length} towns`, value: '' },
-              { label: 'Combined population', value: `${totalPop.toLocaleString()} residents` },
-              { label: `Tier: ${tier.charAt(0).toUpperCase() + tier.slice(1)}`, value: `${buckets} buckets × $${price}/mo` },
-              { label: 'Analyses/month', value: `${totalCap}` },
-            ]}
-            totalMonthly={totalPrice}
-            autoApproveHours={pricing.auto_approve_hours}
-            onBack={() => setStep(3)}
-            onSubmit={handlePayment}
-          />
-        )}
-      </div>
-
-      {/* Bucket warning modal */}
-      {bucketWarning && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-2xl shadow-xl p-7 w-full max-w-sm space-y-4">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-amber-500 mt-0.5" />
-              <div>
-                <h3 className="font-semibold text-[#1A3226]">New Pricing Bucket</h3>
-                <p className="text-sm text-gray-600 mt-1">
-                  Adding <strong>{bucketWarning.territory.city_town}</strong> ({(bucketWarning.territory.population || 0).toLocaleString()} residents) will open Bucket {bucketWarning.newBuckets}.
-                  Your price will increase from <strong>${(price * buckets).toFixed(0)}/mo</strong> to <strong>${(bucketWarning.newPrice).toFixed(0)}/mo</strong>.
-                </p>
+                ))}
               </div>
+            )}
+          </div>
+
+          {/* Town list */}
+          {selectedTowns.map(t => (
+            <div key={t.id} className="flex items-center justify-between rounded-lg border border-[#1A3226]/10 px-4 py-3">
+              <div>
+                <p className="text-sm font-medium text-[#1A3226]">{t.city_town}</p>
+                <p className="text-xs text-[#1A3226]/50">{stateMap[t.state_id]?.code} · {countyMap[t.county_id]?.name} · {(t.population || 0).toLocaleString()} residents</p>
+              </div>
+              <button onClick={() => removeTown(t.id)} className="text-[#1A3226]/30 hover:text-red-500">
+                <X className="w-4 h-4" />
+              </button>
             </div>
+          ))}
+
+          {selectedTowns.length === 0 && (
+            <p className="text-sm text-[#1A3226]/40 text-center py-6">Search and add towns to build your pool.</p>
+          )}
+
+          <div className="flex justify-between pt-2">
+            <Button variant="outline" onClick={() => navigate("/claim")}>← Back</Button>
+            <Button onClick={() => setStep(1)} disabled={selectedTowns.length === 0} className="bg-[#1A3226] text-white hover:bg-[#1A3226]/90">Continue →</Button>
+          </div>
+        </div>
+      )}
+
+      {/* Bucket crossing modal */}
+      {pendingAdd && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md space-y-4">
+            <h3 className="font-semibold text-[#1A3226]">Opening a New Bucket</h3>
+            <p className="text-sm text-[#1A3226]/70">
+              Adding <strong>{pendingAdd.town.city_town}</strong> ({(pendingAdd.town.population || 0).toLocaleString()} residents) will bring your pool to{" "}
+              <strong>{pendingAdd.newPop.toLocaleString()}</strong> residents, opening Bucket {pendingAdd.newBuckets}.
+            </p>
+            <p className="text-sm text-[#1A3226]/70">
+              Your monthly price will increase from <strong>${(pendingAdd.oldBuckets * parseFloat(pricing?.starter_monthly_price || 0)).toFixed(2)}</strong> to{" "}
+              <strong>${(pendingAdd.newBuckets * parseFloat(pricing?.starter_monthly_price || 0)).toFixed(2)}</strong> (Starter tier).
+            </p>
             <div className="flex gap-3 justify-end">
-              <Button variant="outline" size="sm" onClick={() => setBucketWarning(null)}>Cancel</Button>
-              <Button size="sm" onClick={confirmAdd} className="bg-[#1A3226] text-white">Yes, Add Town</Button>
+              <Button variant="outline" onClick={() => setPendingAdd(null)}>Cancel</Button>
+              <Button onClick={() => confirmAdd(pendingAdd.town)} className="bg-[#1A3226] text-white">Yes, Add Town</Button>
             </div>
           </div>
         </div>
       )}
+
+      {step === 1 && (
+        <TierSelector
+          pricing={pricing}
+          selected={tier}
+          onChange={setTier}
+          onNext={() => setStep(2)}
+          onBack={() => setStep(0)}
+          priceOverride={(tierKey, base) => ({ base: bucketsUsed * base, discounted: bucketsUsed * base })}
+        />
+      )}
+      {step === 2 && <BrokerageInfoStep data={brokerage} onChange={setBrokerage} tier={tier} onNext={() => setStep(3)} onBack={() => setStep(1)} />}
+      {step === 3 && <TeamMembersStep members={members} onChange={setMembers} ownerEmail={user?.email} onNext={() => setStep(4)} onBack={() => setStep(2)} />}
+      {step === 4 && <PaymentStep pricing={pricing} summary={buildSummary()} onSuccess={handlePaymentSuccess} onBack={() => setStep(3)} />}
     </div>
   );
 }

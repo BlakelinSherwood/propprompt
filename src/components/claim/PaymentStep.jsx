@@ -1,107 +1,124 @@
-import { useEffect, useState } from 'react';
-import { loadStripe } from '@stripe/stripe-js';
-import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import { base44 } from '@/api/base44Client';
-import { Button } from '@/components/ui/button';
-import { Loader2, ShieldCheck } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { base44 } from "@/api/base44Client";
+import { loadStripe } from "@stripe/stripe-js";
+import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
+import { Lock, Loader2 } from "lucide-react";
 
-function CheckoutForm({ onSubmit, onBack, submitting }) {
+function CardForm({ clientSecret, setupIntentId, onSuccess, onBack, summary, autoApproveHours }) {
   const stripe = useStripe();
   const elements = useElements();
-  const [error, setError] = useState('');
-  const [processing, setProcessing] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
     if (!stripe || !elements) return;
-    setProcessing(true);
-    setError('');
-    const { setupIntent, error: stripeErr } = await stripe.confirmSetup({
-      elements,
-      confirmParams: {},
-      redirect: 'if_required',
+    setLoading(true);
+    setError("");
+
+    const cardElement = elements.getElement(CardElement);
+    const { error: stripeError, setupIntent } = await stripe.confirmCardSetup(clientSecret, {
+      payment_method: { card: cardElement },
     });
-    if (stripeErr) { setError(stripeErr.message); setProcessing(false); return; }
-    if (setupIntent?.payment_method) {
-      await onSubmit(setupIntent.payment_method, setupIntent.id);
+
+    if (stripeError) {
+      setError(stripeError.message);
+      setLoading(false);
+      return;
     }
-    setProcessing(false);
-  };
 
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <PaymentElement />
-      {error && <p className="text-sm text-red-500">{error}</p>}
-      <div className="flex items-center justify-between pt-2">
-        <Button type="button" variant="outline" onClick={onBack} disabled={processing || submitting}>← Back</Button>
-        <Button type="submit" disabled={!stripe || processing || submitting} className="bg-[#1A3226] text-white hover:bg-[#1A3226]/90">
-          {(processing || submitting) ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Processing…</> : 'Submit Claim →'}
-        </Button>
-      </div>
-    </form>
-  );
-}
-
-export default function PaymentStep({ orderLines, totalMonthly, autoApproveHours, onSubmit, onBack }) {
-  const [ready, setReady] = useState(false);
-  const [clientSecret, setClientSecret] = useState(null);
-  const [setupIntentId, setSetupIntentId] = useState(null);
-  const [stripePromise, setStripePromise] = useState(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    base44.functions.invoke('createClaimSetupIntent', {}).then(res => {
-      setClientSecret(res.data.clientSecret);
-      setSetupIntentId(res.data.setupIntentId);
-      setStripePromise(loadStripe(res.data.publishableKey));
-      setReady(true);
-    });
-  }, []);
-
-  const handleSubmit = async (paymentMethodId, intentId) => {
-    setSubmitting(true);
-    await onSubmit(paymentMethodId, intentId || setupIntentId);
-    setSubmitting(false);
+    onSuccess(setupIntent.payment_method, setupIntentId);
   };
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold text-[#1A3226]">Payment</h2>
-        <p className="text-sm text-gray-500 mt-1">Your card will not be charged until your claim is approved.</p>
-      </div>
-
-      {/* Order Summary */}
-      <div className="rounded-xl border border-gray-200 bg-gray-50 p-5 space-y-3">
-        <h3 className="text-sm font-semibold text-[#1A3226]">Order Summary</h3>
-        {orderLines.map((line, i) => (
-          <div key={i} className="flex justify-between text-sm">
-            <span className="text-gray-600">{line.label}</span>
-            <span className="font-medium text-[#1A3226]">{line.value}</span>
-          </div>
-        ))}
-        <div className="border-t border-gray-200 pt-3 flex justify-between">
-          <span className="font-semibold text-[#1A3226]">Monthly Total</span>
-          <span className="font-bold text-[#1A3226] text-lg">${parseFloat(totalMonthly).toFixed(2)}/mo</span>
-        </div>
-      </div>
-
-      <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200">
-        <ShieldCheck className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
-        <p className="text-xs text-amber-700">
-          Your card is saved but <strong>not charged</strong> until your claim is approved. Approval typically takes less than <strong>{autoApproveHours || 48} hours</strong>.
+        <h2 className="text-xl font-semibold text-[#1A3226]">Payment Details</h2>
+        <p className="text-sm text-[#1A3226]/60 mt-1">
+          Your card will not be charged until approved. Approval usually takes less than {autoApproveHours} hours.
         </p>
       </div>
 
-      {!ready ? (
-        <div className="flex items-center gap-2 text-sm text-gray-400 py-4">
-          <Loader2 className="w-4 h-4 animate-spin" /> Loading payment form…
-        </div>
-      ) : (
-        <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: 'stripe' } }}>
-          <CheckoutForm onSubmit={handleSubmit} onBack={onBack} submitting={submitting} />
-        </Elements>
-      )}
+      {/* Order Summary */}
+      <div className="rounded-xl border border-[#1A3226]/10 bg-[#1A3226]/[0.02] p-5 space-y-2">
+        <p className="text-xs font-semibold text-[#1A3226]/50 uppercase tracking-wider mb-3">Order Summary</p>
+        {summary.map((row, i) => (
+          <div key={i} className={`flex justify-between text-sm ${row.bold ? "font-semibold text-[#1A3226]" : "text-[#1A3226]/70"} ${row.discount ? "text-emerald-600" : ""}`}>
+            <span>{row.label}</span>
+            <span>{row.value}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Card Element */}
+      <div className="rounded-xl border border-[#1A3226]/10 p-4">
+        <p className="text-xs font-medium text-[#1A3226]/50 mb-3 flex items-center gap-1.5">
+          <Lock className="w-3 h-3" /> Secured by Stripe
+        </p>
+        <CardElement options={{
+          style: {
+            base: { fontSize: "15px", color: "#1A3226", "::placeholder": { color: "#94a3b8" } },
+          },
+        }} />
+      </div>
+
+      {error && <p className="text-sm text-red-500">{error}</p>}
+
+      <div className="flex justify-between pt-2">
+        <Button variant="outline" onClick={onBack}>Back</Button>
+        <Button
+          onClick={handleSubmit}
+          disabled={loading || !stripe}
+          className="bg-[#1A3226] text-white hover:bg-[#1A3226]/90 gap-2"
+        >
+          {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+          Submit Claim Request
+        </Button>
+      </div>
     </div>
+  );
+}
+
+export default function PaymentStep({ onSuccess, onBack, summary, pricing }) {
+  const [stripePromise, setStripePromise] = useState(null);
+  const [clientSecret, setClientSecret] = useState(null);
+  const [setupIntentId, setSetupIntentId] = useState(null);
+  const [loadError, setLoadError] = useState("");
+
+  const autoApproveHours = parseInt(pricing?.auto_approve_hours || 48);
+
+  useEffect(() => {
+    base44.functions.invoke("createSetupIntent", {}).then(res => {
+      const { clientSecret, setupIntentId, publishableKey } = res.data;
+      setClientSecret(clientSecret);
+      setSetupIntentId(setupIntentId);
+      setStripePromise(loadStripe(publishableKey));
+    }).catch(err => setLoadError(err.message));
+  }, []);
+
+  if (loadError) return (
+    <div className="text-center py-12">
+      <p className="text-red-500 text-sm">{loadError}</p>
+      <Button variant="outline" className="mt-4" onClick={onBack}>Back</Button>
+    </div>
+  );
+
+  if (!clientSecret || !stripePromise) return (
+    <div className="flex items-center justify-center py-16">
+      <Loader2 className="w-7 h-7 animate-spin text-[#1A3226]/40" />
+    </div>
+  );
+
+  return (
+    <Elements stripe={stripePromise} options={{ clientSecret }}>
+      <CardForm
+        clientSecret={clientSecret}
+        setupIntentId={setupIntentId}
+        onSuccess={onSuccess}
+        onBack={onBack}
+        summary={summary}
+        autoApproveHours={autoApproveHours}
+      />
+    </Elements>
   );
 }

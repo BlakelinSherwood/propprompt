@@ -1,182 +1,232 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { base44 } from '@/api/base44Client';
-import { usePricing } from '@/components/pricing/usePricing';
-import TierSelector from './TierSelector';
-import BrokerageInfoStep from './BrokerageInfoStep';
-import PaymentStep from './PaymentStep';
-import { Button } from '@/components/ui/button';
-import { AlertCircle, CheckCircle, MapPin } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { base44 } from "@/api/base44Client";
+import { MapPin, Loader2, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import StepHeader from "./StepHeader";
+import TierSelector from "./TierSelector";
+import BrokerageInfoStep from "./BrokerageInfoStep";
+import PaymentStep from "./PaymentStep";
 
-const STEPS = ['Territory', 'Tier', 'Brokerage', 'Payment'];
+const STEPS = ["Territory", "Tier", "Brokerage", "Payment"];
 
-export default function SingleFlow({ territoryId }) {
+export default function SingleFlow({ pricing, territoryId, user }) {
   const navigate = useNavigate();
-  const { pricing, loading: pricingLoading } = usePricing();
   const [step, setStep] = useState(0);
   const [territory, setTerritory] = useState(null);
   const [state, setState] = useState(null);
-  const [county, setCounty] = useState(null);
-  const [selectedSeat, setSelectedSeat] = useState(1);
-  const [tier, setTier] = useState('starter');
-  const [brokerageInfo, setBrokerageInfo] = useState({});
-  const [user, setUser] = useState(null);
-  const [blockReason, setBlockReason] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [blockMsg, setBlockMsg] = useState("");
+  const [tier, setTier] = useState("starter");
+  const [seatNumber, setSeatNumber] = useState(1);
+  const [brokerage, setBrokerage] = useState({});
+  const [searchQ, setSearchQ] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
 
   useEffect(() => {
-    async function load() {
-      const me = await base44.auth.me().catch(() => null);
-      setUser(me);
-      if (!territoryId) return;
-      const [territories, states, counties] = await Promise.all([
-        base44.entities.Territory.filter({ id: territoryId }),
-        base44.entities.State.list(),
-        base44.entities.County.list(),
-      ]);
-      const t = territories[0];
-      if (!t) return;
-      setTerritory(t);
-      setState(states.find(s => s.id === t.state_id));
-      setCounty(counties.find(c => c.id === t.county_id));
+    if (territoryId) loadTerritory(territoryId);
+    else setLoading(false);
+  }, [territoryId]);
 
-      // Validate availability
-      const total = t.seats_total || 1;
-      const claimed = t.seats_claimed || 0;
-      if (claimed >= total) { setBlockReason('All seats in this territory are already claimed.'); return; }
-
-      // Check rejection cooldown
-      const rejDays = parseInt(pricing.rejection_recliam_days || 30);
-      const since = new Date(Date.now() - rejDays * 24 * 60 * 60 * 1000).toISOString();
-      const recentRejects = await base44.entities.TerritoryClaimRequest.filter({ territory_id: territoryId, status: 'rejected' });
-      const recent = recentRejects.filter(r => r.rejected_at && r.rejected_at > since && r.user_id === me?.id);
-      if (recent.length) setBlockReason(`You were rejected for this territory within the last ${rejDays} days.`);
-    }
-    if (!pricingLoading) load();
-  }, [territoryId, pricingLoading]);
-
-  const handlePayment = async (paymentMethodId, setupIntentId) => {
-    const autoApproveAt = new Date(Date.now() + (parseInt(pricing.auto_approve_hours || 48)) * 3600000).toISOString();
-    await base44.entities.TerritoryClaimRequest.create({
-      territory_id: territoryId,
-      user_id: user?.id,
-      brokerage_name: brokerageInfo.brokerage_name,
-      brokerage_license: brokerageInfo.brokerage_license,
-      agent_count: parseInt(brokerageInfo.agent_count),
-      tier_requested: tier,
-      type_requested: 'single',
-      stripe_payment_method_id: paymentMethodId,
-      stripe_setup_intent_id: setupIntentId,
-      status: 'pending',
-      auto_approve_at: autoApproveAt,
-    });
-    navigate('/claim/submitted', { state: { claimType: 'single', territories: [territory], tier, monthlyPrice: pricing[`${tier}_monthly_price`] } });
+  const loadTerritory = async (id) => {
+    setLoading(true);
+    const rows = await base44.entities.Territory.filter({ id });
+    const t = rows[0];
+    if (!t) { setLoading(false); return; }
+    const stateRows = await base44.entities.State.filter({ id: t.state_id });
+    setState(stateRows[0]);
+    checkBlocked(t);
+    setTerritory(t);
+    const avail = (t.seats_total || 1) - (t.seats_claimed || 0);
+    setSeatNumber(avail > 0 ? (t.seats_claimed || 0) + 1 : 1);
+    setLoading(false);
   };
 
-  if (pricingLoading) return <div className="flex justify-center py-12"><div className="w-6 h-6 border-4 border-[#1A3226]/20 border-t-[#1A3226] rounded-full animate-spin" /></div>;
+  const checkBlocked = (t) => {
+    if ((t.seats_claimed || 0) >= (t.seats_total || 1)) {
+      setBlockMsg("This territory is fully claimed.");
+    }
+  };
 
-  const price = parseFloat(pricing[`${tier}_monthly_price`] || 0);
-  const cap = parseInt(pricing[`${tier}_analyses_cap`] || 0);
-  const total = territory?.seats_total || 1;
-  const claimed = territory?.seats_claimed || 0;
-  const availableSeats = Array.from({ length: total }, (_, i) => i + 1).slice(claimed);
+  const handleSearch = async (q) => {
+    setSearchQ(q);
+    if (q.length < 2) { setSearchResults([]); return; }
+    const results = await base44.entities.Territory.filter({ city_town: { $regex: q } });
+    setSearchResults(results.filter(r => r.status === "available" || (r.seats_claimed || 0) < (r.seats_total || 1)).slice(0, 8));
+  };
+
+  const buildSummary = () => {
+    const price = parseFloat(pricing[`${tier}_monthly_price`] || 0);
+    const cap = parseInt(pricing[`${tier}_analyses_cap`] || 0);
+    return [
+      { label: `${territory?.city_town || ""}, ${state?.code || ""} — Seat #${seatNumber}`, value: "" },
+      { label: `${tier.charAt(0).toUpperCase() + tier.slice(1)} Tier`, value: `$${price.toFixed(2)}/mo` },
+      { label: "Analyses included", value: `${cap}/mo` },
+      { label: "Monthly total", value: `$${price.toFixed(2)}/mo`, bold: true },
+    ];
+  };
+
+  const handlePaymentSuccess = async (paymentMethodId, setupIntentId) => {
+    const autoApproveHours = parseInt(pricing?.auto_approve_hours || 48);
+    const autoAt = new Date(Date.now() + autoApproveHours * 60 * 60 * 1000).toISOString();
+    await base44.entities.TerritoryClaimRequest.create({
+      territory_id: territory.id,
+      user_id: user.id,
+      brokerage_name: brokerage.brokerage_name,
+      brokerage_license: brokerage.brokerage_license,
+      agent_count: parseInt(brokerage.agent_count),
+      tier_requested: tier,
+      type_requested: "single",
+      stripe_payment_method_id: paymentMethodId,
+      stripe_setup_intent_id: setupIntentId,
+      status: "pending",
+      auto_approve_at: autoAt,
+    });
+    navigate("/claim/submitted?type=single&tier=" + tier + "&territory=" + encodeURIComponent(territory.city_town));
+  };
+
+  if (loading) return <div className="flex items-center justify-center py-16"><Loader2 className="w-7 h-7 animate-spin text-[#1A3226]/40" /></div>;
 
   return (
-    <div className="max-w-2xl mx-auto">
-      {/* Progress */}
-      <div className="flex items-center gap-2 mb-8">
-        {STEPS.map((s, i) => (
-          <div key={s} className="flex items-center gap-2">
-            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-colors
-              ${i < step ? 'bg-emerald-500 text-white' : i === step ? 'bg-[#1A3226] text-white' : 'bg-gray-200 text-gray-400'}`}>
-              {i < step ? '✓' : i + 1}
-            </div>
-            <span className={`text-sm ${i === step ? 'font-medium text-[#1A3226]' : 'text-gray-400'}`}>{s}</span>
-            {i < STEPS.length - 1 && <div className="w-6 h-px bg-gray-200" />}
-          </div>
-        ))}
-      </div>
+    <div>
+      <StepHeader steps={STEPS} current={step} />
 
-      <div className="bg-white rounded-2xl border border-gray-200 p-6 lg:p-8">
-        {blockReason && (
-          <div className="flex items-start gap-3 p-4 rounded-lg bg-red-50 border border-red-200 mb-6">
-            <AlertCircle className="w-5 h-5 text-red-500 mt-0.5" />
-            <div>
-              <p className="font-medium text-red-700">Not Available</p>
-              <p className="text-sm text-red-600">{blockReason}</p>
-              <Button size="sm" variant="outline" className="mt-3" onClick={() => navigate('/territories')}>← Back to Map</Button>
-            </div>
+      {step === 0 && (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-xl font-semibold text-[#1A3226]">Select Your Territory</h2>
+            <p className="text-sm text-[#1A3226]/60 mt-1">Search for the town or city you want to claim.</p>
           </div>
-        )}
 
-        {!blockReason && step === 0 && territory && (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-lg font-semibold text-[#1A3226]">Confirm Territory</h2>
-              <p className="text-sm text-gray-500 mt-1">Review this territory before selecting your tier.</p>
-            </div>
-            <div className="rounded-xl border border-gray-200 p-5 flex items-start gap-4">
-              <div className="w-10 h-10 rounded-lg bg-[#1A3226]/5 flex items-center justify-center flex-shrink-0">
-                <MapPin className="w-5 h-5 text-[#1A3226]" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-[#1A3226]">{territory.city_town}</h3>
-                <p className="text-sm text-gray-500">{county?.name}, {state?.code}</p>
-                <div className="mt-2 flex flex-wrap gap-3 text-xs text-gray-500">
-                  <span>Population: {(territory.population || 0).toLocaleString()}</span>
-                  <span>Total seats: {total}</span>
-                  <span>Available: {total - claimed}</span>
-                </div>
-              </div>
-            </div>
-            {total > 1 && (
-              <div>
-                <label className="text-sm font-medium text-[#1A3226] block mb-2">Select Seat</label>
-                <div className="flex flex-wrap gap-2">
-                  {availableSeats.map(seatNum => (
-                    <button key={seatNum} type="button"
-                      onClick={() => setSelectedSeat(seatNum)}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium border transition-all ${selectedSeat === seatNum ? 'bg-[#1A3226] text-white border-[#1A3226]' : 'border-gray-200 text-gray-600 hover:border-[#1A3226]/30'}`}>
-                      Seat {seatNum}
+          {!territory ? (
+            <div className="relative">
+              <input
+                value={searchQ}
+                onChange={e => handleSearch(e.target.value)}
+                placeholder="Search towns, cities…"
+                className="w-full h-10 border border-input rounded-md px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+              {searchResults.length > 0 && (
+                <div className="absolute top-full left-0 right-0 z-10 bg-white border border-[#1A3226]/10 rounded-xl shadow-lg mt-1 overflow-hidden">
+                  {searchResults.map(r => (
+                    <button key={r.id} onClick={() => { loadTerritory(r.id); setSearchResults([]); setSearchQ(""); }}
+                      className="w-full text-left px-4 py-3 hover:bg-[#1A3226]/5 transition-colors border-b border-[#1A3226]/5 last:border-0">
+                      <p className="text-sm font-medium text-[#1A3226]">{r.city_town}</p>
+                      <p className="text-xs text-[#1A3226]/50">
+                        {r.seats_total || 1} seat{(r.seats_total || 1) > 1 ? "s" : ""} · {r.seats_claimed || 0} claimed · Status: {r.status}
+                      </p>
                     </button>
                   ))}
                 </div>
+              )}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-[#1A3226]/10 bg-white p-5 space-y-4">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-[#1A3226]/5 flex items-center justify-center">
+                    <MapPin className="w-5 h-5 text-[#1A3226]" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-[#1A3226]">{territory.city_town}</h3>
+                    <p className="text-xs text-[#1A3226]/50">{state?.name}</p>
+                  </div>
+                </div>
+                <button onClick={() => { setTerritory(null); setBlockMsg(""); }} className="text-xs text-[#1A3226]/40 hover:text-[#1A3226]">Change</button>
               </div>
-            )}
-            <div className="flex justify-end"><Button onClick={() => setStep(1)} className="bg-[#1A3226] text-white">Continue →</Button></div>
-          </div>
-        )}
 
-        {!blockReason && step === 1 && (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-lg font-semibold text-[#1A3226]">Select Your Tier</h2>
-              <p className="text-sm text-gray-500 mt-1">Choose the plan that fits your business.</p>
+              <div className="grid grid-cols-3 gap-3 text-sm">
+                <div className="rounded-lg bg-[#1A3226]/[0.03] p-3 text-center">
+                  <p className="text-lg font-bold text-[#1A3226]">{territory.seats_total || 1}</p>
+                  <p className="text-xs text-[#1A3226]/50">Total Seats</p>
+                </div>
+                <div className="rounded-lg bg-[#1A3226]/[0.03] p-3 text-center">
+                  <p className="text-lg font-bold text-[#1A3226]">{territory.seats_claimed || 0}</p>
+                  <p className="text-xs text-[#1A3226]/50">Claimed</p>
+                </div>
+                <div className="rounded-lg bg-[#1A3226]/[0.03] p-3 text-center">
+                  <p className="text-lg font-bold text-emerald-600">{(territory.seats_total || 1) - (territory.seats_claimed || 0)}</p>
+                  <p className="text-xs text-[#1A3226]/50">Available</p>
+                </div>
+              </div>
+
+              {territory.population && (
+                <p className="text-xs text-[#1A3226]/50">Population: {territory.population.toLocaleString()}</p>
+              )}
+
+              {(territory.seats_total || 1) > 1 && !blockMsg && (
+                <div>
+                  <p className="text-sm font-medium text-[#1A3226] mb-2">Select Your Seat</p>
+                  <div className="flex flex-wrap gap-2">
+                    {Array.from({ length: territory.seats_total || 1 }, (_, i) => i + 1).map(n => {
+                      const isClaimed = n <= (territory.seats_claimed || 0);
+                      return (
+                        <button key={n} disabled={isClaimed}
+                          onClick={() => setSeatNumber(n)}
+                          className={`w-10 h-10 rounded-lg text-sm font-medium transition-all ${
+                            isClaimed ? "bg-red-50 text-red-300 cursor-not-allowed" :
+                            seatNumber === n ? "bg-[#1A3226] text-white" :
+                            "bg-[#1A3226]/5 text-[#1A3226] hover:bg-[#1A3226]/10"
+                          }`}>
+                          {isClaimed ? "✗" : n}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {blockMsg && (
+                <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 rounded-lg px-4 py-3">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  {blockMsg}
+                </div>
+              )}
             </div>
-            <TierSelector pricing={pricing} selectedTier={tier} onChange={setTier} />
-            <div className="flex items-center justify-between">
-              <Button variant="outline" onClick={() => setStep(0)}>← Back</Button>
-              <Button onClick={() => setStep(2)} className="bg-[#1A3226] text-white">Continue →</Button>
+          )}
+
+          {territory && !blockMsg && (
+            <div className="flex justify-between pt-2">
+              <Button variant="outline" onClick={() => navigate("/claim")}>Back</Button>
+              <Button onClick={() => setStep(1)} className="bg-[#1A3226] text-white hover:bg-[#1A3226]/90">Continue →</Button>
             </div>
-          </div>
-        )}
+          )}
+          {!territory && (
+            <div className="flex justify-start pt-2">
+              <Button variant="outline" onClick={() => navigate("/claim")}>← Back to Claim Types</Button>
+            </div>
+          )}
+        </div>
+      )}
 
-        {!blockReason && step === 2 && (
-          <BrokerageInfoStep data={brokerageInfo} onChange={setBrokerageInfo} tier={tier} onBack={() => setStep(1)} onNext={() => setStep(3)} />
-        )}
+      {step === 1 && (
+        <TierSelector
+          pricing={pricing}
+          selected={tier}
+          onChange={setTier}
+          onNext={() => setStep(2)}
+          onBack={() => setStep(0)}
+        />
+      )}
 
-        {!blockReason && step === 3 && (
-          <PaymentStep
-            orderLines={[
-              { label: `${territory?.city_town} — ${tier.charAt(0).toUpperCase() + tier.slice(1)} Seat ${total > 1 ? selectedSeat : ''}`, value: `$${price.toFixed(2)}/mo` },
-              { label: 'Analyses/month', value: `${cap}` },
-            ]}
-            totalMonthly={price}
-            autoApproveHours={pricing.auto_approve_hours}
-            onBack={() => setStep(2)}
-            onSubmit={handlePayment}
-          />
-        )}
-      </div>
+      {step === 2 && (
+        <BrokerageInfoStep
+          data={brokerage}
+          onChange={setBrokerage}
+          tier={tier}
+          onNext={() => setStep(3)}
+          onBack={() => setStep(1)}
+        />
+      )}
+
+      {step === 3 && (
+        <PaymentStep
+          pricing={pricing}
+          summary={buildSummary()}
+          onSuccess={handlePaymentSuccess}
+          onBack={() => setStep(2)}
+        />
+      )}
     </div>
   );
 }

@@ -1,106 +1,89 @@
-import { useLocation, Link } from 'react-router-dom';
-import { CheckCircle, MapPin, Clock } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { usePricing } from '@/components/pricing/usePricing';
+import { Link } from "react-router-dom";
+import { CheckCircle, MapPin, Map } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { usePricing } from "@/components/pricing/usePricing";
 
 const TYPE_LABELS = {
-  single: 'Single Territory',
-  pool: 'Population Pool',
-  bundle: 'Town Bundle',
-  buyout: 'Full City Buyout',
+  single: "Single Territory",
+  pool: "Population Pool",
+  bundle: "Town Bundle",
+  buyout: "Full City Buyout",
 };
 
 export default function ClaimSubmitted() {
-  const { state } = useLocation();
+  const urlParams = new URLSearchParams(window.location.search);
+  const type = urlParams.get("type") || "single";
+  const tier = urlParams.get("tier") || "starter";
+  const territory = urlParams.get("territory");
+  const city = urlParams.get("city");
+  const towns = urlParams.get("towns");
+  const price = urlParams.get("price");
+
   const { pricing } = usePricing();
-  const { claimType, territories = [], tier, monthlyPrice, buckets, bundleName, discount, seats, stateName } = state || {};
+  const autoApproveHours = parseInt(pricing?.auto_approve_hours || 48);
 
-  const autoApproveHours = pricing.auto_approve_hours || 48;
-
-  if (!claimType) {
-    return (
-      <div className="max-w-lg mx-auto py-16 text-center">
-        <p className="text-gray-500 mb-4">No claim data found.</p>
-        <Link to="/claim"><Button>Start a Claim</Button></Link>
-      </div>
-    );
-  }
+  const displayName = territory || city || (towns ? `${towns} towns` : "your territory");
+  const tierLabel = tier.charAt(0).toUpperCase() + tier.slice(1);
 
   return (
-    <div className="max-w-lg mx-auto py-10">
-      <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center space-y-6">
+    <div className="max-w-lg mx-auto py-8">
+      <div className="rounded-2xl border border-[#1A3226]/10 bg-white p-8 text-center space-y-6">
         {/* Success icon */}
-        <div className="flex justify-center">
-          <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center">
-            <CheckCircle className="w-8 h-8 text-emerald-600" />
+        <div className="flex items-center justify-center">
+          <div className="w-16 h-16 rounded-2xl bg-emerald-50 border-2 border-emerald-200 flex items-center justify-center">
+            <CheckCircle className="w-9 h-9 text-emerald-500" />
           </div>
         </div>
 
         <div>
           <h1 className="text-2xl font-bold text-[#1A3226]">Claim Submitted!</h1>
-          <p className="text-gray-500 mt-2">Your territory claim is under review.</p>
-        </div>
-
-        {/* Claim details */}
-        <div className="rounded-xl border border-gray-200 bg-gray-50 p-5 text-left space-y-3">
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Claim Type</span>
-            <span className="font-medium text-[#1A3226]">{TYPE_LABELS[claimType]}</span>
-          </div>
-          {territories.length > 0 && (
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500">{territories.length === 1 ? 'Territory' : 'Territories'}</span>
-              <span className="font-medium text-[#1A3226] text-right">
-                {territories.length === 1
-                  ? territories[0].city_town
-                  : `${territories.length} territories`}
-              </span>
-            </div>
-          )}
-          {claimType === 'pool' && buckets && (
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Buckets</span>
-              <span className="font-medium text-[#1A3226]">{buckets}</span>
-            </div>
-          )}
-          {claimType === 'bundle' && bundleName && (
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Bundle</span>
-              <span className="font-medium text-[#1A3226]">{bundleName} ({discount}% off)</span>
-            </div>
-          )}
-          {claimType === 'buyout' && seats && (
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Seats</span>
-              <span className="font-medium text-[#1A3226]">{seats} (Full Buyout)</span>
-            </div>
-          )}
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Tier</span>
-            <span className="font-medium text-[#1A3226] capitalize">{tier}</span>
-          </div>
-          <div className="flex justify-between text-sm border-t border-gray-200 pt-3">
-            <span className="text-gray-500">Monthly Price</span>
-            <span className="font-bold text-[#1A3226] text-base">${parseFloat(monthlyPrice || 0).toFixed(2)}/mo</span>
-          </div>
-        </div>
-
-        {/* Review timeline */}
-        <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200 text-left">
-          <Clock className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
-          <p className="text-sm text-amber-700">
-            We'll review your claim within <strong>{autoApproveHours} hours</strong>. 
-            Your card will only be charged upon approval. We'll email you when a decision is made.
+          <p className="text-sm text-[#1A3226]/60 mt-2">
+            We'll review your claim within <strong>{autoApproveHours} hours</strong>. You'll hear from us by email.
           </p>
         </div>
 
+        {/* Claim summary */}
+        <div className="rounded-xl bg-[#1A3226]/[0.03] border border-[#1A3226]/8 p-5 text-left space-y-3">
+          <div className="flex justify-between text-sm">
+            <span className="text-[#1A3226]/50">Claim Type</span>
+            <span className="font-medium text-[#1A3226]">{TYPE_LABELS[type] || type}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-[#1A3226]/50">Territory</span>
+            <span className="font-medium text-[#1A3226] text-right max-w-[60%]">{displayName}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-[#1A3226]/50">Tier</span>
+            <span className="font-medium text-[#1A3226]">{tierLabel}</span>
+          </div>
+          {price && (
+            <div className="flex justify-between text-sm">
+              <span className="text-[#1A3226]/50">Monthly Price</span>
+              <span className="font-medium text-[#1A3226]">${price}/mo</span>
+            </div>
+          )}
+          <div className="flex justify-between text-sm">
+            <span className="text-[#1A3226]/50">Status</span>
+            <span className="text-amber-600 font-medium">Pending Review</span>
+          </div>
+        </div>
+
+        <p className="text-xs text-[#1A3226]/40">
+          Your card will not be charged until your claim is approved. 
+          If not reviewed within {autoApproveHours} hours, it will be automatically approved.
+        </p>
+
         <div className="flex flex-col sm:flex-row gap-3">
-          <Link to="/territories" className="flex-1">
-            <Button variant="outline" className="w-full gap-2"><MapPin className="w-4 h-4" /> Back to Map</Button>
-          </Link>
-          <Link to="/Dashboard" className="flex-1">
-            <Button className="w-full bg-[#1A3226] text-white hover:bg-[#1A3226]/90">Go to Dashboard</Button>
-          </Link>
+          <Button variant="outline" className="flex-1 gap-2" asChild>
+            <Link to="/territories">
+              <Map className="w-4 h-4" /> View Territory Map
+            </Link>
+          </Button>
+          <Button className="flex-1 bg-[#1A3226] text-white hover:bg-[#1A3226]/90 gap-2" asChild>
+            <Link to="/Dashboard">
+              Go to Dashboard →
+            </Link>
+          </Button>
         </div>
       </div>
     </div>
