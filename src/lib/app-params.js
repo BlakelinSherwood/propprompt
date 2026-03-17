@@ -16,7 +16,9 @@ export function isInIframe() {
   }
 }
 
-// App-level params injected by the base44 vite plugin
-export const appParams = typeof window !== 'undefined'
-  ? (window.__BASE44_APP_PARAMS__ || {})
-  : {};
+// App params — hardcoded per Base44 support guidance (no vite plugin injection)
+export const appParams = {
+  appId: '69b849e8d5f86924955e7fae',
+  appBaseUrl: '',
+  token: '',
+};
