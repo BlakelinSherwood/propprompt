@@ -77,78 +77,136 @@ const ASSESSMENT_TYPES = [
 ];
 
 export default function Step2Assessment({ intake, update, onNext, onBack }) {
-  return (
-    <div className="p-6 lg:p-8">
-      <h2 className="text-lg font-semibold text-[#1A3226] mb-1" style={{ fontFamily: "Georgia, serif" }}>
-        Assessment Type
-      </h2>
-      <p className="text-sm text-[#1A3226]/50 mb-6">
-        Select the type of analysis. Each activates a dedicated prompt module calibrated for that use case.
-      </p>
+  const standardTypes = ASSESSMENT_TYPES.filter(a => a.id !== 'custom');
+  const customType = ASSESSMENT_TYPES.find(a => a.id === 'custom');
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
-        {ASSESSMENT_TYPES.filter(a => a.id !== 'custom').map((a) => {
-          const selected = intake.assessment_type === a.id;
-          return (
-            <button
-              key={a.id}
-              onClick={() => update({ assessment_type: a.id })}
-              className={`text-left rounded-xl border-2 p-4 transition-all
-                ${selected ? "border-[#1A3226] bg-[#1A3226]/5" : "border-[#1A3226]/10 hover:border-[#1A3226]/20"}`}
-            >
-              <div className="flex items-start gap-3">
-                <span className="text-2xl leading-none mt-0.5">{a.icon}</span>
-                <div className="flex-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <span className="text-sm font-semibold text-[#1A3226]">{a.title}</span>
-                      {a.sublabel && (
-                        <p className="text-[10px] text-[#1A3226]/50 mt-0.5">{a.sublabel}</p>
+  return (
+    <TooltipProvider>
+      <div className="p-6 lg:p-8">
+        <h2 className="text-lg font-semibold text-[#1A3226] mb-1" style={{ fontFamily: "Georgia, serif" }}>
+          Assessment Type
+        </h2>
+        <p className="text-sm text-[#1A3226]/50 mb-6">
+          Select the type of analysis. Each activates a dedicated prompt module calibrated for that use case.
+        </p>
+
+        {/* Grid: 2 columns, 3 rows of standard types */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
+          {standardTypes.map((a) => {
+            const selected = intake.assessment_type === a.id;
+            return (
+              <button
+                key={a.id}
+                onClick={() => update({ assessment_type: a.id })}
+                className={`text-left rounded-xl border-2 p-4 transition-all
+                  ${selected ? "border-[#1A3226] bg-[#1A3226]/5" : "border-[#1A3226]/10 hover:border-[#1A3226]/20"}`}
+              >
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl leading-none mt-0.5">{a.icon}</span>
+                  <div className="flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-[#1A3226]">{a.title}</span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="w-3.5 h-3.5 text-[#B8982F] flex-shrink-0 cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs text-xs bg-[#1A3226] text-white border-0">
+                              {a.tooltip}
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        {a.sublabel && (
+                          <p className="text-[10px] text-[#1A3226]/50 mt-0.5">{a.sublabel}</p>
+                        )}
+                      </div>
+                      {a.badge && (
+                        <span className={`text-[9px] px-2 py-1 rounded flex-shrink-0 font-medium whitespace-nowrap
+                          ${a.badgeColor === 'green' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                          {a.badge}
+                        </span>
                       )}
                     </div>
-                    {a.badge && (
-                      <span className={`text-[9px] px-2 py-1 rounded flex-shrink-0 font-medium
-                        ${a.id === 'client_portfolio' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
-                        {a.badge}
-                      </span>
+                    <p className="text-xs text-[#1A3226]/55 leading-relaxed mt-1">{a.description}</p>
+                    <p className="text-[10px] text-[#B8982F] mt-2 font-medium">{a.time}</p>
+                  </div>
+                  <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 mt-1
+                    ${selected ? "border-[#1A3226] bg-[#1A3226]" : "border-[#1A3226]/20"}`} />
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Custom Analysis - Full Width */}
+        {customType && (
+          <div className="mb-8">
+            <button
+              onClick={() => update({ assessment_type: 'custom' })}
+              className={`w-full text-left rounded-xl border-2 p-4 transition-all
+                ${intake.assessment_type === 'custom' ? "border-[#1A3226] bg-[#1A3226]/5" : "border-[#1A3226]/10 hover:border-[#1A3226]/20"}`}
+            >
+              <div className="flex items-start gap-3">
+                <span className="text-2xl leading-none mt-0.5">{customType.icon}</span>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-semibold text-[#1A3226]">{customType.title}</span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-3.5 h-3.5 text-[#B8982F] flex-shrink-0 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs text-xs bg-[#1A3226] text-white border-0">
+                        {customType.tooltip}
+                      </TooltipContent>
+                    </Tooltip>
+                    <span className="text-[9px] px-2 py-1 rounded bg-blue-100 text-blue-700 font-medium">
+                      {customType.badge}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-[#1A3226]/50 mb-1">Compose your own report from any combination of modules</p>
+
+                  {/* Module Preview Strip */}
+                  <div className="flex items-center gap-2 mb-2">
+                    {customType.modules?.slice(0, 4).map((moduleId) => {
+                      const module = ANALYSIS_MODULES[moduleId];
+                      return module ? (
+                        <Tooltip key={moduleId}>
+                          <TooltipTrigger asChild>
+                            <div className="w-8 h-8 rounded-full bg-[#B8982F]/20 flex items-center justify-center text-[10px] font-semibold text-[#B8982F] cursor-help flex-shrink-0">
+                              {module.name.charAt(0)}
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent className="text-xs bg-[#1A3226] text-white border-0">
+                            {module.name}
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : null;
+                    })}
+                    {customType.modules && customType.modules.length > 4 && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="text-[9px] text-[#1A3226]/50 font-medium">+{customType.modules.length - 4} more</div>
+                        </TooltipTrigger>
+                        <TooltipContent className="text-xs bg-[#1A3226] text-white border-0">
+                          {customType.modules.slice(4).map(id => ANALYSIS_MODULES[id]?.name).filter(Boolean).join(", ")}
+                        </TooltipContent>
+                      </Tooltip>
                     )}
                   </div>
-                  <p className="text-xs text-[#1A3226]/55 leading-relaxed mt-1">{a.description}</p>
-                  <p className="text-[10px] text-[#B8982F] mt-2 font-medium">{a.time}</p>
+
+                  <p className="text-xs text-[#1A3226]/55 leading-relaxed">{customType.description}</p>
+                  <p className="text-[10px] text-[#B8982F] mt-2 font-medium">{customType.time}</p>
                 </div>
                 <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 mt-1
-                  ${selected ? "border-[#1A3226] bg-[#1A3226]" : "border-[#1A3226]/20"}`} />
+                  ${intake.assessment_type === 'custom' ? "border-[#1A3226] bg-[#1A3226]" : "border-[#1A3226]/20"}`} />
               </div>
             </button>
-          );
-        })}
-      </div>
-
-      {/* Custom Analysis - Full Width */}
-      <div className="mb-8">
-        <button
-          onClick={() => update({ assessment_type: 'custom' })}
-          className={`w-full text-left rounded-xl border-2 p-4 transition-all
-            ${intake.assessment_type === 'custom' ? "border-[#1A3226] bg-[#1A3226]/5" : "border-[#1A3226]/10 hover:border-[#1A3226]/20"}`}
-        >
-          <div className="flex items-start gap-3">
-            <span className="text-2xl leading-none mt-0.5">✏️</span>
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-sm font-semibold text-[#1A3226]">Custom Analysis</span>
-                <span className="text-[9px] px-2 py-1 rounded bg-blue-100 text-blue-700 font-medium">Advanced</span>
-              </div>
-              <p className="text-[10px] text-[#1A3226]/50 mt-0.5 mb-1">Compose your own report from any combination of modules</p>
-              <p className="text-xs text-[#1A3226]/55 leading-relaxed">Build a custom report by combining any available analysis modules. For agents running hybrid scenarios — an investor who also wants rental upside, a seller considering rent-and-hold, a buyer comparing multiple markets.</p>
-              <p className="text-[10px] text-[#B8982F] mt-2 font-medium">Varies</p>
-            </div>
-            <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 mt-1
-              ${intake.assessment_type === 'custom' ? "border-[#1A3226] bg-[#1A3226]" : "border-[#1A3226]/20"}`} />
           </div>
-        </button>
-      </div>
+        )}
 
-      <WizardNav step={2} onNext={onNext} onBack={onBack} canNext={!!intake.assessment_type} />
-    </div>
+        <WizardNav step={2} onNext={onNext} onBack={onBack} canNext={!!intake.assessment_type} />
+      </div>
+    </TooltipProvider>
   );
 }
