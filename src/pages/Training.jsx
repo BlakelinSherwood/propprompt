@@ -36,9 +36,9 @@ export default function Training() {
       ]);
 
       try {
-        const subs = await base44.entities.TerritorySubscription.filter({ user_id: me.email, status: 'active' });
-        const bundles = await base44.entities.TerritoryBundle.filter({ owner_user_id: me.email, status: 'active' });
-        const allTiers = [...subs.map(s => s.tier), ...bundles.map(b => b.tier)].filter(Boolean);
+        const subs = await base44.entities.TerritorySubscription.filter({ user_id: me.id, status: 'active' });
+        const bundles = await base44.entities.TerritoryBundle.filter({ user_id: me.id, status: 'active' });
+        const allTiers = [...(subs || []).map(s => s.tier), ...(bundles || []).map(b => b.tier)].filter(Boolean);
         if (allTiers.length) {
           const best = allTiers.reduce((a, b) => TIER_RANK[a] >= TIER_RANK[b] ? a : b);
           setUserTier(best);
@@ -46,8 +46,8 @@ export default function Training() {
       } catch {}
 
       try {
-        const prog = await base44.entities.TrainingProgress.filter({ user_email: me.email });
-        setCompletedIds(new Set(prog.filter(p => p.is_completed).map(p => p.video_id)));
+        const prog = await base44.entities.TrainingProgress.filter({ user_id: me.id });
+        setCompletedIds(new Set((prog || []).filter(p => p.completed_at).map(p => p.video_id)));
       } catch {}
 
       setModules(mods);
