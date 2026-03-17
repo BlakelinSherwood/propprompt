@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
+import { selectAIModel } from "@/lib/aiModelSelector";
 import WizardProgress from "../components/wizard/WizardProgress";
-import Step1Platform from "../components/wizard/Step1Platform";
 import Step2Assessment from "../components/wizard/Step2Assessment";
 import Step3ClientRelationship from "../components/wizard/Step3ClientRelationship";
 import Step4PropertyDetails from "../components/wizard/Step4PropertyDetails";
@@ -11,7 +11,6 @@ import Step5OutputFormat from "../components/wizard/Step5OutputFormat";
 import Step6Confirm from "../components/wizard/Step6Confirm";
 
 const STEP_LABELS = [
-  "AI Platform",
   "Assessment",
   "Client Role",
   "Property",
@@ -20,8 +19,6 @@ const STEP_LABELS = [
 ];
 
 const INITIAL_INTAKE = {
-  ai_platform: "claude",
-  ai_model: "",
   assessment_type: "",
   client_relationship: "",
   address: "",
@@ -30,6 +27,7 @@ const INITIAL_INTAKE = {
   output_format: "narrative",
   on_behalf_of_email: "",
   drive_sync: true,
+  selected_modules: [],
 };
 
 export default function NewAnalysis() {
@@ -43,9 +41,9 @@ export default function NewAnalysis() {
   useEffect(() => {
     async function load() {
       if (!user) return;
-      if (me.role === "assistant" || me.role === "team_lead") {
+      if (user.role === "assistant" || user.role === "team_lead") {
         const members = await base44.entities.User.list();
-        setOrgMembers(members.filter((m) => m.email !== me.email && ["agent", "team_agent"].includes(m.role)));
+        setOrgMembers(members.filter((m) => m.email !== user.email && ["agent", "team_agent"].includes(m.role)));
       }
     }
     load();
@@ -56,7 +54,7 @@ export default function NewAnalysis() {
   }
 
   function next() {
-    setStep((s) => Math.min(s + 1, 6));
+    setStep((s) => Math.min(s + 1, 5));
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -75,6 +73,11 @@ export default function NewAnalysis() {
         setSubmitting(false);
         return;
       }
+
+      // Select Claude model based on analysis type and modules
+      const hasAddons = intake.selected_modules && intake.selected_modules.length > 0;
+      const { platform, model } = selectAIModel(intake.assessment_type, hasAddons);
+
       const analysis = await base44.entities.Analysis.create({
         run_by_email: user.email,
         on_behalf_of_email: intake.on_behalf_of_email || null,
@@ -82,8 +85,8 @@ export default function NewAnalysis() {
         assessment_type: intake.assessment_type,
         property_type: intake.property_type,
         location_class: intake.location_class,
-        ai_platform: intake.ai_platform,
-        ai_model: intake.ai_model || null,
+        ai_platform: platform,
+        ai_model: model,
         output_format: intake.output_format,
         status: "draft",
         intake_data: {
@@ -92,6 +95,7 @@ export default function NewAnalysis() {
           drive_sync: intake.drive_sync,
         },
         drive_sync_status: intake.drive_sync ? "pending" : "not_synced",
+        selected_modules: intake.selected_modules || [],
       });
       navigate(`/AnalysisRun?id=${analysis.id}`);
     } catch (err) {
@@ -118,12 +122,11 @@ export default function NewAnalysis() {
       <WizardProgress currentStep={step} labels={STEP_LABELS} />
 
       <div className="rounded-2xl border border-[#1A3226]/10 bg-white overflow-hidden shadow-sm">
-        {step === 1 && <Step1Platform {...stepProps} />}
-        {step === 2 && <Step2Assessment {...stepProps} />}
-        {step === 3 && <Step3ClientRelationship {...stepProps} />}
-        {step === 4 && <Step4PropertyDetails {...stepProps} />}
-        {step === 5 && <Step5OutputFormat {...stepProps} />}
-        {step === 6 && (
+        {step === 1 && <Step2Assessment {...stepProps} />}
+        {step === 2 && <Step3ClientRelationship {...stepProps} />}
+        {step === 3 && <Step4PropertyDetails {...stepProps} />}
+        {step === 4 && <Step5OutputFormat {...stepProps} />}
+        {step === 5 && (
           <Step6Confirm
             {...stepProps}
             orgMembers={orgMembers}
