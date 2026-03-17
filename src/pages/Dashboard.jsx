@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { Users, FileText, Shield, Activity, ArrowRight, PlusCircle } from "lucide-react";
 import DashboardStatCard from "../components/DashboardStatCard";
 import WelcomeHero from "../components/WelcomeHero";
+import TrainingProgressWidget from "../components/training/TrainingProgressWidget";
 import FairHousingBanner from "../components/FairHousingBanner";
 import PrivacyNoticeModal from "../components/PrivacyNoticeModal";
 
@@ -125,6 +126,8 @@ export default function Dashboard() {
             />
           </div>
         )}
+
+        <TrainingProgressWidget user={user} />
 
         {/* Getting Started */}
         <div className="rounded-2xl border border-[#1A3226]/10 bg-white p-6 lg:p-8">

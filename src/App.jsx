@@ -30,6 +30,9 @@ import ClaimsAdmin from './pages/admin/ClaimsAdmin';
 import ClaimSubmitted from './pages/ClaimSubmitted';
 import BrokerageBranding from './pages/BrokerageBranding';
 import TeamBranding from './pages/TeamBranding';
+import Training from './pages/Training';
+import TrainingVideo from './pages/TrainingVideo';
+import TrainingAdmin from './pages/admin/TrainingAdmin';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -78,6 +81,9 @@ const AuthenticatedApp = () => {
         <Route path="/settings/branding" element={<AgentBranding />} />
         <Route path="/admin/pricing" element={<PricingAdmin />} />
         <Route path="/admin/claims" element={<ClaimsAdmin />} />
+        <Route path="/admin/training" element={<TrainingAdmin />} />
+        <Route path="/training" element={<Training />} />
+        <Route path="/training/:videoId" element={<TrainingVideo />} />
         <Route path="/territories" element={<Territories />} />
         <Route path="/account/topup" element={<TopupPage />} />
         <Route path="/account/bundle/:bundle_id" element={<BundleManagement />} />
