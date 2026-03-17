@@ -8,6 +8,7 @@ import { useFounderProfile } from "@/lib/useFounderProfile";
 import HeroMap from "@/components/landing/HeroMap";
 import UrgencyStrip from "@/components/landing/UrgencyStrip";
 import PricingSection from "@/components/landing/PricingSection";
+import TerritoryLandingMap from "@/components/landing/TerritoryLandingMap";
 
 // TODO: Replace with real testimonials
 const TESTIMONIALS = [
