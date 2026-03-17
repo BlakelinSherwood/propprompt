@@ -8,14 +8,14 @@
 
 ## Executive Summary
 
-The PropPrompt codebase is a sophisticated real-estate SaaS application with multi-tenant architecture, AI streaming integrations, Stripe billing, and document generation. The audit identified **57 findings** across security, correctness, performance, and code quality categories.
+The PropPrompt codebase is a sophisticated real-estate SaaS application with multi-tenant architecture, AI streaming integrations, Stripe billing, and document generation. The audit identified **72 findings** across security, correctness, performance, and code quality categories.
 
 | Severity | Count |
 |----------|-------|
-| Critical | 8     |
-| High     | 17    |
-| Medium   | 19    |
-| Low      | 13    |
+| Critical | 9     |
+| High     | 21    |
+| Medium   | 26    |
+| Low      | 16    |
 
 ---
 
@@ -60,7 +60,12 @@ This means data encrypted by one function cannot be decrypted by the other, lead
 **Issue:** The OAuth `state` parameter is set to the raw user email, and the callback trusts it without verification. An attacker could initiate an OAuth flow, modify the `state` parameter to a victim's email, complete the flow, and connect their own Google account to the victim's PropPrompt account.
 **Fix:** Use a cryptographically random CSRF token as the `state` value, stored server-side and validated on callback.
 
-### C8. No Ownership Verification on Analysis Access in Stream Functions (Security)
+### C8. XSS via `dangerouslySetInnerHTML` on Landing Page (Security)
+**File:** `src/pages/Landing.jsx:350`
+**Issue:** `founder.founder_statement` is rendered with `dangerouslySetInnerHTML={{ __html: founder.founder_statement }}`. This field comes from a database record editable by platform owners. If any admin account is compromised, arbitrary JavaScript can be injected into the public landing page affecting all visitors.
+**Fix:** Sanitize with DOMPurify before rendering, or render as plain text/markdown.
+
+### C9. No Ownership Verification on Analysis Access in Stream Functions (Security)
 **Files:** `functions/claudeStream.ts:26-28`, `functions/geminiStream.ts:37-39`, `functions/grokStream.ts:21-23`, `functions/perplexityStream.ts:22-25`
 **Issue:** These streaming functions fetch an analysis by ID and process it without verifying the requesting user owns or has permission to access that analysis. Any authenticated user can stream any other user's analysis by providing its ID. Only `openaiStream.ts` (line 68-71) properly checks ownership.
 **Fix:** Add ownership check: verify `analysis.run_by_email === user.email` or user has admin role.
@@ -154,6 +159,26 @@ This means data encrypted by one function cannot be decrypted by the other, lead
 **Issue:** The Gemini API key is passed as a URL query parameter (`?key=${apiKey}`). This means it may appear in server access logs, CDN logs, and proxy logs. Other platforms correctly use headers for API key transmission.
 **Fix:** Use the `x-goog-api-key` header instead of the URL parameter.
 
+### H18. N+1 Query Pattern in BundleManagement and PoolManagement (Performance)
+**Files:** `src/pages/BundleManagement.jsx`, `src/pages/PoolManagement.jsx`
+**Issue:** For each bundle/pool member, a separate API call fetches the territory individually. With many members, this creates a waterfall of network requests.
+**Fix:** Batch-fetch all territories then join client-side.
+
+### H19. `loadStripe()` Called Inside Component Render Cycle (Performance)
+**Files:** `src/pages/TopupPage.jsx`, `src/components/claim/PaymentStep.jsx:99`
+**Issue:** `loadStripe()` is called inside the component body or `useEffect`. Stripe's documentation recommends calling `loadStripe()` at module scope to avoid re-loading the Stripe.js script on every render/mount.
+**Fix:** Move `loadStripe()` call to module scope.
+
+### H20. BundleFlow Payment Creates Records Without Transaction Safety (Reliability)
+**File:** `src/components/claim/BundleFlow.jsx:93-125`
+**Issue:** `handlePaymentSuccess` creates bundle records, then loops through territories and members with individual sequential `await` calls. If any call in the middle fails, the claim is left in a partial state with no rollback.
+**Fix:** Move this logic to a backend function that handles it as a single transaction.
+
+### H21. Inconsistent Admin Role Check in `admin/PricingAdmin.jsx` (Bug)
+**File:** `src/pages/admin/PricingAdmin.jsx`
+**Issue:** Checks `user.role !== 'admin'` for access control, but the application uses `platform_owner` as the admin role everywhere else. This may block the actual admin or allow unintended access.
+**Fix:** Use `'platform_owner'` consistently.
+
 ---
 
 ## Medium Severity Findings
@@ -228,7 +253,42 @@ This means data encrypted by one function cannot be decrypted by the other, lead
 **Issue:** When `force_refresh` is true, it still calls `searchRecordsByState` which checks the cache internally (lines 16-25). The cache check inside `searchRecordsByState` doesn't know about `force_refresh`.
 **Fix:** Pass `force_refresh` flag through to `searchRecordsByState` and skip cache when true.
 
-### M15. Email Dialog Lacks Validation (UX)
+### M15. Division by Zero in DataQuality.jsx (Bug)
+**File:** `src/pages/admin/DataQuality.jsx:57`
+**Issue:** `enriched.reduce(...) / enriched.length` divides by `enriched.length` which is 0 when no territories exist, producing `NaN` in the stats display.
+**Fix:** Guard against empty array: `enriched.length > 0 ? ... : 0`.
+
+### M16b. `isIframe` Without Try-Catch at Module Scope (Bug)
+**File:** `src/lib/utils.js`
+**Issue:** `export const isIframe = window.self !== window.top;` will throw a `DOMException` in cross-origin iframe contexts. The same check in `src/lib/app-params.js` correctly wraps this in try-catch.
+**Fix:** Use the safe version from `app-params.js` or add try-catch.
+
+### M17b. Dead Wizard Step Components (Code Quality)
+**Files:** `src/components/wizard/StepAIPlatform.jsx`, `StepAssessmentType.jsx`, `StepClientRelationship.jsx`, `StepPropertyDetails.jsx`, `StepOutputFormat.jsx`, `StepConfirmLaunch.jsx`, `StepAnalysisAddOns.jsx`
+**Issue:** These 7 wizard step components are never imported. The active wizard uses Step1-Step6. These appear to be dead code from an earlier iteration (~700 lines of unused code).
+**Fix:** Remove or archive these unused components.
+
+### M18b. Typo in Pricing Config Key (Bug)
+**File:** `src/pages/admin/ClaimsAdmin.jsx:159`
+**Issue:** References `rejection_recliam_days` — likely should be `rejection_reclaim_days`. If the backend uses the correct spelling, this always returns `undefined`.
+**Fix:** Correct the typo.
+
+### M19b. Unbounded Chat Message Array (Performance)
+**File:** `src/components/ChatbotDrawer.jsx`
+**Issue:** Chat messages accumulate in state without any limit. In a long session, this grows unbounded, increasing memory usage and making re-renders progressively slower.
+**Fix:** Implement a message cap (e.g., keep last 100 messages).
+
+### M20. Duplicate WCAG Utility Functions (Code Quality)
+**Files:** `src/pages/BrokerageBranding.jsx`, `src/pages/TeamBranding.jsx`
+**Issue:** `hexToRgb`, `relativeLuminance`, `getContrastRatio`, and WCAG contrast checking logic are duplicated verbatim across both files.
+**Fix:** Extract to a shared utility module.
+
+### M21. Missing `useEffect` Dependencies (Bug)
+**Files:** `src/pages/TopupPage.jsx:116`, `src/pages/admin/territories/EasternMA.jsx:66`
+**Issue:** useEffect hooks reference variables not listed in their dependency arrays, potentially causing stale closures and missed re-renders.
+**Fix:** Add the missing dependencies to the arrays.
+
+### M22. Email Dialog Lacks Validation (UX)
 **File:** `src/pages/AnalysisRun.jsx:377-383`
 **Issue:** The email input only checks `!emailTo` but doesn't validate email format. Users could send to invalid addresses.
 **Fix:** Add basic email regex validation.
@@ -316,7 +376,22 @@ This means data encrypted by one function cannot be decrypted by the other, lead
 **Issue:** Folder names containing single quotes are injected directly into the Google Drive API query string: `` `name='${folderName}'` ``. If `folderName` contains a quote, it breaks the query.
 **Fix:** Escape single quotes in folder names before constructing the query.
 
-### L13. `confirmTopup` Missing `pool_id` Usage (Bug)
+### L13. `requiresAuth: false` Contradicts Comment (Code Quality)
+**File:** `src/api/base44Client.js`
+**Issue:** The file comment says "authentication required" but the client is configured with `requiresAuth: false`. Misleading.
+**Fix:** Update the comment or the configuration.
+
+### L14. No `React.StrictMode` in Entry Point (Code Quality)
+**File:** `src/main.jsx`
+**Issue:** The app renders without `React.StrictMode`, missing out on development-time checks for common issues.
+**Fix:** Wrap `<App />` with `<React.StrictMode>`.
+
+### L15. `Set` Used in React State (Code Quality)
+**File:** `src/pages/TeamBranding.jsx`
+**Issue:** A `Set` is stored in React state. Sets are non-serializable and their mutations are not detectable by React's shallow comparison, which can cause missed re-renders.
+**Fix:** Use an array instead, or convert to/from Set at usage points.
+
+### L16. `confirmTopup` Missing `pool_id` Usage (Bug)
 **File:** `functions/confirmTopup.ts:17`
 **Issue:** `pool_id` is destructured from the request body but never used in the TopupPack creation. The pack won't be linked to a pool even if `pool_id` is provided.
 **Fix:** Include `pool_id` in the TopupPack creation data.
@@ -332,17 +407,21 @@ This means data encrypted by one function cannot be decrypted by the other, lead
 4. Encrypt OAuth tokens at rest (C3)
 5. Fix `searchPublicRecords` empty request context (C4)
 6. Add CSRF token to OAuth state parameter (C7)
-7. Add ownership verification to all stream functions (C8)
-8. Validate CRM URLs against allowlist to prevent SSRF (C6)
-9. Add quota check before analysis creation (H2)
-10. Add quota deduction after analysis completion (H5)
-11. Fix `confirmTopup` replay attack with idempotency (H14)
-12. Add try/catch to all async UI handlers (H4)
-13. Fix duplicate route in App.jsx (H1)
-14. Add Stripe webhook idempotency (H7)
-15. Fix Stripe failure silently ignored in claim approval (H15)
-16. Encrypt CRM API keys at rest (H16)
-17. Move Gemini API key from URL to header (H17)
+7. Sanitize `dangerouslySetInnerHTML` in Landing.jsx (C8)
+8. Add ownership verification to all stream functions (C9)
+9. Validate CRM URLs against allowlist to prevent SSRF (C6)
+10. Add quota check before analysis creation (H2)
+11. Add quota deduction after analysis completion (H5)
+12. Fix `confirmTopup` replay attack with idempotency (H14)
+13. Add try/catch to all async UI handlers (H4)
+14. Fix duplicate route in App.jsx (H1)
+15. Add Stripe webhook idempotency (H7)
+16. Fix Stripe failure silently ignored in claim approval (H15)
+17. Encrypt CRM API keys at rest (H16)
+18. Move Gemini API key from URL to header (H17)
+19. Move `loadStripe()` to module scope (H19)
+20. Move BundleFlow payment logic to backend transaction (H20)
+21. Fix inconsistent admin role checks (H21, M19)
 
 ### Short-Term Improvements (Medium)
 1. Use `useAuth()` context instead of redundant `auth.me()` calls (H11)
@@ -356,6 +435,13 @@ This means data encrypted by one function cannot be decrypted by the other, lead
 9. Consolidate duplicate chatbot and OpenAI stream functions (M16, M17)
 10. Fix overage pack permanently inflating monthly cap (M18)
 11. Standardize admin role naming across all functions (M19)
+12. Fix division by zero in DataQuality.jsx (M15)
+13. Fix `isIframe` cross-origin exception (M16b)
+14. Remove 7 dead wizard step components (M17b)
+15. Fix typo `rejection_recliam_days` (M18b)
+16. Extract duplicate WCAG utilities (M20)
+17. Fix missing useEffect dependencies (M21)
+18. Batch N+1 territory queries (H18)
 
 ### Long-Term Improvements (Low)
 1. Standardize route casing (L2)
