@@ -29,16 +29,16 @@ async function searchRecordsByState(address, state, base44) {
   let results = {};
   switch (state) {
     case 'MA':
-      results = await searchMassachusetts(address);
+      results = await searchMassachusetts(address, base44);
       break;
     case 'ME':
-      results = await searchMaine(address);
+      results = await searchMaine(address, base44);
       break;
     case 'NH':
-      results = await searchNewHampshire(address);
+      results = await searchNewHampshire(address, base44);
       break;
     case 'VT':
-      results = await searchVermont(address);
+      results = await searchVermont(address, base44);
       break;
     default:
       return { search_status: 'error', search_notes: 'State not supported' };
@@ -61,7 +61,7 @@ async function searchRecordsByState(address, state, base44) {
   }
 }
 
-async function searchMassachusetts(address) {
+async function searchMassachusetts(address, base44) {
   // Use AI to search masslandrecords.com and assessor databases
   const prompt = `Search Massachusetts land records for property: "${address}"
   1. Try https://www.masslandrecords.com - search by address
@@ -74,10 +74,10 @@ async function searchMassachusetts(address) {
   original_mortgage_lender, most_recent_mortgage_amount, most_recent_mortgage_date, assessed_value, annual_property_tax, 
   search_status (found/partial/not_found), source_urls, search_notes`;
   
-  return await invokeAISearch(prompt);
+  return await invokeAISearch(prompt, base44);
 }
 
-async function searchMaine(address) {
+async function searchMaine(address, base44) {
   // Extract county, search county registry portal
   const prompt = `Search Maine Registry of Deeds for property: "${address}"
   1. Determine county from address
@@ -89,10 +89,10 @@ async function searchMaine(address) {
   
   Return structured JSON with deed, mortgage, tax assessment data, search_status, source_urls, search_notes`;
   
-  return await invokeAISearch(prompt);
+  return await invokeAISearch(prompt, base44);
 }
 
-async function searchNewHampshire(address) {
+async function searchNewHampshire(address, base44) {
   const prompt = `Search New Hampshire property records for: "${address}"
   1. Search https://www.nhdeeds.com (centralized index)
   2. Find deed history and ownership
@@ -102,10 +102,10 @@ async function searchNewHampshire(address) {
   
   Return structured JSON with property data, search_status, source_urls, search_notes`;
   
-  return await invokeAISearch(prompt);
+  return await invokeAISearch(prompt, base44);
 }
 
-async function searchVermont(address) {
+async function searchVermont(address, base44) {
   const prompt = `Search Vermont property records for: "${address}"
   CRITICAL: Vermont uses TOWN-BASED records, not county.
   1. Search https://www.vtlandrecords.com
@@ -116,13 +116,11 @@ async function searchVermont(address) {
   
   Return structured JSON with deed, mortgage, lister assessment data, search_status, source_urls, search_notes`;
   
-  return await invokeAISearch(prompt);
+  return await invokeAISearch(prompt, base44);
 }
 
-async function invokeAISearch(prompt) {
-  // Use InvokeLLM integration for web search
-  const base44 = createClientFromRequest({});
-  
+async function invokeAISearch(prompt, base44) {
+  // Use InvokeLLM integration for web search with authenticated client
   try {
     const response = await base44.integrations.Core.InvokeLLM({
       prompt: prompt,

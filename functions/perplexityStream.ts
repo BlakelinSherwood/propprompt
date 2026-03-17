@@ -24,6 +24,13 @@ Deno.serve(async (req) => {
   const analysis = records[0];
   if (!analysis) return Response.json({ error: "Analysis not found" }, { status: 404 });
 
+  // Ownership check
+  if (analysis.run_by_email !== user.email &&
+      analysis.on_behalf_of_email !== user.email &&
+      user.role !== 'platform_owner') {
+    return Response.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
   const keyRes = await base44.functions.invoke("resolveApiKey", {
     platform: "perplexity",
     orgId: analysis.org_id || orgId,

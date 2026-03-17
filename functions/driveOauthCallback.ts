@@ -8,9 +8,17 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const body = await req.json();
-    const { code, state: userEmail } = body; // state = user email from driveOauthStart
+    const { code, state: csrfToken } = body;
 
-    if (!code || !userEmail) return Response.json({ error: 'code and state required' }, { status: 400 });
+    if (!code || !csrfToken) return Response.json({ error: 'code and state required' }, { status: 400 });
+
+    // Verify CSRF token
+    const stateRecords = await base44.asServiceRole.entities.OAuthState.filter({ token: csrfToken });
+    const stateRecord = stateRecords[0];
+    if (!stateRecord || stateRecord.expires_at < new Date().toISOString()) {
+      return Response.json({ error: 'Invalid or expired state token' }, { status: 400 });
+    }
+    const userEmail = stateRecord.user_email;
 
     const clientId = Deno.env.get('GOOGLE_DRIVE_CLIENT_ID');
     const clientSecret = Deno.env.get('GOOGLE_DRIVE_CLIENT_SECRET');
@@ -62,6 +70,9 @@ Deno.serve(async (req) => {
     } else {
       await base44.asServiceRole.entities.DriveConnection.create(connData);
     }
+
+    // Delete used CSRF token
+    await base44.asServiceRole.entities.OAuthState.delete(stateRecord.id);
 
     // Privacy log
     await base44.asServiceRole.entities.PrivacyLog.create({

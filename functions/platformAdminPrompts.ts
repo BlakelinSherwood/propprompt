@@ -2,7 +2,8 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
 // AES-256-GCM encrypt/decrypt using ENCRYPTION_KEY env var
 async function getKey() {
-  const raw = Deno.env.get("ENCRYPTION_KEY") || "default-key-32-bytes-padded-here!!";
+  const raw = Deno.env.get("ENCRYPTION_KEY");
+  if (!raw) throw new Error("ENCRYPTION_KEY environment variable is required");
   const keyMaterial = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(raw.slice(0, 32).padEnd(32, "0")),

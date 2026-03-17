@@ -16,6 +16,17 @@ Deno.serve(async (req) => {
 
     if (!clientId) return Response.json({ error: 'Google Drive not configured. Set GOOGLE_DRIVE_CLIENT_ID.' }, { status: 500 });
 
+    // Generate random CSRF token
+    const csrfToken = crypto.randomUUID();
+    
+    // Store token → email mapping (10 min expiry)
+    await base44.asServiceRole.entities.OAuthState.create({
+      token: csrfToken,
+      user_email: user.email,
+      created_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+    });
+
     const params = new URLSearchParams({
       client_id: clientId,
       redirect_uri: redirectUri,
@@ -23,7 +34,7 @@ Deno.serve(async (req) => {
       scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email',
       access_type: 'offline',
       prompt: 'consent',
-      state: user.email, // pass user email as state to identify on callback
+      state: csrfToken,
     });
 
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;

@@ -40,7 +40,7 @@ export default function PayoffInputCard({ publicRecord, onSubmit }) {
       const principal = parseFloat(originalAmount);
       const months = parseInt(term) * 12;
       const rate = 0.065;
-      const monthsElapsed = new Date() - new Date(loanDate) / (1000 * 60 * 60 * 24 * 30);
+      const monthsElapsed = (new Date() - new Date(loanDate)) / (1000 * 60 * 60 * 24 * 30);
       
       const remainingBalance = principal * Math.pow(1 + rate / 12, -monthsElapsed) / 
                                Math.pow(1 + rate / 12, -months);

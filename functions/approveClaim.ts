@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
       isAdmin = user?.role === 'admin' || user?.role === 'platform_owner';
     } catch (_) {
       // Called from automation — allowed via service role logic below
-      isAdmin = true;
+      isAdmin = false;
     }
     if (!isAdmin) return Response.json({ error: 'Forbidden' }, { status: 403 });
 
