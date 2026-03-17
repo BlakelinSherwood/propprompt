@@ -22,6 +22,18 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Payment not completed', status: pi.status }, { status: 400 });
     }
 
+    // Check for duplicate (idempotency)
+    const existing = await base44.asServiceRole.entities.TopupPack.filter({
+      stripe_payment_intent_id: payment_intent_id,
+    });
+    if (existing.length > 0) {
+      return Response.json({
+        success: true,
+        pack_id: existing[0].id,
+        message: 'Already processed',
+      });
+    }
+
     const pricing = await getPricing(base44);
     const expiryDays = parseInt(pricing.topup_expiry_days || 90);
 

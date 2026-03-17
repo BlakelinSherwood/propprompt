@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
     }
 
     const encKey = Deno.env.get('ENCRYPTION_KEY') || '';
-    const promptText = await decryptData(analysis.prompt_assembled, encKey);
+    const promptText = analysis.prompt_assembled;
 
     const effectiveOrgId = orgId || analysis.org_id;
     let subscriptionPlan = 'team';
@@ -141,6 +141,16 @@ Deno.serve(async (req) => {
         completed_at: new Date().toISOString(),
       });
 
+      // Deduct quota
+      try {
+        await base44.functions.invoke("deductAnalysisQuota", {
+          analysisId,
+          orgId: analysis.org_id,
+        });
+      } catch (e) {
+        console.warn("[openaiStream o3] quota deduction failed:", e.message);
+      }
+
       // Emit full output in chunks so frontend stream consumer works
       const stream = new ReadableStream({
         start(controller) {
@@ -155,7 +165,7 @@ Deno.serve(async (req) => {
       });
 
       return new Response(stream, {
-        headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' },
+        headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' },
       });
     }
 
@@ -180,14 +190,25 @@ Deno.serve(async (req) => {
               const data = line.slice(6).trim();
               if (data === '[DONE]') {
                 await base44.asServiceRole.entities.Analysis.update(analysisId, {
-                  output_text: fullOutput,
-                  status: 'complete',
-                  tokens_used: tokensUsed,
-                  ai_model: selectedModel,
-                  completed_at: new Date().toISOString(),
-                });
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, keySource: keyResult.source, model: selectedModel })}\n\n`));
-                continue;
+                   output_text: fullOutput,
+                   status: 'complete',
+                   tokens_used: tokensUsed,
+                   ai_model: selectedModel,
+                   completed_at: new Date().toISOString(),
+                 });
+
+                 // Deduct quota
+                 try {
+                   await base44.functions.invoke("deductAnalysisQuota", {
+                     analysisId,
+                     orgId: analysis.org_id,
+                   });
+                 } catch (e) {
+                   console.warn("[openaiStream gpt-4o] quota deduction failed:", e.message);
+                 }
+
+                 controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, keySource: keyResult.source, model: selectedModel })}\n\n`));
+                 continue;
               }
               try {
                 const event = JSON.parse(data);
@@ -210,7 +231,7 @@ Deno.serve(async (req) => {
     });
 
     return new Response(stream, {
-      headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive', 'Access-Control-Allow-Origin': '*' },
+      headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' },
     });
   } catch (error) {
     console.error('[openaiStream] error:', error);

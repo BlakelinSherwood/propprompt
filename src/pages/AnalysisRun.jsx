@@ -47,6 +47,7 @@ export default function AnalysisRun() {
   useEffect(() => {
     if (!analysisId || hasStarted.current) return;
     hasStarted.current = true;
+    const abortController = new AbortController();
 
     async function loadAndStream() {
       // Load analysis metadata
@@ -96,11 +97,12 @@ export default function AnalysisRun() {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
-        body: JSON.stringify({ analysisId, orgId })
+        body: JSON.stringify({ analysisId, orgId }),
+        signal: abortController.signal
       });
 
       if (!response.ok) {
-        const err = await response.json();
+        const err = await response.json().catch(() => ({ error: "Request failed" }));
         setErrorMsg(err.error || "Stream failed");
         setStatus("error");
         return;
@@ -144,9 +146,12 @@ export default function AnalysisRun() {
     }
 
     loadAndStream().catch(err => {
+      if (err.name === 'AbortError') return; // Ignore abort errors
       setErrorMsg(err.message);
       setStatus("error");
     });
+
+    return () => abortController.abort();
   }, [analysisId]);
 
 
@@ -161,50 +166,69 @@ export default function AnalysisRun() {
 
   // Server-side branded PDF (white-label)
   const handleDownloadPdf = async () => {
-    const res = await base44.functions.invoke("generateDocuments", { analysisId, format: "pdf" });
-    if (res.data?.url) {
-      window.open(res.data.url, "_blank");
+    try {
+      const res = await base44.functions.invoke("generateDocuments", { analysisId, format: "pdf" });
+      if (res.data?.url) window.open(res.data.url, "_blank");
+    } catch (err) {
+      console.error("PDF download failed:", err);
+      alert("Failed to generate PDF. Please try again.");
     }
   };
 
-  // Server-side branded PPTX
   const handleDownloadPptx = async () => {
     setPptxGenerating(true);
-    const res = await base44.functions.invoke("generateDocuments", { analysisId, format: "pptx" });
-    if (res.data?.url) {
-      setPptxUrl(res.data.url);
-      window.open(res.data.url, "_blank");
+    try {
+      const res = await base44.functions.invoke("generateDocuments", { analysisId, format: "pptx" });
+      if (res.data?.url) { setPptxUrl(res.data.url); window.open(res.data.url, "_blank"); }
+    } catch (err) {
+      console.error("PPTX generation failed:", err);
+      alert("Failed to generate PPTX. Please try again.");
+    } finally {
+      setPptxGenerating(false);
     }
-    setPptxGenerating(false);
   };
 
   const handleDriveUpload = async () => {
     setDriveUploading(true);
-    const res = await base44.functions.invoke("driveSync", { analysisId });
-    if (res.data?.driveUrl) {
-      setDriveUploaded(true);
-      setDriveUrl(res.data.driveUrl);
+    try {
+      const res = await base44.functions.invoke("driveSync", { analysisId });
+      if (res.data?.driveUrl) { setDriveUploaded(true); setDriveUrl(res.data.driveUrl); }
+    } catch (err) {
+      console.error("Drive upload failed:", err);
+      alert("Failed to upload to Drive. Please try again.");
+    } finally {
+      setDriveUploading(false);
     }
-    setDriveUploading(false);
   };
 
   const handleSendEmail = async () => {
     if (!emailTo) return;
     setEmailSending(true);
-    await base44.functions.invoke("sendAnalysisEmail", { analysisId, toEmail: emailTo });
-    setEmailSent(true);
-    setEmailSending(false);
-    setTimeout(() => { setEmailDialogOpen(false); setEmailSent(false); setEmailTo(""); }, 1500);
+    try {
+      await base44.functions.invoke("sendAnalysisEmail", { analysisId, toEmail: emailTo });
+      setEmailSent(true);
+      setTimeout(() => { setEmailDialogOpen(false); setEmailSent(false); setEmailTo(""); }, 1500);
+    } catch (err) {
+      console.error("Email send failed:", err);
+      alert("Failed to send email. Please try again.");
+    } finally {
+      setEmailSending(false);
+    }
   };
 
   const handleCrmPush = async () => {
     if (!crmConnections.length) return;
     setCrmPushing(true);
-    // Push to first active connection (user can expand this later)
-    const conn = crmConnections[0];
-    const res = await base44.functions.invoke("crmPush", { analysisId, connectionId: conn.id });
-    if (res.data?.success) setCrmPushed(true);
-    setCrmPushing(false);
+    try {
+      const conn = crmConnections[0];
+      const res = await base44.functions.invoke("crmPush", { analysisId, connectionId: conn.id });
+      if (res.data?.success) setCrmPushed(true);
+    } catch (err) {
+      console.error("CRM push failed:", err);
+      alert("Failed to push to CRM. Please try again.");
+    } finally {
+      setCrmPushing(false);
+    }
   };
 
   if (!analysisId) {

@@ -46,6 +46,15 @@ Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
 
   try {
+    // Idempotency check
+    const processedEvents = await base44.asServiceRole.entities.ProcessedWebhookEvent.filter({
+      event_id: event.id,
+    });
+    if (processedEvents.length > 0) {
+      console.log(`Skipping duplicate event: ${event.id}`);
+      return Response.json({ received: true, duplicate: true });
+    }
+
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object;
@@ -160,6 +169,17 @@ Deno.serve(async (req) => {
   } catch (err) {
     console.error("Webhook handler error:", err.message);
     return new Response("Handler error", { status: 500 });
+  }
+
+  // After successful processing, record the event
+  try {
+    await base44.asServiceRole.entities.ProcessedWebhookEvent.create({
+      event_id: event.id,
+      event_type: event.type,
+      processed_at: new Date().toISOString(),
+    });
+  } catch (e) {
+    console.error("Failed to record processed event:", e.message);
   }
 
   return Response.json({ received: true });

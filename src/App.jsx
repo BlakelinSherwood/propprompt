@@ -79,7 +79,6 @@ const AuthenticatedApp = () => {
         <Route path="/brokerage/:id/branding" element={<BrokerageBranding />} />
         <Route path="/team/:id/admin" element={<TeamAdmin />} />
         <Route path="/team/:id/branding" element={<TeamBranding />} />
-        <Route path="/team/:id/branding" element={<TeamBranding />} />
         <Route path="/AccountSettings" element={<AccountSettings />} />
         <Route path="/settings/branding" element={<AgentBranding />} />
         <Route path="/admin/pricing" element={<PricingAdmin />} />

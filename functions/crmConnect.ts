@@ -5,6 +5,23 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
  * For API-key based CRMs (FUB, kvCORE, Lofty): accepts apiKey + optional instanceUrl.
  * For Salesforce: OAuth callback stores tokens.
  */
+
+// Encryption utility
+async function encryptKey(plaintext) {
+  const raw = Deno.env.get("ENCRYPTION_KEY");
+  if (!raw) throw new Error("ENCRYPTION_KEY required");
+  const key = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(raw.slice(0, 32).padEnd(32, "0")),
+    { name: "AES-GCM" }, false, ["encrypt"]
+  );
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, new TextEncoder().encode(plaintext));
+  const combined = new Uint8Array(iv.length + new Uint8Array(encrypted).length);
+  combined.set(iv);
+  combined.set(new Uint8Array(encrypted), iv.length);
+  return btoa(String.fromCharCode(...combined));
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -17,10 +34,11 @@ Deno.serve(async (req) => {
     if (action === 'connect') {
       // Find existing or create new
       const existing = await base44.entities.CrmConnection.filter({ user_email: user.email, crm_provider });
+      const encryptedKey = api_key ? await encryptKey(api_key) : '';
       const data = {
         user_email: user.email,
         crm_provider,
-        encrypted_api_key: api_key || '',
+        encrypted_api_key: encryptedKey,
         crm_account_name: crm_account_name || instance_url || '',
         status: 'connected',
         default_push_format: default_push_format || 'note',
