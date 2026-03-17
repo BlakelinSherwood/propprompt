@@ -1,4 +1,7 @@
+import { Info } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import WizardNav from "./WizardNav";
+import { ANALYSIS_MODULES } from "@/lib/analysisModules";
 
 const ASSESSMENT_TYPES = [
   {
@@ -8,6 +11,7 @@ const ASSESSMENT_TYPES = [
     sublabel: "Full Appointment Package",
     description: "Full listing appointment package — CMA foundation, three pricing strategy scenarios, archetype demand profile for this property type, migration feeder markets, and a listing strategy narrative ready to present.",
     time: "~10 min",
+    tooltip: "Use this when you're preparing for a listing appointment. Includes the CMA plus strategy, archetypes, and migration — everything in one deliverable.",
   },
   {
     id: "buyer_intelligence",
@@ -15,6 +19,7 @@ const ASSESSMENT_TYPES = [
     icon: "🎯",
     description: "Archetype matching, migration patterns, offer strategy, and competitive positioning for a buyer client.",
     time: "~6 min",
+    tooltip: "Helps buyers understand the market they're entering and positions you as a strategic advisor.",
   },
   {
     id: "cma",
@@ -23,6 +28,7 @@ const ASSESSMENT_TYPES = [
     sublabel: "Valuation",
     description: "Defensible valuation with three-tier comp structure, temporal adjustments, AVM gap analysis, and a price range report.",
     time: "~7 min",
+    tooltip: "Use this for quick valuations and internal pricing work. Fast, clean, shareable.",
   },
   {
     id: "client_portfolio",
@@ -32,6 +38,8 @@ const ASSESSMENT_TYPES = [
     description: "A proactive equity and options report for past clients who own a home but aren't actively looking to sell.",
     time: "~8 min",
     badge: "Retention Tool",
+    badgeColor: "green",
+    tooltip: "Send this to homeowners in your sphere to re-engage them with their equity story and their options.",
   },
   {
     id: "investment_analysis",
@@ -39,6 +47,7 @@ const ASSESSMENT_TYPES = [
     icon: "📈",
     description: "Full income approach with cap rate, GRM, cash-on-cash return, and 5-year projection.",
     time: "~10 min",
+    tooltip: "Covers single-family and multi-family with rent range overlay and value-add ROI.",
   },
   {
     id: "rental_analysis",
@@ -46,6 +55,7 @@ const ASSESSMENT_TYPES = [
     icon: "🔑",
     description: "Rent range calibration, tenant demand profile, vacancy risk assessment, and rent control exposure check.",
     time: "~5 min",
+    tooltip: "For landlord clients, rent-vs-sell decisions, and investment underwriting.",
   },
   {
     id: "custom",
@@ -54,6 +64,15 @@ const ASSESSMENT_TYPES = [
     description: "Build a custom report by combining any available analysis modules. You control what goes in.",
     time: "Varies",
     badge: "Advanced",
+    badgeColor: "blue",
+    tooltip: "Not a blank prompt — a structured module builder. Pick what you need, we assemble a complete report.",
+    modules: [
+      "comp_valuation",
+      "pricing_strategy_scenarios",
+      "archetype_profile",
+      "investment_metrics",
+      "rent_range_analysis",
+    ],
   },
 ];
 
