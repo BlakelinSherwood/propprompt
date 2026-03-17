@@ -26,17 +26,22 @@ export default function Territories() {
 
   useEffect(() => {
     async function load() {
-      const [terrs, sts, cnts, pricingRes] = await Promise.all([
-        base44.entities.Territory.list(),
-        base44.entities.State.list(),
-        base44.entities.County.list(),
-        base44.functions.invoke("getPricingConfig", {}),
-      ]);
-      setTerritories(terrs);
-      setStates(sts);
-      setCounties(cnts);
-      setPricing(pricingRes.data || {});
-      setLoading(false);
+      try {
+        const [terrs, sts, cnts, pricingRes] = await Promise.all([
+          base44.entities.Territory.list(),
+          base44.entities.State.list(),
+          base44.entities.County.list(),
+          base44.functions.invoke("getPricingConfig", {}),
+        ]);
+        setTerritories(terrs);
+        setStates(sts);
+        setCounties(cnts);
+        setPricing(pricingRes.data || {});
+      } catch (error) {
+        console.error("Failed to load territories data:", error);
+      } finally {
+        setLoading(false);
+      }
     }
     load();
   }, []);
