@@ -223,31 +223,33 @@ export default function Landing() {
 
           {/* Static SVG mini-map */}
           <div className="bg-[#1A3226] rounded-3xl p-6 aspect-square max-w-sm mx-auto w-full relative overflow-hidden">
-            <svg viewBox="0 0 350 350" className="w-full h-full" fill="none">
-              {/* ME accurate outline */}
-              <path d="M165,30 Q200,35 245,45 Q265,50 275,70 Q280,90 275,125 Q270,150 255,160 Q240,168 225,174 Q210,180 200,195 Q190,210 180,220 Q165,230 155,225 Q145,210 140,190 Q135,165 130,140 Q128,115 130,90 Q135,65 145,50 Q155,38 165,30 Z"
-                fill="#B8982F" fillOpacity="0.3" stroke="#B8982F" strokeWidth="1.5" />
-              {/* NH accurate outline */}
-              <path d="M110,160 Q130,170 155,180 Q165,185 170,205 Q172,240 160,275 Q150,290 125,295 Q100,295 85,280 Q75,265 75,235 Q78,205 85,185 Q95,165 110,160 Z"
-                fill="#ef4444" fillOpacity="0.35" stroke="#ef4444" strokeWidth="1.5" />
-              {/* VT accurate outline */}
-              <path d="M75,160 Q85,165 95,175 Q100,185 95,220 Q90,260 80,280 Q70,295 50,300 Q40,295 35,275 Q32,245 35,215 Q40,185 50,170 Q60,160 75,160 Z"
-                fill="#22c55e" fillOpacity="0.3" stroke="#22c55e" strokeWidth="1.5" />
-              {/* MA accurate outline */}
-              <path d="M85,280 Q115,285 160,290 Q170,295 168,310 Q160,330 140,340 Q110,345 75,335 Q50,327 45,310 Q50,295 85,280 Z"
-                fill="#f59e0b" fillOpacity="0.35" stroke="#f59e0b" strokeWidth="1.5" />
+            <svg viewBox="0 0 360 360" className="w-full h-full" fill="none">
+              {/* ME — accurate northeast shape */}
+              <path d="M170,35 Q205,38 250,50 Q270,55 280,75 Q285,100 278,135 Q273,160 258,170 Q240,178 225,185 Q210,190 200,210 Q188,230 175,235 Q160,240 150,230 Q142,215 138,190 Q135,160 133,130 Q132,100 138,75 Q148,50 170,35 Z"
+                fill="#B8982F" fillOpacity="0.3" stroke="#B8982F" strokeWidth="1.5" strokeLinecap="round" />
+              {/* NH — triangular shape */}
+              <path d="M115,170 Q138,180 160,190 Q172,195 175,220 Q175,255 162,285 Q150,300 125,305 Q95,303 82,285 Q75,268 75,240 Q78,205 88,185 Q100,172 115,170 Z"
+                fill="#ef4444" fillOpacity="0.35" stroke="#ef4444" strokeWidth="1.5" strokeLinecap="round" />
+              {/* VT — tall narrow shape */}
+              <path d="M80,170 Q92,177 102,188 Q108,198 105,230 Q100,270 88,295 Q78,308 55,312 Q42,305 38,285 Q35,255 38,220 Q42,190 52,175 Q65,165 80,170 Z"
+                fill="#22c55e" fillOpacity="0.3" stroke="#22c55e" strokeWidth="1.5" strokeLinecap="round" />
+              {/* MA — southern shape */}
+              <path d="M90,295 Q125,300 165,305 Q178,308 178,325 Q172,345 148,355 Q115,360 80,350 Q55,342 48,325 Q52,308 90,295 Z"
+                fill="#f59e0b" fillOpacity="0.35" stroke="#f59e0b" strokeWidth="1.5" strokeLinecap="round" />
+              
               {/* Labels */}
-              <text x="155" y="90" fill="white" fontSize="10" fontFamily="sans-serif" fontWeight="bold" textAnchor="middle">ME</text>
-              <text x="98" y="210" fill="white" fontSize="10" fontFamily="sans-serif" fontWeight="bold" textAnchor="middle">NH</text>
-              <text x="44" y="205" fill="white" fontSize="10" fontFamily="sans-serif" fontWeight="bold" textAnchor="middle">VT</text>
+              <text x="165" y="105" fill="white" fontSize="11" fontFamily="sans-serif" fontWeight="bold" textAnchor="middle">ME</text>
+              <text x="110" y="225" fill="white" fontSize="11" fontFamily="sans-serif" fontWeight="bold" textAnchor="middle">NH</text>
+              <text x="55" y="230" fill="white" fontSize="11" fontFamily="sans-serif" fontWeight="bold" textAnchor="middle">VT</text>
+              <text x="125" y="335" fill="white" fontSize="11" fontFamily="sans-serif" fontWeight="bold" textAnchor="middle">MA</text>
 
               {/* Legend dots */}
-              <circle cx="20" cy="275" r="5" fill="#22c55e" fillOpacity="0.7" />
-              <text x="30" y="279" fill="white" fontSize="8" fontFamily="sans-serif" fillOpacity="0.6">Available</text>
-              <circle cx="90" cy="275" r="5" fill="#ef4444" fillOpacity="0.7" />
-              <text x="100" y="279" fill="white" fontSize="8" fontFamily="sans-serif" fillOpacity="0.6">Claimed</text>
-              <circle cx="155" cy="275" r="5" fill="#f59e0b" fillOpacity="0.7" />
-              <text x="165" y="279" fill="white" fontSize="8" fontFamily="sans-serif" fillOpacity="0.6">Pending</text>
+              <circle cx="20" cy="10" r="5" fill="#22c55e" fillOpacity="0.7" />
+              <text x="30" y="14" fill="white" fontSize="8" fontFamily="sans-serif" fillOpacity="0.7">Available</text>
+              <circle cx="100" cy="10" r="5" fill="#ef4444" fillOpacity="0.7" />
+              <text x="110" y="14" fill="white" fontSize="8" fontFamily="sans-serif" fillOpacity="0.7">Claimed</text>
+              <circle cx="170" cy="10" r="5" fill="#f59e0b" fillOpacity="0.7" />
+              <text x="180" y="14" fill="white" fontSize="8" fontFamily="sans-serif" fillOpacity="0.7">Pending</text>
             </svg>
           </div>
         </div>
