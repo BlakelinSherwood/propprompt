@@ -206,9 +206,9 @@ export default function Landing() {
                 </li>
               ))}
             </ul>
-            <Link to="/territories" className="inline-flex items-center gap-2 text-sm font-semibold text-[#1A3226] hover:text-[#B8982F] transition-colors">
+            <a href="/app/Territories" className="inline-flex items-center gap-2 text-sm font-semibold text-[#1A3226] hover:text-[#B8982F] transition-colors">
               See full territory map → 
-            </Link>
+            </a>
 
             {/* MA note */}
             <div className="rounded-xl border border-[#B8982F]/30 bg-[#B8982F]/5 p-4 space-y-2">
