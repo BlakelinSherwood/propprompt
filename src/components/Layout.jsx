@@ -11,7 +11,8 @@ import {
   FileText,
   PlusCircle,
   CreditCard,
-  Settings
+  Settings,
+  GraduationCap
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import FairHousingOverdueBanner from "./FairHousingOverdueBanner";
@@ -58,6 +59,7 @@ export default function Layout() {
     ...(user?.role === "platform_owner"
       ? [{ label: "Platform Admin", path: "/PlatformAdmin", icon: Shield }]
       : []),
+    { label: "Training", path: "/training", icon: GraduationCap },
     { label: "Account Settings", path: "/AccountSettings", icon: Settings },
     // Brokerage/Team admin links are accessed via org cards in Dashboard, not sidebar nav
   ];
