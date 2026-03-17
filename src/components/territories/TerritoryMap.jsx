@@ -43,13 +43,29 @@ export default function TerritoryMap({
 
   useEffect(() => {
     if (map.current) return;
-    map.current = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: "mapbox://styles/mapbox/light-v11",
-      center: [-69.5, 44.5],
-      zoom: 6,
-    });
-    map.current.addControl(new mapboxgl.NavigationControl(), "top-right");
+
+    const initMap = async () => {
+      try {
+        const { data } = await base44.functions.invoke('getMapboxToken', {});
+        mapboxgl.accessToken = data.token;
+
+        map.current = new mapboxgl.Map({
+          container: mapContainer.current,
+          style: "mapbox://styles/mapbox/light-v11",
+          center: [-69.5, 44.5],
+          zoom: 6,
+        });
+        map.current.addControl(new mapboxgl.NavigationControl(), "top-right");
+      } catch (err) {
+        console.error("Failed to initialize map:", err);
+      }
+    };
+
+    initMap();
+
+    return () => {
+      if (map.current) map.current.remove();
+    };
   }, []);
 
   useEffect(() => {

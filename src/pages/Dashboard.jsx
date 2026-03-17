@@ -1,25 +1,18 @@
-import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { useEffect, useState } from "react";
+import { useAuth } from "@/lib/AuthContext";
 import { Link } from "react-router-dom";
 import { Users, FileText, Shield, Activity, ArrowRight, PlusCircle } from "lucide-react";
+import { ROLE_LABELS } from "@/lib/constants";
 import DashboardStatCard from "../components/DashboardStatCard";
 import WelcomeHero from "../components/WelcomeHero";
 import TrainingProgressWidget from "../components/training/TrainingProgressWidget";
 import FairHousingBanner from "../components/FairHousingBanner";
 import PrivacyNoticeModal from "../components/PrivacyNoticeModal";
 import OnboardingWelcomeModal from "../components/OnboardingWelcomeModal";
-
-const ROLE_LABELS = {
-  platform_owner: "Platform Owner",
-  brokerage_admin: "Brokerage Admin",
-  team_lead: "Team Lead",
-  agent: "Agent",
-  assistant: "Assistant",
-  team_agent: "Team Agent",
-};
+import { base44 } from "@/api/base44Client";
 
 export default function Dashboard() {
-  const [user, setUser] = useState(null);
+  const { user, isLoading: authLoading } = useAuth();
   const [userCount, setUserCount] = useState(null);
   const [analysisCount, setAnalysisCount] = useState(null);
   const [fhStatus, setFhStatus] = useState(null); // { signed, overdue, pending }
@@ -28,16 +21,14 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function load() {
+      if (!user) return;
       try {
-        const me = await base44.auth.me();
-        setUser(me);
-
         // Show privacy notice if never accepted
-        if (!me.privacy_notice_accepted_at) {
+        if (!user.privacy_notice_accepted_at) {
           setShowPrivacyNotice(true);
         }
 
-        const isAdmin = me.role === "platform_owner" || me.role === "brokerage_admin" || me.role === "team_lead";
+        const isAdmin = user.role === "platform_owner" || user.role === "brokerage_admin" || user.role === "team_lead";
         if (isAdmin) {
           const [users, analyses] = await Promise.all([
             base44.entities.User.list(),
@@ -48,8 +39,8 @@ export default function Dashboard() {
         }
 
         // Fair housing status for brokerage_admin / team_lead
-        if (me.role === "brokerage_admin" || me.role === "team_lead") {
-          const reviews = await base44.entities.FairHousingReview.filter({ reviewer_email: me.email });
+        if (user.role === "brokerage_admin" || user.role === "team_lead") {
+          const reviews = await base44.entities.FairHousingReview.filter({ reviewer_email: user.email });
           const current = {
             signed: reviews.filter((r) => r.status === "signed").length,
             overdue: reviews.filter((r) => r.status === "overdue").length,
@@ -64,9 +55,9 @@ export default function Dashboard() {
       }
     }
     load();
-  }, []);
+  }, [user]);
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="w-8 h-8 border-4 border-[#1A3226]/20 border-t-[#1A3226] rounded-full animate-spin" />

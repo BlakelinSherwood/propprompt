@@ -59,6 +59,15 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Idempotency check
+    const processedEvents = await base44.asServiceRole.entities.ProcessedWebhookEvent.filter({
+      event_id: event.id,
+    });
+    if (processedEvents.length > 0) {
+      console.log(`Skipping duplicate event: ${event.id}`);
+      return Response.json({ received: true, duplicate: true });
+    }
+
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object;

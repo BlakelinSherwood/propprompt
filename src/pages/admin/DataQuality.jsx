@@ -53,9 +53,9 @@ export default function DataQualityPanel() {
       setTerritories(enriched);
 
       // Calculate aggregate stats
-      const avgScore = Math.round(
-        enriched.reduce((sum, t) => sum + (t.quality?.average_confidence_score || 0), 0) / enriched.length
-      );
+      const avgScore = enriched.length > 0
+        ? Math.round(enriched.reduce((sum, t) => sum + (t.quality?.average_confidence_score || 0), 0) / enriched.length)
+        : 0;
       const totalBlocked = enriched.reduce((sum, t) => sum + (t.quality?.red_state_count || 0), 0);
       const totalWarnings = enriched.reduce((sum, t) => sum + (t.quality?.yellow_state_count || 0), 0);
 

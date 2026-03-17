@@ -23,6 +23,9 @@ export default function PlatformAIConfig() {
   });
   const [scManagedEnabled, setScManagedEnabled] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [config, setConfig] = useState(null);
+  const [formData, setFormData] = useState({});
 
   async function handleSave() {
     setSaving(true);

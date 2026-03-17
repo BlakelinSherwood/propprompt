@@ -16,6 +16,8 @@ function getStripePromise(publishableKey) {
 import { Lock, Loader2 } from "lucide-react";
 import PaymentTrustBlock from "./PaymentTrustBlock";
 
+const stripePromise = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ? loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY) : Promise.resolve(null);
+
 function CardForm({ clientSecret, setupIntentId, onSuccess, onBack, summary, autoApproveHours }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -94,7 +96,6 @@ function CardForm({ clientSecret, setupIntentId, onSuccess, onBack, summary, aut
 }
 
 export default function PaymentStep({ onSuccess, onBack, summary, pricing }) {
-  const [stripePromise, setStripePromise] = useState(null);
   const [clientSecret, setClientSecret] = useState(null);
   const [setupIntentId, setSetupIntentId] = useState(null);
   const [loadError, setLoadError] = useState("");
@@ -103,7 +104,7 @@ export default function PaymentStep({ onSuccess, onBack, summary, pricing }) {
 
   useEffect(() => {
     base44.functions.invoke("createSetupIntent", {}).then(res => {
-      const { clientSecret, setupIntentId, publishableKey } = res.data;
+      const { clientSecret, setupIntentId } = res.data;
       setClientSecret(clientSecret);
       setSetupIntentId(setupIntentId);
       setStripePromise(getStripePromise(publishableKey));

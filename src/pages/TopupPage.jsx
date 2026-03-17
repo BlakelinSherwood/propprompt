@@ -17,6 +17,8 @@ function getStripePromise(publishableKey) {
 import { Loader2, ShoppingCart, Lock, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+const stripePromise = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ? loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY) : Promise.resolve(null);
+
 function CheckoutForm({ pack, clientSecret, paymentIntentId, subscriptionId, bundleId, onSuccess, onCancel }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -93,7 +95,6 @@ export default function TopupPage() {
 
   const [selectedPack, setSelectedPack] = useState(null);
   const [checkoutData, setCheckoutData] = useState(null);
-  const [stripePromise, setStripePromise] = useState(null);
   const [subscriptions, setSubscriptions] = useState([]);
   const [loadingCheckout, setLoadingCheckout] = useState(false);
   const [success, setSuccess] = useState(null);

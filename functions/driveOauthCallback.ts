@@ -73,6 +73,9 @@ Deno.serve(async (req) => {
       await base44.asServiceRole.entities.DriveConnection.create(connData);
     }
 
+    // Delete used CSRF token
+    await base44.asServiceRole.entities.OAuthState.delete(stateRecord.id);
+
     // Privacy log
     await base44.asServiceRole.entities.PrivacyLog.create({
       event_type: 'drive_connected',

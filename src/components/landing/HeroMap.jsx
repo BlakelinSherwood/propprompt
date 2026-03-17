@@ -11,17 +11,23 @@ export default function HeroMap() {
   useEffect(() => {
     if (map.current) return;
 
-    map.current = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: "mapbox://styles/mapbox/light-v11",
-      center: [-71.5, 44],
-      zoom: 6.5,
-      pitch: 0,
-      bearing: 0,
-      attributionControl: false,
-    });
+    // Fetch token from backend
+    const initMap = async () => {
+      try {
+        const { data } = await base44.functions.invoke('getMapboxToken', {});
+        mapboxgl.accessToken = data.token;
 
-    map.current.on("load", () => {
+        map.current = new mapboxgl.Map({
+          container: mapContainer.current,
+          style: "mapbox://styles/mapbox/light-v11",
+          center: [-71.5, 44],
+          zoom: 6.5,
+          pitch: 0,
+          bearing: 0,
+          attributionControl: false,
+        });
+
+        map.current.on("load", () => {
       // Add state boundaries as a filled layer with actual GeoJSON data
       map.current.addSource("states", {
         type: "geojson",
@@ -102,25 +108,31 @@ export default function HeroMap() {
         }
       });
 
-      map.current.addLayer({
-        id: "state-border",
-        type: "line",
-        source: "states",
-        paint: {
-          "line-color": [
-            "match",
-            ["get", "status"],
-            "active", "#ef4444",
-            "claimed", "#ef4444",
-            "available", "#22c55e",
-            "pending", "#f59e0b",
-            "#94a3b8"
-          ],
-          "line-width": 2,
-          "line-opacity": 0.6
-        }
-      });
-    });
+          map.current.addLayer({
+            id: "state-border",
+            type: "line",
+            source: "states",
+            paint: {
+              "line-color": [
+                "match",
+                ["get", "status"],
+                "active", "#ef4444",
+                "claimed", "#ef4444",
+                "available", "#22c55e",
+                "pending", "#f59e0b",
+                "#94a3b8"
+              ],
+              "line-width": 2,
+              "line-opacity": 0.6
+            }
+          });
+        });
+      } catch (err) {
+        console.error("Failed to initialize map:", err);
+      }
+    };
+
+    initMap();
   }, []);
 
   return (

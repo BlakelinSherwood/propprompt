@@ -55,7 +55,8 @@ function buildKeySummary(analysis) {
 
 async function pushToFollowUpBoss(conn, analysis, summary) {
   const apiKey = conn.encrypted_api_key; // stored decrypted via resolveApiKey waterfall
-  const res = await fetch('https://api.followupboss.com/v1/events', {
+  const url = validateCrmUrl('https://api.followupboss.com/v1/events');
+  const res = await fetch(url, {
     method: 'POST',
     headers: {
       'Authorization': `Basic ${btoa(apiKey + ':')}`,
@@ -98,6 +99,7 @@ async function pushToSalesforce(conn, analysis, summary) {
   // Use stored OAuth access token
   const accessToken = conn.oauth_access_token;
   const instanceUrl = conn.crm_account_name; // store Salesforce instance URL here
+  const url = validateCrmUrl(instanceUrl);
 
   // Create Task record
   const validatedUrl = validateCrmUrl(`${instanceUrl}/services/data/v58.0/sobjects/Task`);
@@ -122,7 +124,8 @@ async function pushToSalesforce(conn, analysis, summary) {
 async function pushToLofty(conn, analysis, summary) {
   const apiKey = conn.encrypted_api_key;
   const contactId = conn.crm_user_id; // store CRM contact ID here
-  const res = await fetch(`https://api.lofty.com/api/v1/contacts/${contactId}/notes`, {
+  const url = validateCrmUrl(`https://api.lofty.com/api/v1/contacts/${contactId}/notes`);
+  const res = await fetch(url, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,

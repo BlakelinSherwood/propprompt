@@ -3,8 +3,6 @@ import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { base44 } from "@/api/base44Client";
 
-mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
-
 export default function TerritoryLandingMap() {
   const mapContainer = useRef(null);
   const map = useRef(null);
@@ -30,7 +28,12 @@ export default function TerritoryLandingMap() {
     if (loading || !mapContainer.current) return;
     if (map.current) return;
 
-    map.current = new mapboxgl.Map({
+    const initMap = async () => {
+      try {
+        const { data } = await base44.functions.invoke('getMapboxToken', {});
+        mapboxgl.accessToken = data.token;
+
+        map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: "mapbox://styles/mapbox/dark-v11",
       center: [-71.5, 43.8],
@@ -97,13 +100,19 @@ export default function TerritoryLandingMap() {
         });
       });
 
-      // Fit bounds to ME, NH, VT, MA
-      const bounds = new mapboxgl.LngLatBounds(
-        [-73.5, 41.2],
-        [-66.8, 47.5]
-      );
-      map.current.fitBounds(bounds, { padding: 40 });
-    });
+        // Fit bounds to ME, NH, VT, MA
+        const bounds = new mapboxgl.LngLatBounds(
+          [-73.5, 41.2],
+          [-66.8, 47.5]
+        );
+        map.current.fitBounds(bounds, { padding: 40 });
+      });
+      } catch (err) {
+        console.error("Failed to initialize map:", err);
+      }
+    };
+
+    initMap();
 
     return () => {
       if (map.current) map.current.remove();

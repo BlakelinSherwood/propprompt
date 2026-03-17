@@ -54,7 +54,7 @@ const TABS = [
   { key: 'rejected', label: 'Rejected' },
 ];
 
-export default function ClaimsTable({ claims, pricing, onApprove, onReject }) {
+export default function ClaimsTable({ claims, pricing, stateMap, onApprove, onReject }) {
   const [tab, setTab] = useState('pending');
   const [expanded, setExpanded] = useState(null);
 

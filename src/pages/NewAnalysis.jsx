@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
+import { selectAIModel } from "@/lib/aiModelSelector";
 import WizardProgress from "../components/wizard/WizardProgress";
-import Step1Platform from "../components/wizard/Step1Platform";
 import Step2Assessment from "../components/wizard/Step2Assessment";
 import Step3ClientRelationship from "../components/wizard/Step3ClientRelationship";
 import Step4PropertyDetails from "../components/wizard/Step4PropertyDetails";
@@ -10,7 +11,6 @@ import Step5OutputFormat from "../components/wizard/Step5OutputFormat";
 import Step6Confirm from "../components/wizard/Step6Confirm";
 
 const STEP_LABELS = [
-  "AI Platform",
   "Assessment",
   "Client Role",
   "Property",
@@ -19,8 +19,6 @@ const STEP_LABELS = [
 ];
 
 const INITIAL_INTAKE = {
-  ai_platform: "claude",
-  ai_model: "",
   assessment_type: "",
   client_relationship: "",
   address: "",
@@ -29,34 +27,34 @@ const INITIAL_INTAKE = {
   output_format: "narrative",
   on_behalf_of_email: "",
   drive_sync: true,
+  selected_modules: [],
 };
 
 export default function NewAnalysis() {
+  const { user } = useAuth();
   const [step, setStep] = useState(1);
   const [intake, setIntake] = useState(INITIAL_INTAKE);
-  const [user, setUser] = useState(null);
   const [orgMembers, setOrgMembers] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     async function load() {
-      const me = await base44.auth.me();
-      setUser(me);
-      if (me.role === "assistant" || me.role === "team_lead") {
+      if (!user) return;
+      if (user.role === "assistant" || user.role === "team_lead") {
         const members = await base44.entities.User.list();
-        setOrgMembers(members.filter((m) => m.email !== me.email && ["agent", "team_agent"].includes(m.role)));
+        setOrgMembers(members.filter((m) => m.email !== user.email && ["agent", "team_agent"].includes(m.role)));
       }
     }
     load();
-  }, []);
+  }, [user]);
 
   function update(fields) {
     setIntake((prev) => ({ ...prev, ...fields }));
   }
 
   function next() {
-    setStep((s) => Math.min(s + 1, 6));
+    setStep((s) => Math.min(s + 1, 5));
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -118,12 +116,11 @@ export default function NewAnalysis() {
       <WizardProgress currentStep={step} labels={STEP_LABELS} />
 
       <div className="rounded-2xl border border-[#1A3226]/10 bg-white overflow-hidden shadow-sm">
-        {step === 1 && <Step1Platform {...stepProps} />}
-        {step === 2 && <Step2Assessment {...stepProps} />}
-        {step === 3 && <Step3ClientRelationship {...stepProps} />}
-        {step === 4 && <Step4PropertyDetails {...stepProps} />}
-        {step === 5 && <Step5OutputFormat {...stepProps} />}
-        {step === 6 && (
+        {step === 1 && <Step2Assessment {...stepProps} />}
+        {step === 2 && <Step3ClientRelationship {...stepProps} />}
+        {step === 3 && <Step4PropertyDetails {...stepProps} />}
+        {step === 4 && <Step5OutputFormat {...stepProps} />}
+        {step === 5 && (
           <Step6Confirm
             {...stepProps}
             orgMembers={orgMembers}

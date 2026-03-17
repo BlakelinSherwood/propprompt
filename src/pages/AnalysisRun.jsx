@@ -175,7 +175,6 @@ export default function AnalysisRun() {
     }
   };
 
-  // Server-side branded PPTX
   const handleDownloadPptx = async () => {
     setPptxGenerating(true);
     try {

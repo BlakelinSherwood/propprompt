@@ -74,7 +74,7 @@ Deno.serve(async (req) => {
       },
     });
 
-    console.log(`[signFairHousingReview] signed by ${user.email}, reviewId=${reviewId}, hash=${contentHash}`);
+    console.log(`[signFairHousingReview] signed by ${user.email}, reviewId=${reviewId}`);
 
     return Response.json({
       success: true,

@@ -1,22 +1,15 @@
 import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
-import { UserPlus, Search, MoreHorizontal } from "lucide-react";
+import { useAuth } from "@/lib/AuthContext";
+import { UserPlus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ROLE_LABELS } from "@/lib/constants";
 import InviteMemberDialog from "../components/InviteMemberDialog";
 import MemberRow from "../components/MemberRow";
-
-const ROLE_LABELS = {
-  platform_owner: "Platform Owner",
-  brokerage_admin: "Brokerage Admin",
-  team_lead: "Team Lead",
-  agent: "Agent",
-  assistant: "Assistant",
-  team_agent: "Team Agent",
-};
+import { base44 } from "@/api/base44Client";
 
 export default function Members() {
-  const [user, setUser] = useState(null);
+  const { user, isLoading: authLoading } = useAuth();
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -28,8 +21,6 @@ export default function Members() {
 
   async function loadData() {
     try {
-      const me = await base44.auth.me();
-      setUser(me);
       const users = await base44.entities.User.list();
       setMembers(users);
     } catch (e) {
@@ -50,7 +41,7 @@ export default function Members() {
     user?.role === "brokerage_admin" ||
     user?.role === "team_lead";
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="w-8 h-8 border-4 border-[#1A3226]/20 border-t-[#1A3226] rounded-full animate-spin" />

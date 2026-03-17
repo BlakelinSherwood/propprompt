@@ -9,19 +9,21 @@ function normalizeAddress(address, state) {
 }
 
 // Search strategy by state
-async function searchRecordsByState(address, state, base44) {
+async function searchRecordsByState(address, state, base44, forceRefresh = false) {
   const normalized = normalizeAddress(address, state);
   
-  // Check cache first (30-day TTL)
-  const cached = await base44.entities.PropertyPublicRecord.filter({
-    property_address_normalized: normalized
-  });
-  
-  if (cached.length > 0) {
-    const record = cached[0];
-    const daysSinceSearch = (new Date() - new Date(record.searched_at)) / (1000 * 60 * 60 * 24);
-    if (daysSinceSearch < 30 && (record.search_status === 'found' || record.search_status === 'partial')) {
-      return { ...record, from_cache: true };
+  if (!forceRefresh) {
+    // Check cache first (30-day TTL)
+    const cached = await base44.entities.PropertyPublicRecord.filter({
+      property_address_normalized: normalized
+    });
+    
+    if (cached.length > 0) {
+      const record = cached[0];
+      const daysSinceSearch = (new Date() - new Date(record.searched_at)) / (1000 * 60 * 60 * 24);
+      if (daysSinceSearch < 30 && (record.search_status === 'found' || record.search_status === 'partial')) {
+        return { ...record, from_cache: true };
+      }
     }
   }
 
@@ -120,7 +122,7 @@ async function searchVermont(address, base44) {
 }
 
 async function invokeAISearch(prompt, base44) {
-  
+
   try {
     const response = await base44.integrations.Core.InvokeLLM({
       prompt: prompt,
@@ -177,13 +179,7 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'address and state required' }, { status: 400 });
     }
 
-    // If force_refresh, skip cache
-    if (force_refresh) {
-      const results = await searchRecordsByState(address, state, base44);
-      return Response.json({ record: results, from_cache: false });
-    }
-
-    const record = await searchRecordsByState(address, state, base44);
+    const record = await searchRecordsByState(address, state, base44, force_refresh);
     return Response.json({ record, from_cache: record.from_cache || false });
   } catch (error) {
     console.error('[searchPublicRecords] Error:', error);
