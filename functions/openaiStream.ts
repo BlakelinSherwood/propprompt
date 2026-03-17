@@ -75,8 +75,7 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Prompt not assembled. Call assemblePrompt first.' }, { status: 400 });
     }
 
-    const encKey = Deno.env.get('ENCRYPTION_KEY') || '';
-    const promptText = await decryptData(analysis.prompt_assembled, encKey);
+    const promptText = analysis.prompt_assembled;
 
     const effectiveOrgId = orgId || analysis.org_id;
     let subscriptionPlan = 'team';
@@ -141,6 +140,12 @@ Deno.serve(async (req) => {
         completed_at: new Date().toISOString(),
       });
 
+      try {
+        await base44.functions.invoke("deductAnalysisQuota", { analysisId, orgId: analysis.org_id });
+      } catch (e) {
+        console.warn("[openaiStream] quota deduction failed:", e.message);
+      }
+
       // Emit full output in chunks so frontend stream consumer works
       const stream = new ReadableStream({
         start(controller) {
@@ -155,7 +160,7 @@ Deno.serve(async (req) => {
       });
 
       return new Response(stream, {
-        headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' },
+        headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' },
       });
     }
 
@@ -186,6 +191,11 @@ Deno.serve(async (req) => {
                   ai_model: selectedModel,
                   completed_at: new Date().toISOString(),
                 });
+                try {
+                  await base44.functions.invoke("deductAnalysisQuota", { analysisId, orgId: analysis.org_id });
+                } catch (e) {
+                  console.warn("[openaiStream] quota deduction failed:", e.message);
+                }
                 controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, keySource: keyResult.source, model: selectedModel })}\n\n`));
                 continue;
               }
@@ -210,7 +220,7 @@ Deno.serve(async (req) => {
     });
 
     return new Response(stream, {
-      headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive', 'Access-Control-Allow-Origin': '*' },
+      headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' },
     });
   } catch (error) {
     console.error('[openaiStream] error:', error);

@@ -70,11 +70,11 @@ Deno.serve(async (req) => {
       }
 
       try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${apiKey}&alt=sse`;
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`;
 
         const response = await fetch(url, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
           body: JSON.stringify({
             contents: [{
               role: "user",
@@ -125,6 +125,13 @@ Deno.serve(async (req) => {
           status: "complete", output_text: fullOutput, completed_at: new Date().toISOString(),
           ai_model: model, intake_data: { ...analysis.intake_data, api_key_source: keySource },
         });
+
+        try {
+          await base44.functions.invoke("deductAnalysisQuota", { analysisId, orgId: analysis.org_id });
+        } catch (e) {
+          console.warn("[geminiStream] quota deduction failed:", e.message);
+        }
+
         send({ done: true, keySource, model });
 
       } catch (err) {

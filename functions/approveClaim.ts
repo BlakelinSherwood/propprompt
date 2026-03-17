@@ -122,7 +122,11 @@ Deno.serve(async (req) => {
         stripeCustomerId = customerId;
       } catch (stripeErr) {
         console.error('[approveClaim] Stripe error:', stripeErr.message);
-        // Continue without Stripe in test/dev — log but don't fail
+        if (claim.stripe_payment_method_id) {
+          return Response.json({
+            error: `Payment failed: ${stripeErr.message}. Claim not approved.`,
+          }, { status: 402 });
+        }
       }
     }
 
@@ -151,7 +155,7 @@ Deno.serve(async (req) => {
         stripe_customer_id: stripeCustomerId,
       });
       const allClaimed = (territory?.seats_claimed || 0) + 1;
-      const newStatus = allClaimed >= (territory?.seats_total || 1) ? 'active' : 'active';
+      const newStatus = allClaimed >= (territory?.seats_total || 1) ? 'fully_claimed' : 'active';
       await base44.asServiceRole.entities.Territory.update(claim.territory_id, {
         status: newStatus,
         seats_claimed: allClaimed,

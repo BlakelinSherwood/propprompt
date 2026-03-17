@@ -210,7 +210,7 @@ async function generatePdf(base44, analysis, branding) {
   addAgentFooter(doc, branding, pageWidth, pageHeight);
 
   const arrayBuffer = doc.output('arraybuffer');
-  const address = analysis.intake_data?.address || analysisId;
+  const address = analysis.intake_data?.address || analysis.id;
   const safeFilename = `${assessmentLabel.replace(/\s+/g, '_')}_${Date.now()}.pdf`;
 
   return { bytes: arrayBuffer, mimeType: 'application/pdf', filename: safeFilename };
@@ -380,12 +380,22 @@ function chunkText(text, maxLen) {
   return chunks.length ? chunks : [''];
 }
 
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function buildEmailHtml(analysis, branding) {
   const primary = branding.primary_color || '#333333';
   const accent = branding.accent_color || '#666666';
-  const assessmentLabel = ASSESSMENT_LABELS[analysis.assessment_type] || 'Analysis';
-  const address = analysis.intake_data?.address || '';
-  const outputText = (analysis.output_text || '').replace(/\n/g, '<br>');
+  const assessmentLabel = escapeHtml(ASSESSMENT_LABELS[analysis.assessment_type] || 'Analysis');
+  const address = escapeHtml(analysis.intake_data?.address || '');
+  const outputText = escapeHtml(analysis.output_text || '').replace(/\n/g, '<br>');
 
   return `
 <!DOCTYPE html>
@@ -398,8 +408,8 @@ function buildEmailHtml(analysis, branding) {
         <!-- Header -->
         <tr><td style="background:${primary};padding:28px 36px;">
           ${branding.org_logo_url ? `<img src="${branding.org_logo_url}" height="44" style="display:block;margin-bottom:10px;" alt="${branding.org_name}">` : ''}
-          <div style="color:#ffffff;font-size:20px;font-weight:bold;">${branding.org_name || ''}</div>
-          ${branding.org_tagline ? `<div style="color:rgba(255,255,255,0.75);font-size:12px;margin-top:4px;">${branding.org_tagline}</div>` : ''}
+          <div style="color:#ffffff;font-size:20px;font-weight:bold;">${escapeHtml(branding.org_name || '')}</div>
+          ${branding.org_tagline ? `<div style="color:rgba(255,255,255,0.75);font-size:12px;margin-top:4px;">${escapeHtml(branding.org_tagline)}</div>` : ''}
         </td></tr>
         <!-- Subject bar -->
         <tr><td style="padding:20px 36px 12px;border-bottom:2px solid ${accent};">
@@ -413,10 +423,10 @@ function buildEmailHtml(analysis, branding) {
         <!-- Agent footer -->
         <tr><td style="padding:20px 36px;background:#f5f5f5;border-top:1px solid #e5e5e5;">
           ${branding.agent_headshot_url ? `<img src="${branding.agent_headshot_url}" width="48" height="48" style="border-radius:50%;float:left;margin-right:14px;" alt="${branding.agent_name}">` : ''}
-          <div style="font-size:13px;font-weight:bold;color:#222;">${branding.agent_name || ''}</div>
-          ${branding.agent_title ? `<div style="font-size:12px;color:#555;">${branding.agent_title}</div>` : ''}
+          <div style="font-size:13px;font-weight:bold;color:#222;">${escapeHtml(branding.agent_name || '')}</div>
+          ${branding.agent_title ? `<div style="font-size:12px;color:#555;">${escapeHtml(branding.agent_title)}</div>` : ''}
           <div style="font-size:12px;color:#777;margin-top:4px;">
-            ${[branding.agent_phone, branding.agent_email].filter(Boolean).join(' &nbsp;|&nbsp; ')}
+            ${[branding.agent_phone, branding.agent_email].filter(Boolean).map(escapeHtml).join(' &nbsp;|&nbsp; ')}
           </div>
         </td></tr>
         <!-- Disclaimer -->

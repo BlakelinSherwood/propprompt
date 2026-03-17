@@ -67,25 +67,38 @@ export default function NewAnalysis() {
 
   async function handleSubmit() {
     setSubmitting(true);
-    const analysis = await base44.entities.Analysis.create({
-      run_by_email: user.email,
-      on_behalf_of_email: intake.on_behalf_of_email || null,
-      org_id: user.org_id || null,
-      assessment_type: intake.assessment_type,
-      property_type: intake.property_type,
-      location_class: intake.location_class,
-      ai_platform: intake.ai_platform,
-      ai_model: intake.ai_model || null,
-      output_format: intake.output_format,
-      status: "draft",
-      intake_data: {
-        address: intake.address,
-        client_relationship: intake.client_relationship,
-        drive_sync: intake.drive_sync,
-      },
-      drive_sync_status: intake.drive_sync ? "pending" : "not_synced",
-    });
-    navigate(`/AnalysisRun?id=${analysis.id}`);
+    try {
+      // Check quota first
+      const quotaRes = await base44.functions.invoke("checkAnalysisQuota", {});
+      if (!quotaRes.data?.allowed) {
+        alert("You've reached your monthly analysis limit. Please upgrade or purchase a top-up pack.");
+        setSubmitting(false);
+        return;
+      }
+      const analysis = await base44.entities.Analysis.create({
+        run_by_email: user.email,
+        on_behalf_of_email: intake.on_behalf_of_email || null,
+        org_id: user.org_id || null,
+        assessment_type: intake.assessment_type,
+        property_type: intake.property_type,
+        location_class: intake.location_class,
+        ai_platform: intake.ai_platform,
+        ai_model: intake.ai_model || null,
+        output_format: intake.output_format,
+        status: "draft",
+        intake_data: {
+          address: intake.address,
+          client_relationship: intake.client_relationship,
+          drive_sync: intake.drive_sync,
+        },
+        drive_sync_status: intake.drive_sync ? "pending" : "not_synced",
+      });
+      navigate(`/AnalysisRun?id=${analysis.id}`);
+    } catch (err) {
+      console.error("Failed to create analysis:", err);
+      alert("Failed to create analysis. Please try again.");
+      setSubmitting(false);
+    }
   }
 
   const stepProps = { intake, update, user, onNext: next, onBack: back };

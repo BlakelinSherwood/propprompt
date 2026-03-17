@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -25,11 +26,19 @@ export default function PlatformAIConfig() {
 
   async function handleSave() {
     setSaving(true);
-    // In production, the Anthropic key update would go through a secure backend function
-    // Platform toggles and SC managed flag would be stored in a global config entity
-    await new Promise((r) => setTimeout(r, 800));
-    setSaving(false);
-    toast({ title: "AI configuration saved", description: "Changes will take effect on next analysis run." });
+    try {
+      await base44.entities.PlatformConfig.create({
+        sc_managed_enabled: scManagedEnabled,
+        platform_toggles: platformToggles,
+        updated_at: new Date().toISOString(),
+      });
+      toast({ title: "AI configuration saved", description: "Changes will take effect on next analysis run." });
+    } catch (err) {
+      console.error("Save failed:", err);
+      toast({ title: "Save failed", description: err.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (

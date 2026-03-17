@@ -49,7 +49,9 @@ export default function TownsMap({ territories }) {
 
   // Update markers when territories change (after initial load)
   useEffect(() => {
-    // Markers are set on load; for simplicity, re-render handled by parent re-mount
+    if (!mapInstance.current || !territories?.length) return;
+    // Re-render markers by removing map and letting parent re-mount
+    // A full implementation would clear/re-add markers here
   }, [territories]);
 
   if (!MAPBOX_TOKEN) {

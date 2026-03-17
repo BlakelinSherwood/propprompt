@@ -22,6 +22,14 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Payment not completed', status: pi.status }, { status: 400 });
     }
 
+    // Idempotency check
+    const existing = await base44.asServiceRole.entities.TopupPack.filter({
+      stripe_payment_intent_id: payment_intent_id,
+    });
+    if (existing.length > 0) {
+      return Response.json({ success: true, topup_id: existing[0].id, message: 'Already processed' });
+    }
+
     const pricing = await getPricing(base44);
     const expiryDays = parseInt(pricing.topup_expiry_days || 90);
 
@@ -32,6 +40,7 @@ Deno.serve(async (req) => {
     const topup = await base44.asServiceRole.entities.TopupPack.create({
       subscription_id: subscription_id || null,
       bundle_id: bundle_id || null,
+      pool_id: pool_id || null,
       analyses_purchased: analyses,
       analyses_remaining: analyses,
       price_paid: pi.amount / 100,

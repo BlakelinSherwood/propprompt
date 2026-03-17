@@ -131,7 +131,7 @@ export default function ClaimsTable({ claims, pricing, onApprove, onReject }) {
                   </td>
                   <td className="px-4 py-3 font-medium text-[#1A3226]">{c.brokerage_name || '—'}</td>
                   <td className="px-4 py-3 text-[#1A3226]/70 max-w-[240px]">
-                    <div className="truncate">{getTerritorySummary(c)}</div>
+                    <div className="truncate">{getTerritorySummary(c, {})}</div>
                     {c._releasedRecord && (
                       <div className="flex items-center gap-1 mt-1 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 w-fit whitespace-nowrap">
                         ⚠️ Right of first refusal — expires {new Date(c._releasedRecord.right_of_refusal_expires_at).toLocaleDateString()}
