@@ -33,6 +33,10 @@ const TESTIMONIALS = [
 
 const FAQ_ITEMS = (pricing) => [
   {
+    q: "What states does PropPrompt currently serve?",
+    a: "PropPrompt currently serves Maine, New Hampshire, Vermont, and Massachusetts. We are expanding to Connecticut and Rhode Island in Q3 2026.",
+  },
+  {
     q: "What if my town is already claimed?",
     a: "If all seats in your town are taken, you can join a waitlist. You'll be notified first if a seat opens up, and you get right-of-first-refusal for 48 hours.",
   },
@@ -121,7 +125,7 @@ export default function Landing() {
         <div className="relative max-w-6xl mx-auto px-6 py-24 lg:py-32 w-full">
           <div className="max-w-2xl">
             <span className="inline-block text-[#B8982F] text-xs font-semibold uppercase tracking-widest mb-5 border border-[#B8982F]/30 px-3 py-1 rounded-full">
-              ME · NH · VT — Exclusive Territories
+              ME · NH · VT · MA — Exclusive Territories
             </span>
             <h1 className="text-4xl lg:text-5xl xl:text-6xl font-bold leading-tight mb-5" style={{ fontFamily: "Georgia, serif" }}>
               Your Market.<br />Your Territory.<br />
@@ -206,6 +210,16 @@ export default function Landing() {
             <Link to="/territories" className="inline-flex items-center gap-2 text-sm font-semibold text-[#1A3226] hover:text-[#B8982F] transition-colors">
               See full territory map → 
             </Link>
+
+            {/* MA note */}
+            <div className="rounded-xl border border-[#B8982F]/30 bg-[#B8982F]/5 p-4 space-y-2">
+              <p className="text-sm text-[#1A3226]/80 leading-relaxed">
+                <span className="font-semibold text-[#1A3226]">Eastern Massachusetts</span> is already active across 351 towns covering 4.5 million residents — held by our Founding Partner.
+              </p>
+              <p className="text-sm text-[#1A3226]/80 leading-relaxed">
+                <span className="font-semibold text-[#22c55e]">Western Massachusetts, the Cape, and the Pioneer Valley</span> are fully open for subscription today.
+              </p>
+            </div>
           </div>
 
           {/* Static SVG mini-map */}
@@ -233,6 +247,33 @@ export default function Landing() {
               <circle cx="155" cy="275" r="5" fill="#f59e0b" fillOpacity="0.7" />
               <text x="165" y="279" fill="white" fontSize="8" fontFamily="sans-serif" fillOpacity="0.6">Pending</text>
             </svg>
+          </div>
+        </div>
+      </section>
+
+      {/* Expansion Roadmap */}
+      <section className="bg-white border-t border-[#1A3226]/8 py-16">
+        <div className="max-w-4xl mx-auto px-6">
+          <div className="text-center mb-10">
+            <p className="text-[#B8982F] text-xs font-semibold uppercase tracking-widest mb-2">Expansion Roadmap</p>
+            <h2 className="text-3xl font-bold text-[#1A3226]" style={{ fontFamily: "Georgia, serif" }}>Where We're Going</h2>
+          </div>
+          <div className="space-y-3">
+            {[
+              { phase: "Phase 1", timing: "Now", states: "Maine, New Hampshire, Vermont, Massachusetts", active: true },
+              { phase: "Phase 2", timing: "Q3 2026", states: "Connecticut, Rhode Island", active: false },
+              { phase: "Phase 3", timing: "Q4 2026", states: "New York, New Jersey, Pennsylvania", active: false },
+              { phase: "Phase 4", timing: "Q1 2027", states: "Florida, Georgia, South Carolina, North Carolina", active: false },
+              { phase: "Phase 5", timing: "2027–2028", states: "All remaining states", active: false },
+            ].map(row => (
+              <div key={row.phase} className={`flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 rounded-xl px-5 py-4 border ${row.active ? 'bg-[#1A3226] border-[#1A3226] text-white' : 'bg-[#FAF8F4] border-[#1A3226]/10 text-[#1A3226]'}`}>
+                <div className="flex items-center gap-3 sm:w-40 flex-shrink-0">
+                  <span className={`text-xs font-bold uppercase tracking-wider ${row.active ? 'text-[#B8982F]' : 'text-[#1A3226]/40'}`}>{row.phase}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${row.active ? 'bg-[#B8982F] text-[#1A3226]' : 'bg-[#1A3226]/10 text-[#1A3226]/50'}`}>{row.timing}</span>
+                </div>
+                <p className={`text-sm font-medium ${row.active ? 'text-white' : 'text-[#1A3226]/70'}`}>{row.states}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -362,14 +403,14 @@ export default function Landing() {
             <div>
               <p className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-3">Territories</p>
               <div className="space-y-1">
-                {['Maine — Active', 'New Hampshire — Active', 'Vermont — Active'].map(s => (
+                {['Maine — Active', 'New Hampshire — Active', 'Vermont — Active', 'Massachusetts — Active'].map(s => (
                   <p key={s} className="text-xs text-white/50">{s}</p>
                 ))}
-                <p className="text-xs text-white/30 mt-2">Coming soon: CT, RI, MA, NY, NJ, PA</p>
+                <p className="text-xs text-white/30 mt-2">Coming soon: CT, RI, NY, NJ, PA and beyond</p>
               </div>
             </div>
             <div>
-              <p className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-3">Waitlist for Other States</p>
+              <p className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-3">Waitlist — CT, RI, NY, NJ, PA & Beyond</p>
               {waitlistSent ? (
                 <p className="text-xs text-[#B8982F] font-semibold">You're on the list! We'll reach out when your state launches.</p>
               ) : (
