@@ -91,6 +91,7 @@ export default function Dashboard() {
           }}
         />
       )}
+      {user && <OnboardingWelcomeModal user={user} onClose={() => {}} />
 
       <div className="space-y-6">
         {/* Fair housing overdue banner — only for brokerage_admin / team_lead */}
