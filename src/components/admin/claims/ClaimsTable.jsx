@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { ChevronDown, ChevronUp, CheckCircle, XCircle, Clock } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ChevronDown, ChevronUp, CheckCircle, XCircle, Clock, AlertTriangle } from "lucide-react";
+import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import ClaimDetail from "./ClaimDetail";
 import moment from "moment";
@@ -57,6 +58,15 @@ const TABS = [
 export default function ClaimsTable({ claims, pricing, onApprove, onReject }) {
   const [tab, setTab] = useState('pending');
   const [expanded, setExpanded] = useState(null);
+  const [releasedMap, setReleasedMap] = useState({});
+
+  useEffect(() => {
+    base44.entities.ReleasedTerritory.list('-released_at', 200).then(rows => {
+      const map = {};
+      rows.forEach(r => { map[r.territory_id] = r; });
+      setReleasedMap(map);
+    }).catch(() => {});
+  }, []);
 
   const filtered = claims.filter(c => {
     if (tab === 'all') return true;
@@ -122,7 +132,13 @@ export default function ClaimsTable({ claims, pricing, onApprove, onReject }) {
                   onClick={() => toggleRow(c.id)}
                   className={`border-b border-[#1A3226]/5 cursor-pointer transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-[#1A3226]/[0.01]'} hover:bg-[#1A3226]/[0.04] ${isExpanded ? 'bg-[#1A3226]/[0.03]' : ''}`}>
                   <td className="px-4 py-3 text-[#1A3226]/60 whitespace-nowrap">
-                    {moment(c.created_date).fromNow()}
+                    <div>{moment(c.created_date).fromNow()}</div>
+                    {c.territory_id && releasedMap[c.territory_id] && new Date(releasedMap[c.territory_id].right_of_refusal_expires_at) > new Date() && (
+                      <div className="flex items-center gap-1 mt-1 text-xs text-amber-600 font-medium">
+                        <AlertTriangle className="w-3 h-3" />
+                        Right of first refusal — expires {moment(releasedMap[c.territory_id].right_of_refusal_expires_at).format('MMM D')}
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${TYPE_COLORS[type]}`}>

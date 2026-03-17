@@ -33,6 +33,7 @@ import TeamBranding from './pages/TeamBranding';
 import Training from './pages/Training';
 import TrainingVideo from './pages/TrainingVideo';
 import TrainingAdmin from './pages/admin/TrainingAdmin';
+import EasternMAAdmin from './pages/admin/EasternMAAdmin';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -82,6 +83,7 @@ const AuthenticatedApp = () => {
         <Route path="/admin/pricing" element={<PricingAdmin />} />
         <Route path="/admin/claims" element={<ClaimsAdmin />} />
         <Route path="/admin/training" element={<TrainingAdmin />} />
+        <Route path="/admin/territories/eastern-ma" element={<EasternMAAdmin />} />
         <Route path="/training" element={<Training />} />
         <Route path="/training/:videoId" element={<TrainingVideo />} />
         <Route path="/territories" element={<Territories />} />
