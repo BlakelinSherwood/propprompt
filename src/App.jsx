@@ -24,6 +24,8 @@ import PricingAdmin from './pages/PricingAdmin';
 import Territories from './pages/Territories';
 import Claim from './pages/Claim';
 import TopupPage from './pages/TopupPage';
+import BundleManagement from './pages/BundleManagement';
+import PoolManagement from './pages/PoolManagement';
 import ClaimsAdmin from './pages/admin/ClaimsAdmin';
 import ClaimSubmitted from './pages/ClaimSubmitted';
 import BrokerageBranding from './pages/BrokerageBranding';
@@ -78,6 +80,8 @@ const AuthenticatedApp = () => {
         <Route path="/admin/claims" element={<ClaimsAdmin />} />
         <Route path="/territories" element={<Territories />} />
         <Route path="/account/topup" element={<TopupPage />} />
+        <Route path="/account/bundle/:bundle_id" element={<BundleManagement />} />
+        <Route path="/account/pool/:pool_id" element={<PoolManagement />} />
         <Route path="/claim" element={<Claim />} />
         <Route path="/claim/submitted" element={<ClaimSubmitted />} />
       </Route>
