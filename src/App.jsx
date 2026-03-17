@@ -20,6 +20,7 @@ import BrokerageAdmin from './pages/BrokerageAdmin';
 import TeamAdmin from './pages/TeamAdmin';
 import AccountSettings from './pages/AccountSettings';
 import AgentBranding from './pages/AgentBranding';
+import PricingAdmin from './pages/admin/PricingAdmin';
 import BrokerageBranding from './pages/BrokerageBranding';
 import TeamBranding from './pages/TeamBranding';
 
@@ -68,6 +69,7 @@ const AuthenticatedApp = () => {
         <Route path="/team/:id/branding" element={<TeamBranding />} />
         <Route path="/AccountSettings" element={<AccountSettings />} />
         <Route path="/settings/branding" element={<AgentBranding />} />
+        <Route path="/admin/pricing" element={<PricingAdmin />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
