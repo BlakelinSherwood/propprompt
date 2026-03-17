@@ -13,4 +13,9 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  server: {
+    allowedHosts: [
+      'ta-01kky95yt0rj7mbdr41vd8t57z-5173-ezenw531v4b13gho4kzfmbcri.w.modal.host',
+    ],
+  },
 })
