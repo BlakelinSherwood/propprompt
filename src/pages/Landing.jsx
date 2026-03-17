@@ -145,6 +145,12 @@ export default function Landing() {
                 See How It Works
               </a>
             </div>
+            {founder && (
+              <div className="flex items-center gap-2 mt-6 text-xs text-white/60 bg-white/5 border border-white/10 rounded-lg px-4 py-3 inline-block">
+                <Home className="w-3.5 h-3.5 text-[#B8982F]" />
+                <span>Built by <span className="font-semibold text-white">{founder.founder_name}</span> · {founder.credentials_line} · {founder.years_experience} Years in New England</span>
+              </div>
+            )}
             <div className="flex flex-wrap gap-4 mt-8 text-xs text-white/50">
               {['Exclusive per-territory', 'No seat sharing', 'AI-powered CMAs', 'Branded reports'].map(f => (
                 <span key={f} className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-[#B8982F]" />{f}</span>
