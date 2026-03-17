@@ -206,9 +206,9 @@ export default function Landing() {
                 </li>
               ))}
             </ul>
-            <Link to="/territories" className="inline-flex items-center gap-2 text-sm font-semibold text-[#1A3226] hover:text-[#B8982F] transition-colors">
+            <a href="/app/Territories" className="inline-flex items-center gap-2 text-sm font-semibold text-[#1A3226] hover:text-[#B8982F] transition-colors">
               See full territory map → 
-            </Link>
+            </a>
 
             {/* MA note */}
             <div className="rounded-xl border border-[#B8982F]/30 bg-[#B8982F]/5 p-4 space-y-2">
@@ -395,8 +395,8 @@ export default function Landing() {
               <p className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-3">Product</p>
               <div className="space-y-2">
                 {[['Territory Map', '/app/Territories'], ['Pricing', '#pricing'], ['Training', '/app/Dashboard'], ['Sign In', '/app/Dashboard']].map(([l, h]) => (
-                    <div key={l}><a href={h} className="text-xs text-white/50 hover:text-white transition-colors">{l}</a></div>
-                  ))}
+                  <div key={l}><a href={h} className="text-xs text-white/50 hover:text-white transition-colors">{l}</a></div>
+                ))}
               </div>
             </div>
             <div>
