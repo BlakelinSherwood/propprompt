@@ -20,6 +20,7 @@ import BrokerageAdmin from './pages/BrokerageAdmin';
 import TeamAdmin from './pages/TeamAdmin';
 import AccountSettings from './pages/AccountSettings';
 import AgentBranding from './pages/AgentBranding';
+import BrokerageBranding from './pages/BrokerageBranding';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
