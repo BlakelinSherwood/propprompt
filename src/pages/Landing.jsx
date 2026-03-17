@@ -169,6 +169,7 @@ export default function Landing() {
           <div className="text-center mb-14">
             <p className="text-[#B8982F] text-xs font-semibold uppercase tracking-widest mb-2">How It Works</p>
             <h2 className="text-3xl font-bold" style={{ fontFamily: "Georgia, serif" }}>Three Steps to Exclusivity</h2>
+            {founder && <p className="text-sm text-white/60 mt-3">Designed by a working broker. Built for agents who want to compete on intelligence.</p>}
           </div>
           <div className="grid sm:grid-cols-3 gap-8 relative">
             {/* Connector line (desktop) */}
