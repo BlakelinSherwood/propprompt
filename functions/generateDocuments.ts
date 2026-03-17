@@ -55,7 +55,21 @@ Deno.serve(async (req) => {
       return await handleEmail(base44, analysis, branding, email_to, email_subject, now);
     }
 
-    // PDF or PPTX — generate bytes then store
+    // For PPTX — delegate to dedicated generatePptx function
+    if (format === 'pptx') {
+      const pptxRes = await base44.functions.invoke('generatePptx', { analysisId, branding });
+      const pptxUrl = pptxRes?.data?.url;
+      if (!pptxUrl) throw new Error('PPTX generation failed');
+      await base44.asServiceRole.entities.Analysis.update(analysisId, {
+        output_pptx_url: pptxUrl,
+        pptx_url: pptxUrl,
+        last_exported_at: now,
+        last_export_format: 'pptx',
+      });
+      return Response.json({ url: pptxUrl, format: 'pptx' });
+    }
+
+    // PDF — generate bytes then store
     const { bytes, mimeType, filename } = await generateDocument(base44, analysis, branding, format);
 
     // 4. Check if Drive is connected with auto-sync enabled
