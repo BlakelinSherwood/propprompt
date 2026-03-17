@@ -359,6 +359,67 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Founder Section */}
+      {founder && (
+        <section className="bg-[#1A3226] text-white py-20">
+          <div className="max-w-6xl mx-auto px-6">
+            <h2 className="text-3xl font-bold text-center mb-14" style={{ fontFamily: "Georgia, serif" }}>
+              Built From Inside the Industry
+            </h2>
+            <div className="grid lg:grid-cols-2 gap-12 items-center">
+              {/* Left: Photo & Credentials */}
+              <div className="flex flex-col items-center">
+                {founder.headshot_url ? (
+                  <img src={founder.headshot_url} alt={founder.founder_name} className="w-64 h-64 rounded-2xl object-cover mb-6" />
+                ) : (
+                  <div className="w-64 h-64 rounded-2xl bg-[#2D5A40] border-2 border-[#B8982F]/40 mb-6 flex items-center justify-center">
+                    <p className="text-sm text-white/40 text-center px-4">TODO: Replace with professional headshot</p>
+                  </div>
+                )}
+                <h3 className="text-2xl font-bold text-center">{founder.founder_name}</h3>
+                <p className="text-sm text-white/70 text-center mt-1">{founder.credentials_line}</p>
+                <p className="text-sm text-white/70 text-center">{founder.years_experience} Years Experience</p>
+                {founder.detail_1 && <p className="text-sm text-[#B8982F] text-center mt-2 font-semibold">{founder.detail_1}</p>}
+                {founder.detail_2 && <p className="text-sm text-[#B8982F] text-center">{founder.detail_2}</p>}
+              </div>
+
+              {/* Right: Statement */}
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-2xl font-bold mb-4">"I built the tool I wished I had."</h3>
+                  <div className="text-white/80 leading-relaxed space-y-4 text-sm">
+                    {founder.founder_statement && (
+                      <div dangerouslySetInnerHTML={{ __html: founder.founder_statement }} />
+                    )}
+                    {!founder.founder_statement && (
+                      <p>For [YEARS_EXPERIENCE] years I've sat across from sellers trying to explain market data that took me hours to pull together. PropPrompt is what I built to solve that — a practitioner's tool for agents who want to compete on intelligence.</p>
+                    )}
+                  </div>
+                  <p className="text-white/70 text-sm mt-6 italic">— {founder.founder_name}, Broker / Founder</p>
+                </div>
+
+                {/* Credential chips */}
+                <div className="flex flex-wrap gap-3 pt-6">
+                  <div className="bg-[#B8982F]/15 border border-[#B8982F]/40 rounded-full px-4 py-2 text-xs font-semibold text-[#B8982F]">
+                    {founder.years_experience}+ Years Licensed
+                  </div>
+                  {founder.detail_1 && (
+                    <div className="bg-[#B8982F]/15 border border-[#B8982F]/40 rounded-full px-4 py-2 text-xs font-semibold text-[#B8982F]">
+                      {founder.detail_1}
+                    </div>
+                  )}
+                  {founder.detail_2 && (
+                    <div className="bg-[#B8982F]/15 border border-[#B8982F]/40 rounded-full px-4 py-2 text-xs font-semibold text-[#B8982F]">
+                      {founder.detail_2}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* FAQ */}
       <section className="bg-white border-t border-[#1A3226]/8 py-20">
         <div className="max-w-3xl mx-auto px-6">
