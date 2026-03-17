@@ -70,12 +70,15 @@ Deno.serve(async (req) => {
       }
 
       try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${apiKey}&alt=sse`;
-
-        const response = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": apiKey,
+            },
+            body: JSON.stringify({
             contents: [{
               role: "user",
               parts: [{ text: `You are PropPrompt™, an elite real estate AI analyst for Eastern Massachusetts. Provide detailed, professional analysis.\n\n${prompt}` }],
