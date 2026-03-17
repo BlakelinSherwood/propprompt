@@ -102,13 +102,13 @@ export default function Landing() {
             <span className="hidden sm:inline text-white/30 text-sm ml-1">by Sherwood & Company</span>
           </div>
           <nav className="hidden sm:flex items-center gap-6 text-sm text-white/70">
-            <Link to="/territories" className="hover:text-white transition-colors">Territory Map</Link>
+            <a href="/#territories" className="hover:text-white transition-colors">Territory Map</a>
             <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
             <a href="#how-it-works" className="hover:text-white transition-colors">How It Works</a>
           </nav>
-          <Link to="/Dashboard" className="text-sm bg-[#B8982F] hover:bg-[#B8982F]/90 text-[#1A3226] font-semibold px-4 py-2 rounded-lg transition-colors">
+          <a href="/app/Territories" onClick={(e) => { window.location.href = '/app/Territories'; }} className="text-sm bg-[#B8982F] hover:bg-[#B8982F]/90 text-[#1A3226] font-semibold px-4 py-2 rounded-lg transition-colors cursor-pointer">
             Sign In
-          </Link>
+          </a>
         </div>
       </header>
 
