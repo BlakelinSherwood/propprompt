@@ -21,7 +21,10 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function load() {
-      if (!user) return;
+      if (!user) {
+        setLoading(false);
+        return;
+      }
       try {
         // Show privacy notice if never accepted
         if (!user.privacy_notice_accepted_at) {
@@ -30,23 +33,31 @@ export default function Dashboard() {
 
         const isAdmin = user.role === "platform_owner" || user.role === "brokerage_admin" || user.role === "team_lead";
         if (isAdmin) {
-          const [users, analyses] = await Promise.all([
-            base44.entities.User.list('', 500),
-            base44.entities.Analysis.list("-created_date", 200),
-          ]);
-          setUserCount(users.length);
-          setAnalysisCount(analyses.length);
+          try {
+            const [users, analyses] = await Promise.all([
+              base44.entities.User.list('', 500),
+              base44.entities.Analysis.list("-created_date", 200),
+            ]);
+            setUserCount(users.length);
+            setAnalysisCount(analyses.length);
+          } catch (err) {
+            console.warn('Failed to load admin stats:', err);
+          }
         }
 
         // Fair housing status for brokerage_admin / team_lead
         if (user.role === "brokerage_admin" || user.role === "team_lead") {
-          const reviews = await base44.entities.FairHousingReview.filter({ reviewer_email: user.email });
-          const current = {
-            signed: reviews.filter((r) => r.status === "signed").length,
-            overdue: reviews.filter((r) => r.status === "overdue").length,
-            pending: reviews.filter((r) => r.status === "pending" || r.status === "viewed").length,
-          };
-          setFhStatus(current);
+          try {
+            const reviews = await base44.entities.FairHousingReview.filter({ reviewer_email: user.email });
+            const current = {
+              signed: reviews.filter((r) => r.status === "signed").length,
+              overdue: reviews.filter((r) => r.status === "overdue").length,
+              pending: reviews.filter((r) => r.status === "pending" || r.status === "viewed").length,
+            };
+            setFhStatus(current);
+          } catch (err) {
+            console.warn('Failed to load fair housing status:', err);
+          }
         }
       } catch (e) {
         console.error(e);
@@ -78,7 +89,6 @@ export default function Dashboard() {
           user={user}
           onAccepted={() => {
             setShowPrivacyNotice(false);
-            setUser((u) => ({ ...u, privacy_notice_accepted_at: new Date().toISOString() }));
           }}
         />
       )}
