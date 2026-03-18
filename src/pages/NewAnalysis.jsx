@@ -69,6 +69,12 @@ export default function NewAnalysis() {
   async function handleSubmit() {
     setSubmitting(true);
     try {
+      // Check authentication
+      if (!user) {
+        alert("You must be logged in to run an analysis.");
+        setSubmitting(false);
+        return;
+      }
       // Validate required fields
       if (!intake.ai_platform) {
         alert("Please select an AI platform.");
