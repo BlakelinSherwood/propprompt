@@ -45,8 +45,8 @@ function QuotaMeter({ user }) {
   }
 
   const used = user?.analyses_run_this_month ?? 0;
-  const limit = user?.analyses_limit ?? 10;
-  const pct = Math.min((used / limit) * 100, 100);
+  const limit = user?.analyses_limit ?? 30;
+  const pct = limit > 0 ? Math.min((used / limit) * 100, 100) : 0;
   const color = pct >= 90 ? "bg-red-500" : pct >= 70 ? "bg-amber-500" : "bg-[#B8982F]";
 
   return (
