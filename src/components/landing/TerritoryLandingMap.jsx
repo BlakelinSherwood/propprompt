@@ -31,15 +31,15 @@ export default function TerritoryLandingMap() {
     if (loading || !mapContainer.current) return;
     if (map.current) return;
 
-    const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
     const initMap = async () => {
       try {
-        if (!MAPBOX_TOKEN) {
-          console.warn("Mapbox token not configured");
+        const { data } = await base44.functions.invoke('getMapboxToken', {});
+        if (!data?.token) {
+          console.warn("Mapbox token not available");
           setMapFailed(true);
           return;
         }
-        mapboxgl.accessToken = MAPBOX_TOKEN;
+        mapboxgl.accessToken = data.token;
 
         map.current = new mapboxgl.Map({
           container: mapContainer.current,
