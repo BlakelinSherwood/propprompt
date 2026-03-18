@@ -106,12 +106,16 @@ export default function NewAnalysis() {
         return;
       }
 
-      // Check quota
-      const quotaRes = await base44.functions.invoke("checkAnalysisQuota", {});
-      if (!quotaRes.data?.allowed) {
-        alert("You've reached your monthly analysis limit. Please upgrade or purchase a top-up pack.");
-        setSubmitting(false);
-        return;
+      // Check quota (skip if network fails — backend will validate)
+      try {
+        const quotaRes = await base44.functions.invoke("checkAnalysisQuota", {});
+        if (!quotaRes.data?.allowed) {
+          alert("You've reached your monthly analysis limit. Please upgrade or purchase a top-up pack.");
+          setSubmitting(false);
+          return;
+        }
+      } catch (quotaErr) {
+        console.warn("Quota check failed, proceeding anyway:", quotaErr);
       }
       const analysis = await base44.entities.Analysis.create({
         run_by_email: user.email,
