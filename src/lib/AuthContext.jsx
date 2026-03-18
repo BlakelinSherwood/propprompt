@@ -8,6 +8,7 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [isLoadingPublicSettings, setIsLoadingPublicSettings] = useState(true);
   const [authError, setAuthError] = useState(null);
@@ -94,11 +95,17 @@ export const AuthProvider = ({ children }) => {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
       setIsAuthenticated(true);
+      
+      // Check if user has an active subscription
+      const subs = await base44.entities.TerritorySubscription.filter({ user_id: currentUser.id, status: 'active' });
+      setHasActiveSubscription(subs && subs.length > 0);
+      
       setIsLoadingAuth(false);
     } catch (error) {
       console.error('User auth check failed:', error);
       setIsLoadingAuth(false);
       setIsAuthenticated(false);
+      setHasActiveSubscription(false);
       
       // If user auth fails, it might be an expired token
       if (error.status === 401 || error.status === 403) {
@@ -131,7 +138,8 @@ export const AuthProvider = ({ children }) => {
   return (
     <AuthContext.Provider value={{ 
       user, 
-      isAuthenticated, 
+      isAuthenticated,
+      hasActiveSubscription,
       isLoadingAuth,
       isLoadingPublicSettings,
       authError,
