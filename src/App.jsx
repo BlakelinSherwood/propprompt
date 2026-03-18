@@ -22,6 +22,7 @@ import AccountSettings from './pages/AccountSettings';
 import AgentBranding from './pages/AgentBranding';
 import PricingAdmin from './pages/PricingAdmin';
 import PlatformSettings from './pages/admin/PlatformSettings';
+import TerritoriesPublic from './pages/TerritoriesPublic';
 import Territories from './pages/Territories';
 import Claim from './pages/Claim';
 import TopupPage from './pages/TopupPage';
@@ -119,11 +120,12 @@ const AuthenticatedApp = () => {
         <Route path="/account/alert-settings" element={<ProtectedRoute element={<AlertSettings />} requiresAuth={true} />} />
         <Route path="/training" element={<ProtectedRoute element={<Training />} requiresAuth={true} />} />
         <Route path="/training/:videoId" element={<ProtectedRoute element={<TrainingVideo />} requiresAuth={true} />} />
-        <Route path="/Territories" element={<ProtectedRoute element={<Territories />} requiresAuth={false} />} />
+        <Route path="/Territories" element={<TerritoriesPublic />} />
         <Route path="/account/topup" element={<ProtectedRoute element={<TopupPage />} requiresAuth={true} requiresSubscription={true} />} />
         <Route path="/account/bundle/:bundle_id" element={<ProtectedRoute element={<BundleManagement />} requiresAuth={true} requiresSubscription={true} />} />
         <Route path="/account/pool/:pool_id" element={<ProtectedRoute element={<PoolManagement />} requiresAuth={true} requiresSubscription={true} />} />
         <Route path="/Claim" element={<ProtectedRoute element={<Claim />} requiresAuth={true} requiresSubscription={false} />} />
+        <Route path="/app/Territories" element={<ProtectedRoute element={<Territories />} requiresAuth={true} requiresSubscription={false} />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
