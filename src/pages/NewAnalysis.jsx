@@ -144,7 +144,8 @@ export default function NewAnalysis() {
       navigate(`/AnalysisRun?id=${analysis.id}`);
     } catch (err) {
       console.error("Failed to create analysis:", err);
-      alert("Failed to create analysis. Please try again.");
+      const msg = err?.response?.data?.message || err?.message || 'Failed to create analysis';
+      alert(msg);
       setSubmitting(false);
     }
   }
