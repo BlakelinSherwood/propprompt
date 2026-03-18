@@ -138,10 +138,7 @@ export default function Landing() {
               PropPrompt gives your brokerage exclusive AI-powered market analysis for your towns — locked to you, unavailable to any competitor.
             </p>
             <div className="flex flex-wrap gap-4">
-              <a href="/app/Territories"
-                className="flex items-center gap-2 bg-[#B8982F] hover:bg-[#B8982F]/90 text-[#1A3226] font-bold px-7 py-3.5 rounded-xl transition-colors">
-                Find Your Territory <ArrowRight className="w-4 h-4" />
-              </a>
+  
               <a href="#how-it-works"
                 className="flex items-center gap-2 border border-white/20 hover:border-white/50 text-white px-7 py-3.5 rounded-xl transition-colors">
                 See How It Works
