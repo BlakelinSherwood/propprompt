@@ -14,7 +14,7 @@ export default function TerritoryLandingMap() {
   useEffect(() => {
     const loadTerritories = async () => {
       try {
-        const result = await base44.entities.Territory.list();
+        const result = await base44.entities.Territory.list('', 5000);
         setTerritories(result || []);
       } catch (err) {
         console.warn("Territory data unavailable, showing map without markers:", err);
@@ -42,77 +42,77 @@ export default function TerritoryLandingMap() {
         mapboxgl.accessToken = MAPBOX_TOKEN;
 
         map.current = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: "mapbox://styles/mapbox/dark-v11",
-      center: [-71.8, 43.0],
-      zoom: 6.2,
-      scrollZoom: false,
-      dragPan: false,
-      attributionControl: false,
-    });
-
-    map.current.on("load", () => {
-      // Add markers for each territory
-      territories.forEach((territory) => {
-        if (!territory.lat || !territory.lng) return;
-
-        const statusColorMap = {
-          available: "#22c55e",
-          pending_approval: "#eab308",
-          active: "#ef4444",
-          reserved: "#ef4444",
-          sublicensed: "#ef4444",
-          coming_soon: "#94a3b8",
-        };
-
-        const markerSize =
-          territory.seats_total >= 5
-            ? 8
-            : territory.seats_total >= 2
-              ? 6
-              : 4;
-
-        const el = document.createElement("div");
-        el.className = "territory-marker";
-        el.style.width = `${markerSize * 2}px`;
-        el.style.height = `${markerSize * 2}px`;
-        el.style.borderRadius = "50%";
-        el.style.backgroundColor =
-          statusColorMap[territory.status] || "#94a3b8";
-        el.style.border = "2px solid rgba(255, 255, 255, 0.3)";
-        el.style.cursor = "pointer";
-        el.style.transition = "all 0.2s ease";
-
-        const marker = new mapboxgl.Marker({ element: el })
-          .setLngLat([territory.lng, territory.lat])
-          .addTo(map.current);
-
-        // Hover tooltip
-        el.addEventListener("mouseenter", () => {
-          new mapboxgl.Popup({ offset: 25 })
-            .setLngLat([territory.lng, territory.lat])
-            .setHTML(`<div class="text-sm font-medium">${territory.city_town}, ${territory.state_id}</div>`)
-            .addTo(map.current);
-
-          el.style.transform = "scale(1.3)";
-          el.style.zIndex = "1000";
+          container: mapContainer.current,
+          style: "mapbox://styles/mapbox/dark-v11",
+          center: [-71.8, 43.0],
+          zoom: 6.2,
+          scrollZoom: false,
+          dragPan: false,
+          attributionControl: false,
         });
 
-        el.addEventListener("mouseleave", () => {
-          map.current.getCanvas().style.cursor = "";
-          el.style.transform = "scale(1)";
-          el.style.zIndex = "0";
-          document.querySelectorAll(".mapboxgl-popup").forEach((p) => p.remove());
-        });
-      });
+        map.current.on("load", () => {
+          // Add markers for each territory
+          territories.forEach((territory) => {
+            if (!territory.lat || !territory.lng) return;
 
-        // Fit bounds to show all New England
-        const bounds = new mapboxgl.LngLatBounds(
-          [-73.8, 40.9],
-          [-69.8, 47.5]
-        );
-        map.current.fitBounds(bounds, { padding: 40 });
-      });
+            const statusColorMap = {
+              available: "#22c55e",
+              pending_approval: "#eab308",
+              active: "#ef4444",
+              reserved: "#ef4444",
+              sublicensed: "#ef4444",
+              coming_soon: "#94a3b8",
+            };
+
+            const markerSize =
+              territory.seats_total >= 5
+                ? 8
+                : territory.seats_total >= 2
+                  ? 6
+                  : 4;
+
+            const el = document.createElement("div");
+            el.className = "territory-marker";
+            el.style.width = `${markerSize * 2}px`;
+            el.style.height = `${markerSize * 2}px`;
+            el.style.borderRadius = "50%";
+            el.style.backgroundColor =
+              statusColorMap[territory.status] || "#94a3b8";
+            el.style.border = "2px solid rgba(255, 255, 255, 0.3)";
+            el.style.cursor = "pointer";
+            el.style.transition = "all 0.2s ease";
+
+            const marker = new mapboxgl.Marker({ element: el })
+              .setLngLat([territory.lng, territory.lat])
+              .addTo(map.current);
+
+            // Hover tooltip
+            el.addEventListener("mouseenter", () => {
+              new mapboxgl.Popup({ offset: 25 })
+                .setLngLat([territory.lng, territory.lat])
+                .setHTML(`<div class="text-sm font-medium">${territory.city_town}, ${territory.state_id}</div>`)
+                .addTo(map.current);
+
+              el.style.transform = "scale(1.3)";
+              el.style.zIndex = "1000";
+            });
+
+            el.addEventListener("mouseleave", () => {
+              map.current.getCanvas().style.cursor = "";
+              el.style.transform = "scale(1)";
+              el.style.zIndex = "0";
+              document.querySelectorAll(".mapboxgl-popup").forEach((p) => p.remove());
+            });
+          });
+
+          // Fit bounds to show all New England
+          const bounds = new mapboxgl.LngLatBounds(
+            [-73.8, 40.9],
+            [-69.8, 47.5]
+          );
+          map.current.fitBounds(bounds, { padding: 40 });
+        });
       } catch (err) {
         console.error("Failed to initialize map:", err);
         setMapFailed(true);
