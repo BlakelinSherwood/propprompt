@@ -71,7 +71,7 @@ export default function NewAnalysis() {
     try {
       // Check authentication
       if (!user) {
-        alert("You must be logged in to run an analysis.");
+        navigate('/Landing');
         setSubmitting(false);
         return;
       }
