@@ -152,7 +152,7 @@ export default function TerritoryLandingMap() {
       )}
       <div className="text-center">
         <a
-          href="/app/Territories"
+          href="/Territories"
           className="inline-flex items-center gap-2 text-sm font-semibold text-[#1A3226] hover:text-[#B8982F] transition-colors"
         >
           Explore available territories →
