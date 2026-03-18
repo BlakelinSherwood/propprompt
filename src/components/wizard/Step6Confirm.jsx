@@ -10,7 +10,7 @@ import {
 
 const LABELS = {
   ai_platform: { claude: "Claude (Anthropic)", chatgpt: "ChatGPT (OpenAI)", gemini: "Gemini (Google)", perplexity: "Perplexity", grok: "Grok (xAI)" },
-  assessment_type: { listing_pricing: "Listing Pricing Analysis", buyer_intelligence: "Buyer Intelligence Report", investment_analysis: "Investment Analysis", cma: "CMA", rental_analysis: "Rental Market Analysis", custom: "Custom Analysis" },
+  assessment_type: { listing_pricing: "Listing Pricing Analysis", buyer_intelligence: "Buyer Intelligence Report", investment_analysis: "Investment Analysis", cma: "CMA", rental_analysis: "Rental Market Analysis", client_portfolio: "Client Portfolio Analysis", custom: "Custom Analysis" },
   client_relationship: { listing_agent: "Listing Agent", buyer_agent: "Buyer's Agent", dual_agent: "Dual Agent / Facilitator", investor_advisor: "Investor Advisor" },
   property_type: { single_family: "Single-Family", condo: "Condo / TH", multi_family: "Multi-Family", land: "Land", commercial: "Commercial" },
   location_class: { urban_core: "Urban Core", inner_suburb: "Inner Suburb", outer_suburb: "Outer Suburb", coastal: "Coastal", rural: "Rural / Estate" },
@@ -82,9 +82,9 @@ export default function Step6Confirm({ intake, update, user, orgMembers, submitt
       {/* Summary Table */}
       <div className="rounded-xl border border-[#1A3226]/10 overflow-hidden mb-5">
         {ROWS.map((row, i) => {
-          const displayValue = row.raw
-            ? intake[row.key]
-            : LABELS[row.key]?.[intake[row.key]];
+           let displayValue = row.raw
+             ? (row.key === "address" ? intake.intake_data?.address : intake[row.key])
+             : LABELS[row.key]?.[intake[row.key]];
           return (
             <div
               key={row.key}
