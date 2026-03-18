@@ -131,9 +131,16 @@ export default function TerritoryLandingMap() {
         className="w-full rounded-2xl overflow-hidden bg-gradient-to-br from-[#1A3226] to-[#2D5A40]"
         style={{ height: "420px", minHeight: "420px" }}
       />
+      {!loading && territories.length === 0 && (
+        <div className="bg-[#FAF8F4] border border-[#1A3226]/10 rounded-xl p-4 text-center">
+          <p className="text-xs text-[#1A3226]/50 mb-2">Territory data loading...</p>
+          <p className="text-sm font-semibold text-[#1A3226]">~5,000+ territories available</p>
+          <p className="text-xs text-[#1A3226]/40 mt-1">ME • NH • VT • MA</p>
+        </div>
+      )}
       <div className="text-center">
         <a
-          href="/territories"
+          href="/app/Territories"
           className="inline-flex items-center gap-2 text-sm font-semibold text-[#1A3226] hover:text-[#B8982F] transition-colors"
         >
           Explore available territories →
