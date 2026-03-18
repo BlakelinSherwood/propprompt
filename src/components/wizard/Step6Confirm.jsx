@@ -28,7 +28,7 @@ const ROWS = [
 ];
 
 function QuotaMeter({ user }) {
-  const isOwner = user?.role === "platform_owner" || user?.role === "admin";
+  const isOwner = user?.role === "platform_owner" || user?.role === "admin" || user?.analyses_limit === null || user?.analyses_limit === Infinity;
   
   if (isOwner) {
     return (
