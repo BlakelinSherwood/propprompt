@@ -96,8 +96,8 @@ export default function Step6Confirm({ intake, update, user, orgMembers, submitt
               </span>
             </div>
           );
-        })
-        <div className={`flex items-center gap-4 px-4 py-3 ${ROWS.length % 2 === 0 ? "bg-[#FAF8F4]/60" : "bg-white"}`}>
+          })}
+          <div className={`flex items-center gap-4 px-4 py-3 ${ROWS.length % 2 === 0 ? "bg-[#FAF8F4]/60" : "bg-white"}`}>
           <span className="text-xs text-[#1A3226]/45 w-32 flex-shrink-0">Drive Sync</span>
           <span className={`text-sm font-medium ${intake.drive_sync ? "text-emerald-600" : "text-[#1A3226]/40"}`}>
             {intake.drive_sync ? "Enabled" : "Disabled"}
