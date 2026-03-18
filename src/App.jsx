@@ -38,6 +38,29 @@ import EasternMA from './pages/admin/territories/EasternMA';
 import DataQuality from './pages/admin/DataQuality';
 import AlertSettings from './pages/AlertSettings';
 
+const ProtectedRoute = ({ element, requiresSubscription = true }) => {
+  const { isAuthenticated, hasActiveSubscription, isLoadingAuth } = useAuth();
+  
+  if (isLoadingAuth) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-[#FAF8F4]">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 rounded-xl bg-[#1A3226] flex items-center justify-center text-[#B8982F] font-bold text-sm">PP</div>
+          <div className="w-8 h-8 border-4 border-[#1A3226]/20 border-t-[#1A3226] rounded-full animate-spin" />
+        </div>
+      </div>
+    );
+  }
+  
+  if (!requiresSubscription) return element;
+  
+  if (!isAuthenticated || !hasActiveSubscription) {
+    return <Navigate to="/Landing" replace />;
+  }
+  
+  return element;
+};
+
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
 
@@ -65,39 +88,39 @@ const AuthenticatedApp = () => {
 
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/home" replace />} />
+      <Route path="/" element={<Navigate to="/Landing" replace />} />
       <Route path="/app" element={<Navigate to="/Dashboard" replace />} />
       <Route path="/app/*" element={<Navigate to="/Dashboard" replace />} />
       <Route element={<Layout />}>
-        <Route path="/Dashboard" element={<Dashboard />} />
-        <Route path="/Members" element={<Members />} />
-        <Route path="/PlatformAdmin" element={<PlatformAdmin />} />
-        <Route path="/NewAnalysis" element={<NewAnalysis />} />
-        <Route path="/Analysis/:id" element={<AnalysisDetail />} />
-        <Route path="/AnalysisRun" element={<AnalysisRun />} />
-        <Route path="/Analyses" element={<Analyses />} />
-        <Route path="/Billing" element={<Billing />} />
-        <Route path="/brokerage/:id/admin" element={<BrokerageAdmin />} />
-        <Route path="/brokerage/:id/branding" element={<BrokerageBranding />} />
-        <Route path="/team/:id/admin" element={<TeamAdmin />} />
-        <Route path="/team/:id/branding" element={<TeamBranding />} />
-        <Route path="/AccountSettings" element={<AccountSettings />} />
-        <Route path="/settings/branding" element={<AgentBranding />} />
-        <Route path="/admin/pricing" element={<PricingAdmin />} />
-        <Route path="/admin/settings" element={<PlatformSettings />} />
-        <Route path="/admin/claims" element={<ClaimsAdmin />} />
-        <Route path="/admin/training" element={<TrainingAdmin />} />
-        <Route path="/admin/data-quality" element={<DataQuality />} />
-        <Route path="/admin/territories/eastern-ma" element={<EasternMA />} />
-        <Route path="/account/alert-settings" element={<AlertSettings />} />
-        <Route path="/training" element={<Training />} />
-        <Route path="/training/:videoId" element={<TrainingVideo />} />
-        <Route path="/Territories" element={<Territories />} />
-        <Route path="/account/topup" element={<TopupPage />} />
-        <Route path="/account/bundle/:bundle_id" element={<BundleManagement />} />
-        <Route path="/account/pool/:pool_id" element={<PoolManagement />} />
-        <Route path="/claim" element={<Claim />} />
-        <Route path="/claim/submitted" element={<ClaimSubmitted />} />
+        <Route path="/Dashboard" element={<ProtectedRoute element={<Dashboard />} />} />
+        <Route path="/Members" element={<ProtectedRoute element={<Members />} />} />
+        <Route path="/PlatformAdmin" element={<ProtectedRoute element={<PlatformAdmin />} />} />
+        <Route path="/NewAnalysis" element={<ProtectedRoute element={<NewAnalysis />} />} />
+        <Route path="/Analysis/:id" element={<ProtectedRoute element={<AnalysisDetail />} />} />
+        <Route path="/AnalysisRun" element={<ProtectedRoute element={<AnalysisRun />} />} />
+        <Route path="/Analyses" element={<ProtectedRoute element={<Analyses />} />} />
+        <Route path="/Billing" element={<ProtectedRoute element={<Billing />} />} />
+        <Route path="/brokerage/:id/admin" element={<ProtectedRoute element={<BrokerageAdmin />} />} />
+        <Route path="/brokerage/:id/branding" element={<ProtectedRoute element={<BrokerageBranding />} />} />
+        <Route path="/team/:id/admin" element={<ProtectedRoute element={<TeamAdmin />} />} />
+        <Route path="/team/:id/branding" element={<ProtectedRoute element={<TeamBranding />} />} />
+        <Route path="/AccountSettings" element={<ProtectedRoute element={<AccountSettings />} />} />
+        <Route path="/settings/branding" element={<ProtectedRoute element={<AgentBranding />} />} />
+        <Route path="/admin/pricing" element={<ProtectedRoute element={<PricingAdmin />} />} />
+        <Route path="/admin/settings" element={<ProtectedRoute element={<PlatformSettings />} />} />
+        <Route path="/admin/claims" element={<ProtectedRoute element={<ClaimsAdmin />} />} />
+        <Route path="/admin/training" element={<ProtectedRoute element={<TrainingAdmin />} />} />
+        <Route path="/admin/data-quality" element={<ProtectedRoute element={<DataQuality />} />} />
+        <Route path="/admin/territories/eastern-ma" element={<ProtectedRoute element={<EasternMA />} />} />
+        <Route path="/account/alert-settings" element={<ProtectedRoute element={<AlertSettings />} />} />
+        <Route path="/training" element={<ProtectedRoute element={<Training />} />} />
+        <Route path="/training/:videoId" element={<ProtectedRoute element={<TrainingVideo />} />} />
+        <Route path="/Territories" element={<ProtectedRoute element={<Territories />} requiresSubscription={false} />} />
+        <Route path="/account/topup" element={<ProtectedRoute element={<TopupPage />} />} />
+        <Route path="/account/bundle/:bundle_id" element={<ProtectedRoute element={<BundleManagement />} />} />
+        <Route path="/account/pool/:pool_id" element={<ProtectedRoute element={<PoolManagement />} />} />
+        <Route path="/claim" element={<ProtectedRoute element={<Claim />} />} />
+        <Route path="/claim/submitted" element={<ProtectedRoute element={<ClaimSubmitted />} />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
