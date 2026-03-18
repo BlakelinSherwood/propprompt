@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.21';
 
 // Returns the active subscription records for a user across all 4 types
 async function getUserSubscriptions(base44, userId) {
@@ -50,10 +50,16 @@ Deno.serve(async (req) => {
 
     // platform_owner is always unlimited
     if (user.role === 'platform_owner') {
-      return Response.json({ allowed: true, unlimited: true });
+      return Response.json({ allowed: true, unlimited: true, analyses_cap: Infinity, analyses_used_this_month: 0 });
     }
 
-    const { user_id } = await req.json();
+    let user_id;
+    try {
+      const body = await req.json();
+      user_id = body.user_id;
+    } catch {
+      // No body or invalid JSON
+    }
     const targetUserId = user_id || user.id;
 
     const [subs, pricing] = await Promise.all([
