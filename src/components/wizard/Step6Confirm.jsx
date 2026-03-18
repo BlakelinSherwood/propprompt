@@ -28,6 +28,22 @@ const ROWS = [
 ];
 
 function QuotaMeter({ user }) {
+  const isOwner = user?.role === "platform_owner";
+  
+  if (isOwner) {
+    return (
+      <div className="rounded-xl border border-[#1A3226]/10 p-4">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-medium text-[#1A3226]/60">Monthly Analysis Quota</span>
+          <span className="text-xs font-semibold text-emerald-600">Unlimited</span>
+        </div>
+        <div className="h-2 bg-emerald-100 rounded-full overflow-hidden">
+          <div className="h-full rounded-full bg-emerald-500" style={{ width: "100%" }} />
+        </div>
+      </div>
+    );
+  }
+
   const used = user?.analyses_run_this_month ?? 0;
   const limit = user?.analyses_limit ?? 10;
   const pct = Math.min((used / limit) * 100, 100);

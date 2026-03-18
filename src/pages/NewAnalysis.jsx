@@ -57,7 +57,7 @@ export default function NewAnalysis() {
   }
 
   function next() {
-    setStep((s) => Math.min(s + 1, 5));
+    setStep((s) => Math.min(s + 1, 6));
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
