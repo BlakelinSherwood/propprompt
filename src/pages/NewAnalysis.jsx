@@ -42,13 +42,6 @@ export default function NewAnalysis() {
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
-  // Guard: redirect if not authenticated
-  useEffect(() => {
-    if (!isLoadingAuth && !user) {
-      navigate('/Landing');
-    }
-  }, [isLoadingAuth, user, navigate]);
-
   useEffect(() => {
     async function load() {
       if (!user) return;
@@ -77,12 +70,6 @@ export default function NewAnalysis() {
   async function handleSubmit() {
     setSubmitting(true);
     try {
-      // Check authentication
-      if (!user) {
-        navigate('/Landing');
-        setSubmitting(false);
-        return;
-      }
       // Validate required fields
       if (!intake.ai_platform) {
         alert("Please select an AI platform.");
