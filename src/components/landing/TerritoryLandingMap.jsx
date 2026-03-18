@@ -36,10 +36,8 @@ export default function TerritoryLandingMap() {
         map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: "mapbox://styles/mapbox/dark-v11",
-      center: [-71.5, 43.8],
-      zoom: 6,
-      pitch: 0,
-      bearing: 0,
+      center: [-71.5, 42.2],
+      zoom: 7.5,
       scrollZoom: false,
       dragPan: false,
       attributionControl: false,
@@ -100,12 +98,12 @@ export default function TerritoryLandingMap() {
         });
       });
 
-        // Fit bounds to ME, NH, VT, MA
+        // Fit bounds to MA (Eastern MA focus)
         const bounds = new mapboxgl.LngLatBounds(
           [-73.5, 41.2],
-          [-66.8, 47.5]
+          [-69.9, 43.0]
         );
-        map.current.fitBounds(bounds, { padding: 40 });
+        map.current.fitBounds(bounds, { padding: 50 });
       });
       } catch (err) {
         console.error("Failed to initialize map:", err);
