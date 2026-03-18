@@ -8,6 +8,7 @@ export default function TerritoryLandingMap() {
   const map = useRef(null);
   const [territories, setTerritories] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [mapFailed, setMapFailed] = useState(false);
 
   // Fetch territories
   useEffect(() => {
@@ -35,6 +36,7 @@ export default function TerritoryLandingMap() {
       try {
         if (!MAPBOX_TOKEN) {
           console.warn("Mapbox token not configured");
+          setMapFailed(true);
           return;
         }
         mapboxgl.accessToken = MAPBOX_TOKEN;
@@ -113,6 +115,7 @@ export default function TerritoryLandingMap() {
       });
       } catch (err) {
         console.error("Failed to initialize map:", err);
+        setMapFailed(true);
       }
     };
 
