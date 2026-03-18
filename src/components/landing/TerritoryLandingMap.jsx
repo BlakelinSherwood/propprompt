@@ -36,8 +36,8 @@ export default function TerritoryLandingMap() {
         map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: "mapbox://styles/mapbox/dark-v11",
-      center: [-71.5, 42.2],
-      zoom: 7.5,
+      center: [-71.8, 43.0],
+      zoom: 6.2,
       scrollZoom: false,
       dragPan: false,
       attributionControl: false,
@@ -98,12 +98,12 @@ export default function TerritoryLandingMap() {
         });
       });
 
-        // Fit bounds to MA (Eastern MA focus)
+        // Fit bounds to show all New England
         const bounds = new mapboxgl.LngLatBounds(
-          [-73.5, 41.2],
-          [-69.9, 43.0]
+          [-73.8, 40.9],
+          [-69.8, 47.5]
         );
-        map.current.fitBounds(bounds, { padding: 50 });
+        map.current.fitBounds(bounds, { padding: 40 });
       });
       } catch (err) {
         console.error("Failed to initialize map:", err);
