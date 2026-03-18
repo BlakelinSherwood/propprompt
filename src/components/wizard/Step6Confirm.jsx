@@ -81,19 +81,22 @@ export default function Step6Confirm({ intake, update, user, orgMembers, submitt
 
       {/* Summary Table */}
       <div className="rounded-xl border border-[#1A3226]/10 overflow-hidden mb-5">
-        {ROWS.map((row, i) => (
-          <div
-            key={row.key}
-            className={`flex items-start gap-4 px-4 py-3 ${i % 2 === 0 ? "bg-[#FAF8F4]/60" : "bg-white"}`}
-          >
-            <span className="text-xs text-[#1A3226]/45 w-32 flex-shrink-0 pt-0.5">{row.label}</span>
-            <span className="text-sm text-[#1A3226] font-medium">
-              {row.raw
-                ? intake[row.key] || <span className="text-[#1A3226]/30 font-normal">—</span>
-                : LABELS[row.key]?.[intake[row.key]] || <span className="text-[#1A3226]/30 font-normal">—</span>}
-            </span>
-          </div>
-        ))}
+        {ROWS.map((row, i) => {
+          const displayValue = row.raw
+            ? intake[row.key]
+            : LABELS[row.key]?.[intake[row.key]];
+          return (
+            <div
+              key={row.key}
+              className={`flex items-start gap-4 px-4 py-3 ${i % 2 === 0 ? "bg-[#FAF8F4]/60" : "bg-white"}`}
+            >
+              <span className="text-xs text-[#1A3226]/45 w-32 flex-shrink-0 pt-0.5">{row.label}</span>
+              <span className="text-sm text-[#1A3226] font-medium">
+                {displayValue || <span className="text-[#1A3226]/30 font-normal">—</span>}
+              </span>
+            </div>
+          );
+        })
         <div className={`flex items-center gap-4 px-4 py-3 ${ROWS.length % 2 === 0 ? "bg-[#FAF8F4]/60" : "bg-white"}`}>
           <span className="text-xs text-[#1A3226]/45 w-32 flex-shrink-0">Drive Sync</span>
           <span className={`text-sm font-medium ${intake.drive_sync ? "text-emerald-600" : "text-[#1A3226]/40"}`}>
