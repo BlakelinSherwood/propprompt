@@ -3,6 +3,7 @@ import {
   ArrowRight, Check, Star, MapPin, Lock, Play,
   ChevronDown, Mail, Shield, Zap, TrendingUp, Home
 } from "lucide-react";
+import { base44 } from "@/api/base44Client";
 import { usePricing } from "@/components/pricing/usePricing";
 import { useFounderProfile } from "@/lib/useFounderProfile";
 import HeroMap from "@/components/landing/HeroMap";
@@ -109,9 +110,9 @@ export default function Landing() {
             <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
             <a href="#how-it-works" className="hover:text-white transition-colors">How It Works</a>
           </nav>
-          <a href="/app/Territories" onClick={(e) => { window.location.href = '/app/Territories'; }} className="text-sm bg-[#B8982F] hover:bg-[#B8982F]/90 text-[#1A3226] font-semibold px-4 py-2 rounded-lg transition-colors cursor-pointer">
-            Sign In
-          </a>
+          <button onClick={() => base44.auth.redirectToLogin()} className="text-sm bg-[#B8982F] hover:bg-[#B8982F]/90 text-[#1A3226] font-semibold px-4 py-2 rounded-lg transition-colors cursor-pointer">
+           Sign In
+          </button>
         </div>
       </header>
 
@@ -406,9 +407,9 @@ export default function Landing() {
             <a href="/app/Territories" className="inline-flex items-center gap-2 bg-[#B8982F] text-[#1A3226] font-bold px-8 py-3.5 rounded-xl hover:bg-[#B8982F]/90 transition-colors">
               Check Territory Availability <ArrowRight className="w-4 h-4" />
             </a>
-            <a href="/app/Dashboard" className="inline-flex items-center gap-2 border border-white/20 text-white font-semibold px-8 py-3.5 rounded-xl hover:border-white/50 transition-colors">
+            <button onClick={() => base44.auth.redirectToLogin()} className="inline-flex items-center gap-2 border border-white/20 text-white font-semibold px-8 py-3.5 rounded-xl hover:border-white/50 transition-colors">
               Sign In
-            </a>
+            </button>
           </div>
         </div>
       </section>
