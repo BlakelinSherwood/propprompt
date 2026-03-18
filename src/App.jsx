@@ -38,7 +38,7 @@ import EasternMA from './pages/admin/territories/EasternMA';
 import DataQuality from './pages/admin/DataQuality';
 import AlertSettings from './pages/AlertSettings';
 
-const ProtectedRoute = ({ element, requiresSubscription = true }) => {
+const ProtectedRoute = ({ element, requiresAuth = true, requiresSubscription = false }) => {
   const { isAuthenticated, hasActiveSubscription, isLoadingAuth } = useAuth();
   
   if (isLoadingAuth) {
@@ -52,10 +52,14 @@ const ProtectedRoute = ({ element, requiresSubscription = true }) => {
     );
   }
   
-  if (!requiresSubscription) return element;
+  if (!requiresAuth) return element;
   
-  if (!isAuthenticated || !hasActiveSubscription) {
+  if (!isAuthenticated) {
     return <Navigate to="/Landing" replace />;
+  }
+  
+  if (requiresSubscription && !hasActiveSubscription) {
+    return <Navigate to="/claim" replace />;
   }
   
   return element;
