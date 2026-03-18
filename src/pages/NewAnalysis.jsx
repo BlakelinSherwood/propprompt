@@ -69,7 +69,44 @@ export default function NewAnalysis() {
   async function handleSubmit() {
     setSubmitting(true);
     try {
-      // Check quota first
+      // Validate required fields
+      if (!intake.ai_platform) {
+        alert("Please select an AI platform.");
+        setSubmitting(false);
+        return;
+      }
+      if (!intake.assessment_type) {
+        alert("Please select an assessment type.");
+        setSubmitting(false);
+        return;
+      }
+      if (!intake.client_relationship) {
+        alert("Please select a client role.");
+        setSubmitting(false);
+        return;
+      }
+      if (!intake.address) {
+        alert("Please enter the property address.");
+        setSubmitting(false);
+        return;
+      }
+      if (!intake.property_type) {
+        alert("Please select a property type.");
+        setSubmitting(false);
+        return;
+      }
+      if (!intake.location_class) {
+        alert("Please select a location class.");
+        setSubmitting(false);
+        return;
+      }
+      if (!intake.output_format) {
+        alert("Please select an output format.");
+        setSubmitting(false);
+        return;
+      }
+
+      // Check quota
       const quotaRes = await base44.functions.invoke("checkAnalysisQuota", {});
       if (!quotaRes.data?.allowed) {
         alert("You've reached your monthly analysis limit. Please upgrade or purchase a top-up pack.");
