@@ -96,9 +96,17 @@ export const AuthProvider = ({ children }) => {
       setUser(currentUser);
       setIsAuthenticated(true);
       
-      // Check if user has an active subscription
-      const subs = await base44.entities.TerritorySubscription.filter({ user_id: currentUser.id, status: 'active' });
-      setHasActiveSubscription(subs && subs.length > 0);
+      // Platform owners (admins) and agents automatically have subscription access
+      const isPlatformOwner = currentUser.role === 'admin';
+      const isAgent = ['agent', 'team_agent', 'team_lead', 'brokerage_admin'].includes(currentUser.role);
+      
+      if (isPlatformOwner || isAgent) {
+        setHasActiveSubscription(true);
+      } else {
+        // Regular users must have an active subscription
+        const subs = await base44.entities.TerritorySubscription.filter({ user_id: currentUser.id, status: 'active' });
+        setHasActiveSubscription(subs && subs.length > 0);
+      }
       
       setIsLoadingAuth(false);
     } catch (error) {
