@@ -59,7 +59,7 @@ const ProtectedRoute = ({ element, requiresAuth = true, requiresSubscription = f
   }
   
   if (requiresSubscription && !hasActiveSubscription) {
-    return <Navigate to="/claim" replace />;
+    return <Navigate to="/Claim" replace />;
   }
   
   return element;
