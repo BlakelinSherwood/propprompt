@@ -138,8 +138,8 @@ export default function HeroMap() {
   }, []);
 
   return (
-    <div className="relative w-full h-full opacity-40 select-none pointer-events-none">
-      <div ref={mapContainer} className="w-full h-full" />
+    <div className="relative w-full h-full opacity-40 select-none">
+      <div ref={mapContainer} className="w-full h-full" style={{ pointerEvents: 'none' }} />
     </div>
   );
 }
