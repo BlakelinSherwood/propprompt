@@ -14,24 +14,28 @@ const PLATFORMS = [
     name: "ChatGPT (OpenAI)",
     description: "Fast, reliable, excellent all-purpose model",
     icon: "✨",
+    comingSoon: true,
   },
   {
     id: "gemini",
     name: "Gemini (Google)",
     description: "Multimodal understanding, strong math & logic",
     icon: "🌟",
+    comingSoon: true,
   },
   {
     id: "perplexity",
     name: "Perplexity AI",
     description: "Research-focused with internet access",
     icon: "🔍",
+    comingSoon: true,
   },
   {
     id: "grok",
     name: "Grok (xAI)",
     description: "Real-time information, edgy analysis",
     icon: "⚡",
+    comingSoon: true,
   },
 ];
 
@@ -53,9 +57,12 @@ export default function Step1Platform({ intake, update, onNext, onBack }) {
         {PLATFORMS.map((platform) => (
           <button
             key={platform.id}
-            onClick={() => update({ ai_platform: platform.id })}
+            onClick={() => !platform.comingSoon && update({ ai_platform: platform.id })}
+            disabled={platform.comingSoon}
             className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
-              intake.ai_platform === platform.id
+              platform.comingSoon
+                ? "border-[#1A3226]/10 bg-[#1A3226]/3 opacity-60 cursor-not-allowed"
+                : intake.ai_platform === platform.id
                 ? "border-[#1A3226] bg-[#1A3226]/5"
                 : "border-[#1A3226]/10 hover:border-[#1A3226]/20 bg-white"
             }`}
@@ -69,6 +76,11 @@ export default function Step1Platform({ intake, update, onNext, onBack }) {
                     {platform.recommended && (
                       <span className="text-xs bg-[#B8982F] text-white px-2 py-0.5 rounded-full">
                         Recommended
+                      </span>
+                    )}
+                    {platform.comingSoon && (
+                      <span className="text-xs bg-[#1A3226]/20 text-[#1A3226] px-2 py-0.5 rounded-full">
+                        Coming Soon
                       </span>
                     )}
                   </div>
