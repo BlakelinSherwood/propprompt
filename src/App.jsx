@@ -96,7 +96,7 @@ const AuthenticatedApp = () => {
       <Route path="/app" element={<Navigate to="/Dashboard" replace />} />
       <Route path="/app/*" element={<Navigate to="/Dashboard" replace />} />
       <Route element={<Layout />}>
-        <Route path="/Dashboard" element={<ProtectedRoute element={<Dashboard />} requiresAuth={true} />} />
+        <Route path="/Dashboard" element={<ProtectedRoute element={<Dashboard />} requiresAuth={true} requiresSubscription={false} />} />
         <Route path="/Members" element={<ProtectedRoute element={<Members />} requiresAuth={true} requiresSubscription={true} />} />
         <Route path="/PlatformAdmin" element={<ProtectedRoute element={<PlatformAdmin />} requiresAuth={true} />} />
         <Route path="/NewAnalysis" element={<ProtectedRoute element={<NewAnalysis />} requiresAuth={true} requiresSubscription={true} />} />
