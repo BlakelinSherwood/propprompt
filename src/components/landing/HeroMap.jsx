@@ -2,7 +2,10 @@ import { useEffect, useRef } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 
-mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
+if (MAPBOX_TOKEN) {
+  mapboxgl.accessToken = MAPBOX_TOKEN;
+}
 
 export default function HeroMap() {
   const mapContainer = useRef(null);
@@ -11,11 +14,12 @@ export default function HeroMap() {
   useEffect(() => {
     if (map.current) return;
 
-    // Fetch token from backend
     const initMap = async () => {
       try {
-        const { data } = await base44.functions.invoke('getMapboxToken', {});
-        mapboxgl.accessToken = data.token;
+        if (!MAPBOX_TOKEN) {
+          console.warn("Mapbox token not configured");
+          return;
+        }
 
         map.current = new mapboxgl.Map({
           container: mapContainer.current,
