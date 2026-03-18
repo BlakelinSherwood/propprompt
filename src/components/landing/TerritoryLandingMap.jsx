@@ -33,13 +33,21 @@ export default function TerritoryLandingMap() {
 
     const initMap = async () => {
       try {
-        const { data } = await base44.functions.invoke('getMapboxToken', {});
-        if (!data?.token) {
-          console.warn("Mapbox token not available");
+        let token;
+        try {
+          const { data } = await base44.functions.invoke('getMapboxToken', {});
+          token = data?.token;
+        } catch (tokenError) {
+          console.warn("Could not fetch Mapbox token from function", tokenError);
           setMapFailed(true);
           return;
         }
-        mapboxgl.accessToken = data.token;
+
+        if (!token) {
+          setMapFailed(true);
+          return;
+        }
+        mapboxgl.accessToken = token;
 
         map.current = new mapboxgl.Map({
           container: mapContainer.current,
@@ -129,27 +137,24 @@ export default function TerritoryLandingMap() {
 
   return (
     <div className="space-y-4">
-      {mapFailed ? (
-        <div className="w-full rounded-2xl overflow-hidden bg-gradient-to-br from-[#1A3226] to-[#2D5A40] flex items-center justify-center" style={{ height: "420px", minHeight: "420px" }}>
+      <div
+        ref={mapContainer}
+        className="w-full rounded-2xl overflow-hidden bg-gradient-to-br from-[#1A3226] to-[#2D5A40] flex items-center justify-center"
+        style={{ height: "420px", minHeight: "420px" }}
+      >
+        {loading && (
+          <div className="text-center">
+            <div className="w-8 h-8 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-2" />
+            <p className="text-sm text-white/60">Loading territories...</p>
+          </div>
+        )}
+        {mapFailed && !loading && (
           <div className="text-center">
             <p className="text-sm text-white/70 mb-2">Map unavailable</p>
-            <p className="text-xs text-white/50">Mapbox not configured</p>
+            <p className="text-xs text-white/50">Explore territories list below</p>
           </div>
-        </div>
-      ) : (
-        <div
-          ref={mapContainer}
-          className="w-full rounded-2xl overflow-hidden bg-gradient-to-br from-[#1A3226] to-[#2D5A40]"
-          style={{ height: "420px", minHeight: "420px" }}
-        />
-      )}
-      {!loading && territories.length === 0 && (
-        <div className="bg-[#FAF8F4] border border-[#1A3226]/10 rounded-xl p-4 text-center">
-          <p className="text-xs text-[#1A3226]/50 mb-2">Territory data loading...</p>
-          <p className="text-sm font-semibold text-[#1A3226]">~5,000+ territories available</p>
-          <p className="text-xs text-[#1A3226]/40 mt-1">ME • NH • VT • MA</p>
-        </div>
-      )}
+        )}
+      </div>
       <div className="text-center">
         <a
           href="/Territories"
