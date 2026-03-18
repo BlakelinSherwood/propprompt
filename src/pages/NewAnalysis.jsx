@@ -34,12 +34,20 @@ const INITIAL_INTAKE = {
 };
 
 export default function NewAnalysis() {
-  const { user } = useAuth();
+  const { user, isLoadingAuth } = useAuth();
   const [step, setStep] = useState(1);
   const [intake, setIntake] = useState(INITIAL_INTAKE);
   const [orgMembers, setOrgMembers] = useState([]);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
   const navigate = useNavigate();
+
+  // Guard: redirect if not authenticated
+  useEffect(() => {
+    if (!isLoadingAuth && !user) {
+      navigate('/Landing');
+    }
+  }, [isLoadingAuth, user, navigate]);
 
   useEffect(() => {
     async function load() {
@@ -144,13 +152,21 @@ export default function NewAnalysis() {
       navigate(`/AnalysisRun?id=${analysis.id}`);
     } catch (err) {
       console.error("Failed to create analysis:", err);
-      const msg = err?.response?.data?.message || err?.message || 'Failed to create analysis';
+      const msg = err?.response?.data?.message || err?.message || 'Unable to create analysis. Please check your connection and try again.';
       alert(msg);
       setSubmitting(false);
     }
   }
 
   const stepProps = { intake, update, user, onNext: next, onBack: back };
+
+  if (isLoadingAuth) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-4 border-[#1A3226]/20 border-t-[#1A3226] rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
