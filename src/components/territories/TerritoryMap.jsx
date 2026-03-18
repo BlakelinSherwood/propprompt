@@ -45,8 +45,17 @@ export default function TerritoryMap({
 
     const initMap = async () => {
       try {
-        const { data } = await base44.functions.invoke('getMapboxToken', {});
-        mapboxgl.accessToken = data.token;
+        let token;
+        try {
+          const { data } = await base44.functions.invoke('getMapboxToken', {});
+          token = data?.token;
+        } catch (tokenError) {
+          console.warn("Could not fetch Mapbox token from function", tokenError);
+          return;
+        }
+
+        if (!token) return;
+        mapboxgl.accessToken = token;
 
         map.current = new mapboxgl.Map({
           container: mapContainer.current,
@@ -128,7 +137,7 @@ export default function TerritoryMap({
 
       markersRef.current.push(marker);
     });
-  }, [territories, pricing]);
+  }, [territories, pricing, stateMap, countyMap]);
 
   // Fly to selected territory
   useEffect(() => {
