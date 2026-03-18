@@ -250,7 +250,7 @@ export default function Landing() {
       </section>
 
       {/* Pricing Section */}
-      {!pricingLoading && <PricingSection pricing={pricing} />}
+      <PricingSection pricing={pricing} />
 
       {/* Training Teaser */}
       <section className="bg-[#1A3226] text-white py-20">
