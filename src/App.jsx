@@ -123,8 +123,7 @@ const AuthenticatedApp = () => {
         <Route path="/account/topup" element={<ProtectedRoute element={<TopupPage />} requiresAuth={true} requiresSubscription={true} />} />
         <Route path="/account/bundle/:bundle_id" element={<ProtectedRoute element={<BundleManagement />} requiresAuth={true} requiresSubscription={true} />} />
         <Route path="/account/pool/:pool_id" element={<ProtectedRoute element={<PoolManagement />} requiresAuth={true} requiresSubscription={true} />} />
-        <Route path="/claim" element={<ProtectedRoute element={<Claim />} requiresAuth={true} />} />
-        <Route path="/claim/submitted" element={<ProtectedRoute element={<ClaimSubmitted />} requiresAuth={true} />} />
+        <Route path="/Claim" element={<ProtectedRoute element={<Claim />} requiresAuth={true} requiresSubscription={false} />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
