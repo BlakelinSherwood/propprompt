@@ -1,11 +1,10 @@
 import { useEffect, useRef } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
+import { base44 } from "@/api/base44Client";
 import TerritoryLegend from "./TerritoryLegend";
 import TerritoryPopupContent from "./TerritoryPopupContent";
 import { createRoot } from "react-dom/client";
-
-mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
 function getColor(t) {
   if (t.status === "coming_soon") return "#94a3b8";
