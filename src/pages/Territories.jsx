@@ -28,9 +28,9 @@ export default function Territories() {
     async function load() {
       try {
         const [terrs, sts, cnts, pricingRes] = await Promise.all([
-          base44.entities.Territory.list(),
-          base44.entities.State.list(),
-          base44.entities.County.list(),
+          base44.entities.Territory.list('', 5000),
+          base44.entities.State.list('', 100),
+          base44.entities.County.list('', 500),
           base44.functions.invoke("getPricingConfig", {}),
         ]);
         setTerritories(terrs);
