@@ -83,7 +83,7 @@ export default function Step6Confirm({ intake, update, user, orgMembers, submitt
       <div className="rounded-xl border border-[#1A3226]/10 overflow-hidden mb-5">
         {ROWS.map((row, i) => {
            let displayValue = row.raw
-             ? (row.key === "address" ? intake.intake_data?.address : intake[row.key])
+             ? intake[row.key]
              : LABELS[row.key]?.[intake[row.key]];
           return (
             <div
