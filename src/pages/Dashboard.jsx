@@ -31,7 +31,7 @@ export default function Dashboard() {
         const isAdmin = user.role === "platform_owner" || user.role === "brokerage_admin" || user.role === "team_lead";
         if (isAdmin) {
           const [users, analyses] = await Promise.all([
-            base44.entities.User.list(),
+            base44.entities.User.list('', 500),
             base44.entities.Analysis.list("-created_date", 200),
           ]);
           setUserCount(users.length);
