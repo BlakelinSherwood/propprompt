@@ -27,16 +27,23 @@ export default function Territories() {
   useEffect(() => {
     async function load() {
       try {
-        const [terrs, sts, cnts, pricingRes] = await Promise.all([
+        const [terrs, sts, cnts] = await Promise.all([
           base44.entities.Territory.list('', 5000),
           base44.entities.State.list('', 100),
           base44.entities.County.list('', 500),
-          base44.functions.invoke("getPricingConfig", {}),
         ]);
         setTerritories(terrs);
         setStates(sts);
         setCounties(cnts);
-        setPricing(pricingRes.data || {});
+        
+        // Load pricing separately with error handling
+        try {
+          const pricingRes = await base44.functions.invoke("getPricingConfig", {});
+          setPricing(pricingRes.data || {});
+        } catch (pricingError) {
+          console.warn("Could not load pricing config:", pricingError);
+          setPricing({});
+        }
       } catch (error) {
         console.error("Failed to load territories data:", error);
       } finally {
