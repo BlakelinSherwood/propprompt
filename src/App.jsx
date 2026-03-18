@@ -96,35 +96,35 @@ const AuthenticatedApp = () => {
       <Route path="/app" element={<Navigate to="/Dashboard" replace />} />
       <Route path="/app/*" element={<Navigate to="/Dashboard" replace />} />
       <Route element={<Layout />}>
-        <Route path="/Dashboard" element={<ProtectedRoute element={<Dashboard />} />} />
-        <Route path="/Members" element={<ProtectedRoute element={<Members />} />} />
-        <Route path="/PlatformAdmin" element={<ProtectedRoute element={<PlatformAdmin />} />} />
-        <Route path="/NewAnalysis" element={<ProtectedRoute element={<NewAnalysis />} />} />
-        <Route path="/Analysis/:id" element={<ProtectedRoute element={<AnalysisDetail />} />} />
-        <Route path="/AnalysisRun" element={<ProtectedRoute element={<AnalysisRun />} />} />
-        <Route path="/Analyses" element={<ProtectedRoute element={<Analyses />} />} />
-        <Route path="/Billing" element={<ProtectedRoute element={<Billing />} />} />
-        <Route path="/brokerage/:id/admin" element={<ProtectedRoute element={<BrokerageAdmin />} />} />
-        <Route path="/brokerage/:id/branding" element={<ProtectedRoute element={<BrokerageBranding />} />} />
-        <Route path="/team/:id/admin" element={<ProtectedRoute element={<TeamAdmin />} />} />
-        <Route path="/team/:id/branding" element={<ProtectedRoute element={<TeamBranding />} />} />
-        <Route path="/AccountSettings" element={<ProtectedRoute element={<AccountSettings />} />} />
-        <Route path="/settings/branding" element={<ProtectedRoute element={<AgentBranding />} />} />
-        <Route path="/admin/pricing" element={<ProtectedRoute element={<PricingAdmin />} />} />
-        <Route path="/admin/settings" element={<ProtectedRoute element={<PlatformSettings />} />} />
-        <Route path="/admin/claims" element={<ProtectedRoute element={<ClaimsAdmin />} />} />
-        <Route path="/admin/training" element={<ProtectedRoute element={<TrainingAdmin />} />} />
-        <Route path="/admin/data-quality" element={<ProtectedRoute element={<DataQuality />} />} />
-        <Route path="/admin/territories/eastern-ma" element={<ProtectedRoute element={<EasternMA />} />} />
-        <Route path="/account/alert-settings" element={<ProtectedRoute element={<AlertSettings />} />} />
-        <Route path="/training" element={<ProtectedRoute element={<Training />} />} />
-        <Route path="/training/:videoId" element={<ProtectedRoute element={<TrainingVideo />} />} />
-        <Route path="/Territories" element={<ProtectedRoute element={<Territories />} requiresSubscription={false} />} />
-        <Route path="/account/topup" element={<ProtectedRoute element={<TopupPage />} />} />
-        <Route path="/account/bundle/:bundle_id" element={<ProtectedRoute element={<BundleManagement />} />} />
-        <Route path="/account/pool/:pool_id" element={<ProtectedRoute element={<PoolManagement />} />} />
-        <Route path="/claim" element={<ProtectedRoute element={<Claim />} />} />
-        <Route path="/claim/submitted" element={<ProtectedRoute element={<ClaimSubmitted />} />} />
+        <Route path="/Dashboard" element={<ProtectedRoute element={<Dashboard />} requiresAuth={true} />} />
+        <Route path="/Members" element={<ProtectedRoute element={<Members />} requiresAuth={true} requiresSubscription={true} />} />
+        <Route path="/PlatformAdmin" element={<ProtectedRoute element={<PlatformAdmin />} requiresAuth={true} />} />
+        <Route path="/NewAnalysis" element={<ProtectedRoute element={<NewAnalysis />} requiresAuth={true} requiresSubscription={true} />} />
+        <Route path="/Analysis/:id" element={<ProtectedRoute element={<AnalysisDetail />} requiresAuth={true} requiresSubscription={true} />} />
+        <Route path="/AnalysisRun" element={<ProtectedRoute element={<AnalysisRun />} requiresAuth={true} requiresSubscription={true} />} />
+        <Route path="/Analyses" element={<ProtectedRoute element={<Analyses />} requiresAuth={true} requiresSubscription={true} />} />
+        <Route path="/Billing" element={<ProtectedRoute element={<Billing />} requiresAuth={true} />} />
+        <Route path="/brokerage/:id/admin" element={<ProtectedRoute element={<BrokerageAdmin />} requiresAuth={true} />} />
+        <Route path="/brokerage/:id/branding" element={<ProtectedRoute element={<BrokerageBranding />} requiresAuth={true} />} />
+        <Route path="/team/:id/admin" element={<ProtectedRoute element={<TeamAdmin />} requiresAuth={true} />} />
+        <Route path="/team/:id/branding" element={<ProtectedRoute element={<TeamBranding />} requiresAuth={true} />} />
+        <Route path="/AccountSettings" element={<ProtectedRoute element={<AccountSettings />} requiresAuth={true} />} />
+        <Route path="/settings/branding" element={<ProtectedRoute element={<AgentBranding />} requiresAuth={true} />} />
+        <Route path="/admin/pricing" element={<ProtectedRoute element={<PricingAdmin />} requiresAuth={true} />} />
+        <Route path="/admin/settings" element={<ProtectedRoute element={<PlatformSettings />} requiresAuth={true} />} />
+        <Route path="/admin/claims" element={<ProtectedRoute element={<ClaimsAdmin />} requiresAuth={true} />} />
+        <Route path="/admin/training" element={<ProtectedRoute element={<TrainingAdmin />} requiresAuth={true} />} />
+        <Route path="/admin/data-quality" element={<ProtectedRoute element={<DataQuality />} requiresAuth={true} />} />
+        <Route path="/admin/territories/eastern-ma" element={<ProtectedRoute element={<EasternMA />} requiresAuth={true} />} />
+        <Route path="/account/alert-settings" element={<ProtectedRoute element={<AlertSettings />} requiresAuth={true} />} />
+        <Route path="/training" element={<ProtectedRoute element={<Training />} requiresAuth={true} />} />
+        <Route path="/training/:videoId" element={<ProtectedRoute element={<TrainingVideo />} requiresAuth={true} />} />
+        <Route path="/Territories" element={<ProtectedRoute element={<Territories />} requiresAuth={false} />} />
+        <Route path="/account/topup" element={<ProtectedRoute element={<TopupPage />} requiresAuth={true} requiresSubscription={true} />} />
+        <Route path="/account/bundle/:bundle_id" element={<ProtectedRoute element={<BundleManagement />} requiresAuth={true} requiresSubscription={true} />} />
+        <Route path="/account/pool/:pool_id" element={<ProtectedRoute element={<PoolManagement />} requiresAuth={true} requiresSubscription={true} />} />
+        <Route path="/claim" element={<ProtectedRoute element={<Claim />} requiresAuth={true} />} />
+        <Route path="/claim/submitted" element={<ProtectedRoute element={<ClaimSubmitted />} requiresAuth={true} />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
