@@ -16,9 +16,11 @@ export default function TerritoryLandingMap() {
         const result = await base44.entities.Territory.list();
         setTerritories(result || []);
       } catch (err) {
-        console.error("Failed to load territories:", err);
+        console.warn("Territory data unavailable, showing map without markers:", err);
+        setTerritories([]);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     loadTerritories();
   }, []);
@@ -28,10 +30,14 @@ export default function TerritoryLandingMap() {
     if (loading || !mapContainer.current) return;
     if (map.current) return;
 
+    const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
     const initMap = async () => {
       try {
-        const { data } = await base44.functions.invoke('getMapboxToken', {});
-        mapboxgl.accessToken = data.token;
+        if (!MAPBOX_TOKEN) {
+          console.warn("Mapbox token not configured");
+          return;
+        }
+        mapboxgl.accessToken = MAPBOX_TOKEN;
 
         map.current = new mapboxgl.Map({
       container: mapContainer.current,
