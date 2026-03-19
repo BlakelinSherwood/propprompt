@@ -139,8 +139,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const navigateToLogin = () => {
-    // Redirect to Dashboard after login — use relative path for published app
-    base44.auth.redirectToLogin('/Dashboard');
+    base44.auth.redirectToLogin(window.location.origin + '/Dashboard');
   };
 
   return (
