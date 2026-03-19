@@ -120,10 +120,6 @@ export default function Landing() {
       <section className="relative bg-[#1A3226] text-white overflow-hidden min-h-[580px] flex items-center">
         {/* Background glow */}
         <div className="absolute inset-0 opacity-20" style={{ backgroundImage: "radial-gradient(ellipse at 80% 50%, #B8982F 0%, transparent 55%)" }} />
-        {/* Animated map (right half) */}
-        <div className="absolute right-0 top-0 bottom-0 w-1/2 hidden lg:block">
-          <HeroMap />
-        </div>
 
         <div className="relative max-w-6xl mx-auto px-6 py-24 lg:py-32 w-full">
           <div className="max-w-2xl">
