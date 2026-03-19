@@ -22,23 +22,31 @@ export const AuthProvider = ({ children }) => {
       setUser(currentUser);
       setIsAuthenticated(true);
 
-      // Admins and known agent roles always get subscription access
+      // Admins and known agent roles always have full access — no subscription check needed
       const privilegedRoles = ['admin', 'agent', 'team_agent', 'team_lead', 'brokerage_admin'];
       if (privilegedRoles.includes(currentUser.role)) {
         setHasActiveSubscription(true);
-      } else {
+        setIsLoadingAuth(false);
+        return;
+      }
+
+      // Regular users: check for an active territory subscription
+      try {
         const subs = await base44.entities.TerritorySubscription.filter({
           user_id: currentUser.id,
           status: 'active',
         });
         setHasActiveSubscription(subs && subs.length > 0);
+      } catch {
+        // Subscription check failed — don't log the user out, just assume no sub
+        setHasActiveSubscription(false);
       }
     } catch (error) {
       // user_not_registered is a special platform error
       if (error?.data?.extra_data?.reason === 'user_not_registered') {
         setAuthError({ type: 'user_not_registered' });
       }
-      // All other errors just mean "not logged in" — fine for a public app
+      // All other errors mean not logged in — fine for a public app
       setIsAuthenticated(false);
       setUser(null);
       setHasActiveSubscription(false);
