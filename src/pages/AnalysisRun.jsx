@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
-import { appParams } from "@/lib/app-params";
 import ReactMarkdown from "react-markdown";
 import { Button } from "@/components/ui/button";
 import { Copy, Download, Mail, CheckCircle, AlertCircle, Loader2, ArrowLeft, Cloud, Database, Presentation, Send } from "lucide-react";
@@ -44,114 +43,73 @@ export default function AnalysisRun() {
   const outputRef = useRef(null);
   const hasStarted = useRef(false);
 
+  // Simulate typing effect from full text
+  function simulateTyping(fullText) {
+    const chunkSize = 12;
+    let pos = 0;
+    setOutput("");
+    const interval = setInterval(() => {
+      if (pos >= fullText.length) {
+        clearInterval(interval);
+        setStatus("complete");
+        return;
+      }
+      const chunk = fullText.slice(pos, pos + chunkSize);
+      pos += chunkSize;
+      setOutput(prev => prev + chunk);
+      if (outputRef.current) {
+        outputRef.current.scrollTop = outputRef.current.scrollHeight;
+      }
+    }, 16);
+  }
+
   useEffect(() => {
     if (!analysisId || hasStarted.current) return;
     hasStarted.current = true;
-    const abortController = new AbortController();
 
-    async function loadAndStream() {
+    async function loadAndRun() {
       // Load analysis metadata
       const records = await base44.entities.Analysis.filter({ id: analysisId });
       const rec = records[0];
       if (!rec) { setStatus("error"); setErrorMsg("Analysis not found."); return; }
       setAnalysis(rec);
 
-      // If already complete, show stored output
+      // If already complete, show stored output with typing effect
       if (rec.status === "complete" && rec.output_text) {
-        setOutput(rec.output_text);
-        setStatus("complete");
+        setStatus("streaming");
+        simulateTyping(rec.output_text);
         return;
       }
 
-      // Load CRM connections for this user
+      // Load CRM connections
       const me = await base44.auth.me().catch(() => null);
       if (me) {
         base44.entities.CrmConnection.filter({ user_email: me.email, status: "connected" })
           .then(setCrmConnections).catch(() => {});
       }
-      // Check if analysis already has drive sync
       if (rec.drive_url) setDriveUrl(rec.drive_url);
       if (rec.crm_push_status === "pushed") setCrmPushed(true);
 
       setStatus("streaming");
 
-      // Build the function URL from appParams (SSE requires raw fetch, not SDK invoke)
-      const baseUrl = appParams.appBaseUrl || "";
-      const appId = appParams.appId || "";
-      const token = appParams.token || "";
+      // Call generateAnalysis via SDK (proper auth handled automatically)
+      const res = await base44.functions.invoke("generateAnalysis", { analysisId, orgId });
 
-      // Route to correct stream handler based on ai_platform
-      const PLATFORM_FUNCTIONS = {
-        claude:     "claudeStream",
-        chatgpt:    "chatgptStream",
-        gemini:     "geminiStream",
-        perplexity: "perplexityStream",
-        grok:       "grokStream",
-      };
-      const fnName = PLATFORM_FUNCTIONS[rec.ai_platform] || "claudeStream";
-      const fnUrl = `${baseUrl}/api/v1/apps/${appId}/functions/${fnName}`;
-
-      const response = await fetch(fnUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({ analysisId, orgId }),
-        signal: abortController.signal,
-      });
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({ error: "Request failed" }));
-        setErrorMsg(err.error || "Stream failed");
+      if (!res.data?.output) {
+        const errMsg = res.data?.error || "Analysis generation failed";
+        setErrorMsg(errMsg);
         setStatus("error");
         return;
       }
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop();
-
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            try {
-              const payload = JSON.parse(line.slice(6));
-              if (payload.token) {
-                setOutput(prev => prev + payload.token);
-                // Auto-scroll
-                if (outputRef.current) {
-                  outputRef.current.scrollTop = outputRef.current.scrollHeight;
-                }
-              }
-              if (payload.done) {
-                setStatus("complete");
-                setKeySource(payload.keySource);
-              }
-              if (payload.error) {
-                setErrorMsg(payload.error);
-                setStatus("error");
-              }
-            } catch (_) {}
-          }
-        }
-      }
+      setKeySource(res.data.keySource);
+      simulateTyping(res.data.output);
     }
 
-    loadAndStream().catch(err => {
-      if (err.name === 'AbortError') return;
-      setErrorMsg(err.message);
+    loadAndRun().catch(err => {
+      setErrorMsg(err.message || "Unexpected error");
       setStatus("error");
     });
-
-    return () => abortController.abort();
   }, [analysisId]);
 
 
