@@ -48,10 +48,9 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    // platform_owner is always unlimited
-    if (user.role === 'platform_owner') {
-      return Response.json({ allowed: true, unlimited: true, analyses_cap: Infinity, analyses_used_this_month: 0 });
-    }
+    // admin and platform_owner always get unlimited access
+    const UNLIMITED_ROLES = ['platform_owner', 'admin'];
+    if (UNLIMITED_ROLES.includes(user.role)) {
 
     let user_id;
     try {
