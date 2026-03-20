@@ -50,6 +50,7 @@ function substituteTokens(template, analysis) {
 
 function buildBaselinePrompt(analysis) {
   const d = analysis.intake_data || {};
+  const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
   return `You are PropPrompt™, an elite AI real estate analyst for Eastern Massachusetts.
 
 ASSESSMENT TYPE: ${analysis.assessment_type?.replace(/_/g, " ").toUpperCase()}
