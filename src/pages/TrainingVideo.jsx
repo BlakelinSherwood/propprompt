@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useParams, Link } from 'react-router-dom';
-import { CheckCircle, ChevronDown, ArrowRight, ArrowLeft } from 'lucide-react';
+import { CheckCircle, ChevronDown, ArrowRight, ArrowLeft, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 function formatDuration(s) {
