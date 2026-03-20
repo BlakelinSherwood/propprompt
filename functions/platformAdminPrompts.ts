@@ -58,8 +58,8 @@ async function resolvePromptText(base44, rawText) {
 async function uploadPromptAsFile(base44, plainText) {
   const encrypted = "ENC:" + await encryptText(plainText);
   const bytes = new TextEncoder().encode(encrypted);
-  const blob = new Blob([bytes], { type: "text/plain" });
-  const { file_uri } = await base44.asServiceRole.integrations.Core.UploadPrivateFile({ file: blob });
+  const file = new File([bytes], "prompt.enc", { type: "text/plain" });
+  const { file_uri } = await base44.asServiceRole.integrations.Core.UploadPrivateFile({ file: file });
   return "FILE:" + file_uri;
 }
 
