@@ -23,7 +23,7 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(true);
 
       // Admins and known agent roles always have full access — no subscription check needed
-      const privilegedRoles = ['admin', 'agent', 'team_agent', 'team_lead', 'brokerage_admin'];
+      const privilegedRoles = ['admin', 'platform_owner', 'agent', 'team_agent', 'team_lead', 'brokerage_admin'];
       if (privilegedRoles.includes(currentUser.role)) {
         setHasActiveSubscription(true);
         setIsLoadingAuth(false);
