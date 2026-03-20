@@ -12,6 +12,7 @@ const ANTHROPIC_MODELS = {
 
 async function callClaude(apiKey, prompt, keySource) {
   const model = keySource === "agent" ? ANTHROPIC_MODELS.agent : ANTHROPIC_MODELS.default;
+  const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -23,7 +24,7 @@ async function callClaude(apiKey, prompt, keySource) {
       model,
       max_tokens: 4096,
       messages: [{ role: "user", content: prompt }],
-      system: "You are PropPrompt™, an elite real estate AI analyst serving New England brokerages. Provide thorough, data-driven analysis with professional narrative quality. Use markdown formatting.",
+      system: `You are PropPrompt™, an elite real estate AI analyst serving New England brokerages. Today's date is ${today}. All market analysis, pricing, and trends should reflect current conditions as of this date. Provide thorough, data-driven analysis with professional narrative quality. Use markdown formatting.`,
     }),
   });
   if (!res.ok) {
@@ -35,6 +36,7 @@ async function callClaude(apiKey, prompt, keySource) {
 }
 
 async function callOpenAI(apiKey, prompt) {
+  const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -45,7 +47,7 @@ async function callOpenAI(apiKey, prompt) {
       model: "gpt-4o",
       max_tokens: 4096,
       messages: [
-        { role: "system", content: "You are PropPrompt™, an elite real estate AI analyst serving New England brokerages. Provide thorough, data-driven analysis with professional narrative quality. Use markdown formatting." },
+        { role: "system", content: `You are PropPrompt™, an elite real estate AI analyst serving New England brokerages. Today's date is ${today}. All market analysis, pricing, and trends should reflect current conditions as of this date. Provide thorough, data-driven analysis with professional narrative quality. Use markdown formatting.` },
         { role: "user", content: prompt }
       ],
     }),
@@ -60,13 +62,14 @@ async function callOpenAI(apiKey, prompt) {
 
 async function callGemini(apiKey, prompt) {
   const model = "gemini-2.0-flash";
+  const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: { maxOutputTokens: 4096 },
-      systemInstruction: { parts: [{ text: "You are PropPrompt™, an elite real estate AI analyst serving New England brokerages. Provide thorough, data-driven analysis with professional narrative quality. Use markdown formatting." }] },
+      systemInstruction: { parts: [{ text: `You are PropPrompt™, an elite real estate AI analyst serving New England brokerages. Today's date is ${today}. All market analysis, pricing, and trends should reflect current conditions as of this date. Provide thorough, data-driven analysis with professional narrative quality. Use markdown formatting.` }] },
     }),
   });
   if (!res.ok) {
