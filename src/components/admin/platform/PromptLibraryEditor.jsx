@@ -154,7 +154,7 @@ export default function PromptLibraryEditor() {
               <Eye className="w-3.5 h-3.5" /> Prompt Text (decrypted for editing — will be re-encrypted on save)
             </label>
             <textarea
-              className="w-full h-64 rounded-lg border border-[#1A3226]/15 bg-white p-3 text-xs font-mono text-[#1A3226]/80 resize-y focus:outline-none focus:ring-2 focus:ring-[#1A3226]/20"
+              className="w-full h-[32rem] rounded-lg border border-[#1A3226]/15 bg-white p-3 text-xs font-mono text-[#1A3226]/80 resize-y focus:outline-none focus:ring-2 focus:ring-[#1A3226]/20"
               value={form.prompt_text}
               onChange={(e) => setForm({ ...form, prompt_text: e.target.value })}
               placeholder="Enter prompt text with [PLACEHOLDER] tokens…"
@@ -197,7 +197,7 @@ export default function PromptLibraryEditor() {
             </div>
             {expanded === p.id && (
               <div className="border-t border-[#1A3226]/8 px-4 py-3 bg-[#1A3226]/[0.02]">
-                <pre className="text-xs font-mono text-[#1A3226]/70 whitespace-pre-wrap leading-relaxed max-h-64 overflow-y-auto">
+                <pre className="text-xs font-mono text-[#1A3226]/70 whitespace-pre-wrap leading-relaxed max-h-96 overflow-y-auto">
                   {p.prompt_text || "(empty)"}
                 </pre>
                 {p.notes && <p className="text-xs text-[#1A3226]/40 mt-2 italic">Note: {p.notes}</p>}
