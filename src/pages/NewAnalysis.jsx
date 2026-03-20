@@ -118,15 +118,12 @@ export default function NewAnalysis() {
       } catch (quotaErr) {
         console.warn("Quota check failed, proceeding anyway:", quotaErr);
       }
-      const analysis = await base44.entities.Analysis.create({
+      const analysisData = {
         run_by_email: user.email,
-        on_behalf_of_email: intake.on_behalf_of_email || null,
-        org_id: user.org_id || null,
         assessment_type: intake.assessment_type,
         property_type: intake.property_type,
         location_class: intake.location_class,
         ai_platform: intake.ai_platform,
-        ai_model: intake.ai_model || null,
         output_format: intake.output_format,
         status: "draft",
         intake_data: {
@@ -135,7 +132,11 @@ export default function NewAnalysis() {
           drive_sync: intake.drive_sync,
         },
         drive_sync_status: intake.drive_sync ? "pending" : "not_synced",
-      });
+      };
+      if (intake.on_behalf_of_email) analysisData.on_behalf_of_email = intake.on_behalf_of_email;
+      if (user.org_id) analysisData.org_id = user.org_id;
+      if (intake.ai_model) analysisData.ai_model = intake.ai_model;
+      const analysis = await base44.entities.Analysis.create(analysisData);
       navigate(`/AnalysisRun?id=${analysis.id}`);
     } catch (err) {
       console.error("Failed to create analysis:", err);
