@@ -129,6 +129,12 @@ Deno.serve(async (req) => {
     }
 
     let promptText = match.prompt_text || "";
+    if (promptText.startsWith("FILE:")) {
+      const fileUri = promptText.slice(5);
+      const { signed_url } = await base44.asServiceRole.integrations.Core.CreateFileSignedUrl({ file_uri: fileUri, expires_in: 120 });
+      const fileRes = await fetch(signed_url);
+      promptText = await fileRes.text();
+    }
     if (promptText.startsWith("ENC:")) {
       promptText = await decryptText(promptText.slice(4));
     }
