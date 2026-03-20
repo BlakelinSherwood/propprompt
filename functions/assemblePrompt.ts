@@ -51,7 +51,7 @@ function substituteTokens(template, analysis) {
 function buildBaselinePrompt(analysis) {
   const d = analysis.intake_data || {};
   const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-  return `You are PropPrompt™, an elite AI real estate analyst for Eastern Massachusetts.
+  return `You are PropPrompt™, an elite AI real estate analyst for Eastern Massachusetts. Today's date is ${today}. All market data, pricing trends, and comparable sales should reflect conditions as of this date.
 
 ASSESSMENT TYPE: ${analysis.assessment_type?.replace(/_/g, " ").toUpperCase()}
 PROPERTY TYPE: ${analysis.property_type?.replace(/_/g, " ")}
