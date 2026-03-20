@@ -12,7 +12,7 @@ const LABELS = {
   ai_platform: { claude: "Claude (Anthropic)", chatgpt: "ChatGPT (OpenAI)", gemini: "Gemini (Google)", perplexity: "Perplexity", grok: "Grok (xAI)" },
   assessment_type: { listing_pricing: "Listing Pricing Analysis", buyer_intelligence: "Buyer Intelligence Report", investment_analysis: "Investment Analysis", cma: "CMA", rental_analysis: "Rental Market Analysis", client_portfolio: "Client Portfolio Analysis", custom: "Custom Analysis" },
   client_relationship: { listing_agent: "Listing Agent", buyer_agent: "Buyer's Agent", dual_agent: "Dual Agent / Facilitator", investor_advisor: "Investor Advisor" },
-  property_type: { single_family: "Single-Family", condo: "Condo / TH", multi_family: "Multi-Family", land: "Land", commercial: "Commercial" },
+  property_type: { single_family: "Single-Family", condo: "Condo / TH", multi_family: "Multi-Family", land: "Land" },
   location_class: { urban_core: "Urban Core", inner_suburb: "Inner Suburb", outer_suburb: "Outer Suburb", coastal: "Coastal", rural: "Rural / Estate" },
   output_format: { narrative: "Narrative", structured: "Structured", bullets: "Bullets" },
 };

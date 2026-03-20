@@ -9,7 +9,6 @@ const PROPERTY_TYPES = [
   { id: "condo", label: "Condo / TH" },
   { id: "multi_family", label: "Multi-Family" },
   { id: "land", label: "Land" },
-  { id: "commercial", label: "Commercial" },
 ];
 
 const LOCATION_CLASSES = [

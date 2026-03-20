@@ -8,7 +8,7 @@ import { Plus, Save, Trash2, Lock, Eye, ChevronDown, ChevronUp, Loader2 } from "
 
 const PLATFORMS = ["claude", "chatgpt", "gemini", "perplexity", "grok", "generic"];
 const ASSESSMENT_TYPES = ["listing_pricing", "buyer_intelligence", "investment_analysis", "cma", "rental_analysis"];
-const PROPERTY_TYPES = ["single_family", "condo", "multi_family", "land", "commercial", "all"];
+const PROPERTY_TYPES = ["single_family", "condo", "multi_family", "land", "all"];
 const SECTIONS = [
   "system_instructions", "intake_template", "followup_protocol", "valuation_module",
   "migration_module", "archetype_module", "avm_module", "listing_strategy_module",
