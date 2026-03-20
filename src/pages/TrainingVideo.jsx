@@ -163,10 +163,9 @@ export default function TrainingVideo() {
           <p className="text-xs text-[#1A3226]/40 font-semibold uppercase tracking-wide mb-3">Up Next</p>
           <Link to={`/training/${nextVideo.id}`} className="flex items-center justify-between gap-4 group">
             <div className="flex items-center gap-3 min-w-0">
-              {nextVideo.thumbnail_url
-                ? <img src={nextVideo.thumbnail_url} alt="" className="w-16 h-10 object-cover rounded flex-shrink-0" />
-                : <div className="w-16 h-10 bg-[#1A3226]/5 rounded flex-shrink-0" />
-              }
+              <div className="w-16 h-10 bg-[#1A3226]/10 rounded flex-shrink-0 flex items-center justify-center">
+                <Play className="w-4 h-4 text-[#1A3226]/30" />
+              </div>
               <div className="min-w-0">
                 <p className="text-sm font-medium text-[#1A3226] group-hover:text-[#B8982F] transition-colors truncate">{nextVideo.title}</p>
                 {nextVideo.duration_seconds && <p className="text-xs text-[#1A3226]/40">{formatDuration(nextVideo.duration_seconds)}</p>}
