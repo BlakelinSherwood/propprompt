@@ -200,24 +200,23 @@ export default function AnalysisRun() {
   return (
     <div className="max-w-4xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="text-[#1A3226]/60 hover:text-[#1A3226]">
+          <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="text-[#1A3226]/60 hover:text-[#1A3226] flex-shrink-0">
             <ArrowLeft className="w-4 h-4 mr-1" /> Back
           </Button>
-          <div>
-            <h1 className="text-lg font-semibold text-[#1A3226]">
+          <div className="min-w-0">
+            <h1 className="text-base sm:text-lg font-semibold text-[#1A3226] truncate">
               {ASSESSMENT_LABELS[analysis?.assessment_type] || "Analysis"}
             </h1>
             {analysis?.intake_data?.address && (
-              <p className="text-sm text-[#1A3226]/50">{analysis.intake_data.address}</p>
+              <p className="text-xs sm:text-sm text-[#1A3226]/50 truncate">{analysis.intake_data.address}</p>
             )}
           </div>
         </div>
-
         {keySource && (
-          <span className="text-[10px] uppercase tracking-wider bg-[#1A3226]/5 text-[#1A3226]/50 px-2 py-1 rounded-full">
-            {keySource === "sc_managed" ? "S&C Platform Key" : keySource === "org_managed" ? "Org Key" : "Personal Key"}
+          <span className="text-[10px] uppercase tracking-wider bg-[#1A3226]/5 text-[#1A3226]/50 px-2 py-1 rounded-full self-start sm:self-auto flex-shrink-0">
+            {keySource === "sc_managed" ? "S&C Key" : keySource === "org_managed" ? "Org Key" : "Personal Key"}
           </span>
         )}
       </div>
@@ -243,87 +242,72 @@ export default function AnalysisRun() {
       {(status === "streaming" || status === "complete") && (
         <div className="rounded-2xl border border-[#1A3226]/10 bg-white overflow-hidden">
           {/* Sticky Action Bar */}
-          <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-3 bg-white/95 backdrop-blur border-b border-[#1A3226]/8">
-            <div className="flex items-center gap-2">
-              {status === "streaming" && (
-                <span className="flex items-center gap-1.5 text-xs text-[#B8982F]">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  Generating…
-                </span>
-              )}
-              {status === "complete" && (
-                <span className="flex items-center gap-1.5 text-xs text-emerald-600">
-                  <CheckCircle className="w-3.5 h-3.5" />
-                  Complete
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline" size="sm"
-                onClick={handleCopy}
-                disabled={!output}
-                className="h-7 text-xs gap-1.5 border-[#1A3226]/15"
-              >
-                {copied ? <CheckCircle className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                {copied ? "Copied" : "Copy"}
-              </Button>
-              <Button
-                variant="outline" size="sm"
-                onClick={handleDownloadPdf}
-                disabled={status !== "complete"}
-                className="h-7 text-xs gap-1.5 border-[#1A3226]/15"
-              >
-                <Download className="w-3.5 h-3.5" /> PDF
-              </Button>
-              <Button
-                variant="outline" size="sm"
-                onClick={handleDownloadPptx}
-                disabled={status !== "complete" || pptxGenerating}
-                className="h-7 text-xs gap-1.5 border-[#1A3226]/15"
-              >
-                {pptxGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Presentation className="w-3.5 h-3.5" />}
-                PPTX
-              </Button>
-              <Button
-                variant="outline" size="sm"
-                onClick={() => setEmailDialogOpen(true)}
-                disabled={status !== "complete"}
-                className="h-7 text-xs gap-1.5 border-[#1A3226]/15"
-              >
-                <Mail className="w-3.5 h-3.5" /> Email
-              </Button>
-              <Button
-                variant="outline" size="sm"
-                onClick={handleDriveUpload}
-                disabled={status !== "complete" || driveUploading || driveUploaded}
-                className="h-7 text-xs gap-1.5 border-[#1A3226]/15"
-                title={driveUrl ? "View in Drive" : "Upload to Google Drive"}
-              >
-                {driveUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : driveUploaded ? <CheckCircle className="w-3.5 h-3.5 text-emerald-500" /> : <Cloud className="w-3.5 h-3.5" />}
-                {driveUploaded ? <a href={driveUrl} target="_blank" rel="noopener noreferrer" className="text-emerald-600">Drive ↗</a> : "Drive"}
-              </Button>
-              {crmConnections.length > 0 && (
-                <Button
-                  variant="outline" size="sm"
-                  onClick={handleCrmPush}
-                  disabled={status !== "complete" || crmPushing || crmPushed}
-                  className="h-7 text-xs gap-1.5 border-[#1A3226]/15"
-                >
-                  {crmPushing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : crmPushed ? <CheckCircle className="w-3.5 h-3.5 text-emerald-500" /> : <Database className="w-3.5 h-3.5" />}
-                  {crmPushed ? "Pushed" : "CRM"}
+          <div className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-[#1A3226]/8 px-3 sm:px-5 py-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                {status === "streaming" && (
+                  <span className="flex items-center gap-1 text-xs text-[#B8982F]">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span className="hidden sm:inline">Generating…</span>
+                  </span>
+                )}
+                {status === "complete" && (
+                  <span className="flex items-center gap-1 text-xs text-emerald-600">
+                    <CheckCircle className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Complete</span>
+                  </span>
+                )}
+              </div>
+              {/* Scrollable button row on mobile */}
+              <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide flex-1 justify-end">
+                <Button variant="outline" size="sm" onClick={handleCopy} disabled={!output}
+                  className="h-7 text-xs gap-1 border-[#1A3226]/15 flex-shrink-0">
+                  {copied ? <CheckCircle className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span className="hidden sm:inline">{copied ? "Copied" : "Copy"}</span>
                 </Button>
-              )}
+                <Button variant="outline" size="sm" onClick={handleDownloadPdf} disabled={status !== "complete"}
+                  className="h-7 text-xs gap-1 border-[#1A3226]/15 flex-shrink-0">
+                  <Download className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">PDF</span>
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleDownloadPptx} disabled={status !== "complete" || pptxGenerating}
+                  className="h-7 text-xs gap-1 border-[#1A3226]/15 flex-shrink-0">
+                  {pptxGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Presentation className="w-3.5 h-3.5" />}
+                  <span className="hidden sm:inline">PPTX</span>
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setEmailDialogOpen(true)} disabled={status !== "complete"}
+                  className="h-7 text-xs gap-1 border-[#1A3226]/15 flex-shrink-0">
+                  <Mail className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Email</span>
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleDriveUpload}
+                  disabled={status !== "complete" || driveUploading || driveUploaded}
+                  className="h-7 text-xs gap-1 border-[#1A3226]/15 flex-shrink-0">
+                  {driveUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : driveUploaded ? <CheckCircle className="w-3.5 h-3.5 text-emerald-500" /> : <Cloud className="w-3.5 h-3.5" />}
+                  {driveUploaded
+                    ? <a href={driveUrl} target="_blank" rel="noopener noreferrer" className="text-emerald-600 hidden sm:inline">Drive ↗</a>
+                    : <span className="hidden sm:inline">Drive</span>}
+                </Button>
+                {crmConnections.length > 0 && (
+                  <Button variant="outline" size="sm" onClick={handleCrmPush}
+                    disabled={status !== "complete" || crmPushing || crmPushed}
+                    className="h-7 text-xs gap-1 border-[#1A3226]/15 flex-shrink-0">
+                    {crmPushing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : crmPushed ? <CheckCircle className="w-3.5 h-3.5 text-emerald-500" /> : <Database className="w-3.5 h-3.5" />}
+                    <span className="hidden sm:inline">{crmPushed ? "Pushed" : "CRM"}</span>
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
 
           {/* Markdown output */}
           <div
             ref={outputRef}
-            className="p-6 lg:p-8 max-h-[60vh] overflow-y-auto prose prose-sm max-w-none
-              prose-headings:text-[#1A3226] prose-headings:font-semibold
-              prose-p:text-[#1A3226]/80 prose-p:leading-relaxed
-              prose-strong:text-[#1A3226] prose-li:text-[#1A3226]/80
+            className="p-4 sm:p-6 lg:p-8 max-h-[65vh] overflow-y-auto overflow-x-hidden prose prose-sm max-w-none
+              prose-headings:text-[#1A3226] prose-headings:font-semibold prose-headings:break-words
+              prose-p:text-[#1A3226]/80 prose-p:leading-relaxed prose-p:break-words
+              prose-strong:text-[#1A3226] prose-li:text-[#1A3226]/80 prose-li:break-words
+              prose-table:w-full prose-table:text-xs
               prose-hr:border-[#1A3226]/10"
           >
             {output ? (
@@ -338,7 +322,7 @@ export default function AnalysisRun() {
 
           {/* Disclaimer footer — always last, visually distinct */}
           {(status === "complete" || output.length > 100) && (
-            <div className="px-6 lg:px-8 py-4 bg-[#1A3226]/[0.03] border-t border-[#1A3226]/8">
+            <div className="px-4 sm:px-6 lg:px-8 py-4 bg-[#1A3226]/[0.03] border-t border-[#1A3226]/8">
               <div className="prose prose-xs max-w-none">
                 <ReactMarkdown className="text-xs text-[#1A3226]/40 leading-relaxed">
                   {DISCLAIMER}
