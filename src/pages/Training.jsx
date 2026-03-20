@@ -137,10 +137,9 @@ export default function Training() {
                   onClick={locked ? e => e.preventDefault() : undefined}
                   className={`group rounded-xl border overflow-hidden transition-all ${locked ? 'border-[#1A3226]/10 opacity-60 cursor-not-allowed' : 'border-[#1A3226]/10 hover:border-[#B8982F]/40 hover:shadow-md'}`}>
                   <div className="relative aspect-video bg-[#1A3226]/5">
-                    {video.thumbnail_url
-                      ? <img src={video.thumbnail_url} alt={video.title} className="w-full h-full object-cover" />
-                      : <div className="w-full h-full flex items-center justify-center"><Play className="w-10 h-10 text-[#1A3226]/20" /></div>
-                    }
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Play className="w-10 h-10 text-[#1A3226]/20" />
+                    </div>
                     <div className="absolute inset-0 flex items-center justify-center">
                       {locked
                         ? <div className="w-10 h-10 rounded-full bg-black/50 flex items-center justify-center"><Lock className="w-5 h-5 text-white" /></div>

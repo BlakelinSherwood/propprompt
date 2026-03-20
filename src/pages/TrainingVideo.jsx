@@ -105,8 +105,14 @@ export default function TrainingVideo() {
 
       {/* Video embed */}
       <div className="aspect-video rounded-xl overflow-hidden bg-black">
-        {video.heygen_embed_url ? (
-          <iframe src={video.heygen_embed_url} allow="autoplay" allowFullScreen className="w-full h-full" title={video.title} />
+        {video.heygen_video_id ? (
+          <iframe
+            src={`https://app.heygen.com/embeds/${video.heygen_video_id}`}
+            allow="autoplay; fullscreen"
+            allowFullScreen
+            className="w-full h-full"
+            title={video.title}
+          />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center text-white/30 gap-2">
             <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center">
