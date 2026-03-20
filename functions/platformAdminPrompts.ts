@@ -1,17 +1,16 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.21';
 
 // AES-256-GCM encrypt/decrypt using ENCRYPTION_KEY env var
 async function getKey() {
   const raw = Deno.env.get("ENCRYPTION_KEY");
   if (!raw) throw new Error("ENCRYPTION_KEY environment variable is required");
-  const keyMaterial = await crypto.subtle.importKey(
+  return crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(raw.slice(0, 32).padEnd(32, "0")),
     { name: "AES-GCM" },
     false,
     ["encrypt", "decrypt"]
   );
-  return keyMaterial;
 }
 
 async function encryptText(text) {
@@ -36,6 +35,34 @@ async function decryptText(encrypted) {
   return new TextDecoder().decode(plain);
 }
 
+// Resolve prompt text from a record — handles FILE: and legacy ENC: prefixes
+async function resolvePromptText(base44, rawText) {
+  let text = rawText || "";
+  try {
+    if (text.startsWith("FILE:")) {
+      const fileUri = text.slice(5);
+      const { signed_url } = await base44.asServiceRole.integrations.Core.CreateFileSignedUrl({ file_uri: fileUri, expires_in: 120 });
+      const res = await fetch(signed_url);
+      text = await res.text();
+    }
+    if (text.startsWith("ENC:")) {
+      text = await decryptText(text.slice(4));
+    }
+  } catch (e) {
+    console.error("resolvePromptText error:", e.message);
+  }
+  return text;
+}
+
+// Upload encrypted prompt as a private file to avoid entity field size limits
+async function uploadPromptAsFile(base44, plainText) {
+  const encrypted = "ENC:" + await encryptText(plainText);
+  const bytes = new TextEncoder().encode(encrypted);
+  const blob = new Blob([bytes], { type: "text/plain" });
+  const { file_uri } = await base44.asServiceRole.integrations.Core.UploadPrivateFile({ file: blob });
+  return "FILE:" + file_uri;
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -50,12 +77,7 @@ Deno.serve(async (req) => {
     if (action === "list") {
       const prompts = await base44.asServiceRole.entities.PromptLibrary.list('-created_date', 200);
       const decrypted = await Promise.all(prompts.map(async (p) => {
-        let prompt_text = p.prompt_text;
-        try {
-          if (prompt_text && prompt_text.startsWith("ENC:")) {
-            prompt_text = await decryptText(prompt_text.slice(4));
-          }
-        } catch (_) {}
+        const prompt_text = await resolvePromptText(base44, p.prompt_text);
         return { ...p, prompt_text };
       }));
       return Response.json({ prompts: decrypted });
@@ -63,12 +85,13 @@ Deno.serve(async (req) => {
 
     if (action === "save") {
       const { prompt_text, ...rest } = data;
-      const encrypted = "ENC:" + await encryptText(prompt_text);
+      // Store prompt as private encrypted file to bypass entity field size limits
+      const storedRef = await uploadPromptAsFile(base44, prompt_text);
       if (id) {
-        const updated = await base44.asServiceRole.entities.PromptLibrary.update(id, { ...rest, prompt_text: encrypted, last_updated_by: user.email });
+        const updated = await base44.asServiceRole.entities.PromptLibrary.update(id, { ...rest, prompt_text: storedRef, last_updated_by: user.email });
         return Response.json({ prompt: updated });
       } else {
-        const created = await base44.asServiceRole.entities.PromptLibrary.create({ ...rest, prompt_text: encrypted, last_updated_by: user.email });
+        const created = await base44.asServiceRole.entities.PromptLibrary.create({ ...rest, prompt_text: storedRef, last_updated_by: user.email });
         return Response.json({ prompt: created });
       }
     }
@@ -81,6 +104,7 @@ Deno.serve(async (req) => {
     return Response.json({ error: "Unknown action" }, { status: 400 });
   } catch (error) {
     console.error("platformAdminPrompts error:", error);
+    console.error("Error data:", JSON.stringify(error?.data));
     return Response.json({ error: error.message }, { status: 500 });
   }
 });
