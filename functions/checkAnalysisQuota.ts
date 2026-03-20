@@ -19,8 +19,6 @@ async function getPricing(base44) {
 // Find oldest-expiring topup pack with remaining analyses
 async function findTopupPack(base44, userId, subs) {
   const now = new Date().toISOString();
-
-  // Build list of subscription IDs to check
   const subIds = subs.singles.map(s => s.id);
   const bundleIds = subs.bundles.map(b => b.id);
   const poolIds = subs.pools.map(p => p.id);
@@ -33,12 +31,9 @@ async function findTopupPack(base44, userId, subs) {
       (p.subscription_id && subIds.includes(p.subscription_id)) ||
       (p.bundle_id && bundleIds.includes(p.bundle_id)) ||
       (p.pool_id && poolIds.includes(p.pool_id)) ||
-      // If pack has no subscription linkage but belongs to user (legacy)
       (!p.subscription_id && !p.bundle_id && !p.pool_id)
     )
   );
-
-  // Return oldest-expiring first
   return valid[0] || null;
 }
 
@@ -49,8 +44,10 @@ Deno.serve(async (req) => {
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     // admin and platform_owner always get unlimited access
-    const UNLIMITED_ROLES = ['platform_owner', 'admin'];
+    const UNLIMITED_ROLES = ['platform_owner', 'admin', 'brokerage_admin', 'team_lead'];
     if (UNLIMITED_ROLES.includes(user.role)) {
+      return Response.json({ allowed: true, unlimited: true, analyses_cap: 9999, analyses_used_this_month: 0 });
+    }
 
     let user_id;
     try {
@@ -72,18 +69,14 @@ Deno.serve(async (req) => {
       team: parseInt(pricing.team_analyses_cap || 0),
     };
 
-    // Check each subscription type independently
-    // If ANY has remaining capacity, allowed = true
     const subscriptionStatuses = [];
 
-    // Singles
     for (const sub of subs.singles) {
       const cap = sub.analyses_cap || tierCapMap[sub.tier] || 0;
       const used = sub.analyses_used_this_month || 0;
       subscriptionStatuses.push({ type: 'single', id: sub.id, cap, used, remaining: cap - used, tier: sub.tier });
     }
 
-    // Pools
     for (const pool of subs.pools) {
       const tierCap = tierCapMap[pool.tier] || 0;
       const cap = pool.analyses_cap || (pool.buckets_used || 1) * tierCap;
@@ -91,21 +84,18 @@ Deno.serve(async (req) => {
       subscriptionStatuses.push({ type: 'pool', id: pool.id, cap, used, remaining: cap - used, tier: pool.tier });
     }
 
-    // Bundles
     for (const bundle of subs.bundles) {
       const cap = bundle.analyses_cap || 0;
       const used = bundle.analyses_used_this_month || 0;
       subscriptionStatuses.push({ type: 'bundle', id: bundle.id, cap, used, remaining: cap - used, tier: bundle.tier });
     }
 
-    // Buyouts
     for (const bo of subs.buyouts) {
       const cap = bo.analyses_cap || 0;
       const used = bo.analyses_used_this_month || 0;
       subscriptionStatuses.push({ type: 'buyout', id: bo.id, cap, used, remaining: cap - used, tier: bo.tier });
     }
 
-    // Find first subscription with remaining capacity (monthly cap)
     const availableSub = subscriptionStatuses.find(s => s.remaining > 0);
     if (availableSub) {
       return Response.json({
