@@ -120,7 +120,11 @@ Deno.serve(async (req) => {
 
     let match =
       allPrompts.find((p) => p.ai_platform === platform && p.assessment_type === assessmentType && p.property_type === propertyType) ||
-      // No library entry — use baseline
+      allPrompts.find((p) => p.ai_platform === platform && p.assessment_type === assessmentType && p.property_type === "all") ||
+      allPrompts.find((p) => p.ai_platform === "generic" && p.assessment_type === assessmentType && p.property_type === "all") ||
+      null;
+
+    if (!match) {
       return Response.json({ prompt: buildBaselinePrompt(analysis), source: "baseline" });
     }
 
