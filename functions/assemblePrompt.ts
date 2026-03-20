@@ -33,8 +33,9 @@ async function decryptText(encrypted) {
   return new TextDecoder().decode(plain);
 }
 
-function substituteTokens(template, analysis) {
+function substituteTokens(template, analysis, territory) {
   const d = analysis.intake_data || {};
+  const t = territory || {};
   return template
     .replace(/\[ADDRESS\]/g, d.address || "")
     .replace(/\[PROPERTY_TYPE\]/g, analysis.property_type || "")
@@ -45,6 +46,9 @@ function substituteTokens(template, analysis) {
     .replace(/\[AI_PLATFORM\]/g, analysis.ai_platform || "")
     .replace(/\[AGENT_EMAIL\]/g, analysis.run_by_email || "")
     .replace(/\[ORG_ID\]/g, analysis.org_id || "")
+    .replace(/\[REGISTRY_URL\]/g, t.registry_url || "")
+    .replace(/\[GIS_URL\]/g, t.gis_url || "")
+    .replace(/\[TOWN_URL\]/g, t.town_url || "")
     .replace(/\[INTAKE_JSON\]/g, JSON.stringify(d, null, 2));
 }
 
@@ -99,13 +103,23 @@ Deno.serve(async (req) => {
     const propertyType = analysis.property_type;
 
     // Priority lookup
+    // Try to find a matching territory for URL tokens
+    let territory = null;
+    try {
+      const address = analysis.intake_data?.address || "";
+      // Extract city name heuristic: last word before state/zip
+      const cityMatch = address.match(/,\s*([^,]+?)\s*(?:,\s*MA|\s+MA|\s+0\d{4}|$)/i);
+      if (cityMatch) {
+        const cityName = cityMatch[1].trim();
+        const territories = await base44.asServiceRole.entities.Territory.filter({ city_town: cityName });
+        if (territories.length > 0) territory = territories[0];
+      }
+    } catch (e) {
+      // Territory lookup is best-effort; never block prompt assembly
+    }
+
     let match =
       allPrompts.find((p) => p.ai_platform === platform && p.assessment_type === assessmentType && p.property_type === propertyType) ||
-      allPrompts.find((p) => p.ai_platform === platform && p.assessment_type === assessmentType && p.property_type === "all") ||
-      allPrompts.find((p) => p.ai_platform === "generic" && p.assessment_type === assessmentType && p.property_type === "all") ||
-      null;
-
-    if (!match) {
       // No library entry — use baseline
       return Response.json({ prompt: buildBaselinePrompt(analysis), source: "baseline" });
     }
@@ -115,7 +129,7 @@ Deno.serve(async (req) => {
       promptText = await decryptText(promptText.slice(4));
     }
 
-    const assembled = substituteTokens(promptText, analysis);
+    const assembled = substituteTokens(promptText, analysis, territory);
 
     // Store assembled prompt on the analysis
     await base44.asServiceRole.entities.Analysis.update(analysisId, { prompt_assembled: assembled });
