@@ -14,7 +14,6 @@ const PLATFORMS = [
     name: "ChatGPT (OpenAI)",
     description: "Fast, reliable, excellent all-purpose model",
     icon: "✨",
-    comingSoon: true,
   },
   {
     id: "gemini",
