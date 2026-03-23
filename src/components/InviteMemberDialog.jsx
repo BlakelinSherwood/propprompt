@@ -46,6 +46,21 @@ export default function InviteMemberDialog({ userRole, onClose, onInvited }) {
     try {
       const res = await base44.functions.invoke("inviteMember", { email, appRole: role });
       if (res.data?.error) throw new Error(res.data.error);
+      toast({
+        title: "Invite sent",
+        description: `${email} has been invited as ${ROLE_LABELS[role] || role}.`,
+      });
+      onInvited();
+    } catch (e) {
+      toast({
+        title: "Error",
+        description: e.message || "Could not send invite.",
+        variant: "destructive",
+      });
+    } finally {
+      setSending(false);
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
