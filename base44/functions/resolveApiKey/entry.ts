@@ -40,6 +40,15 @@ const PLATFORM_ENV_VARS = {
   grok:        "GROK_API_KEY",
 };
 
+// Map platform name to PlatformConfig field
+const PLATFORM_CONFIG_KEYS = {
+  claude:      { keyField: "anthropic_api_key", enabledField: "claude_enabled" },
+  chatgpt:     { keyField: "openai_api_key",    enabledField: "chatgpt_enabled" },
+  gemini:      { keyField: "google_api_key",    enabledField: "gemini_enabled" },
+  perplexity:  { keyField: "perplexity_api_key",enabledField: "perplexity_enabled" },
+  grok:        { keyField: "grok_api_key",      enabledField: "grok_enabled" },
+};
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -89,7 +98,21 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 4. S&C platform key
+    // 4. PlatformConfig entity (admin-saved keys)
+    const configMapping = PLATFORM_CONFIG_KEYS[platform];
+    if (configMapping) {
+      const configs = await base44.asServiceRole.entities.PlatformConfig.filter({});
+      const config = configs[0];
+      if (config) {
+        const isEnabled = config[configMapping.enabledField] !== false;
+        const storedKey = config[configMapping.keyField];
+        if (isEnabled && storedKey) {
+          return Response.json({ apiKey: storedKey, source: "sc_platform" });
+        }
+      }
+    }
+
+    // 5. S&C env var fallback
     const envKey = PLATFORM_ENV_VARS[platform];
     const scKey = envKey ? Deno.env.get(envKey) : null;
     if (scKey) return Response.json({ apiKey: scKey, source: "sc_platform" });
