@@ -21,10 +21,38 @@ export default function OrgsList() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    base44.entities.Organization.list("-created_date", 100).then((data) => {
+    async function load() {
+      const [data, me] = await Promise.all([
+        base44.entities.Organization.list("-created_date", 100),
+        base44.auth.me(),
+      ]);
+
+      // Ensure platform owner has an org record at team tier
+      if (me?.email) {
+        const ownerOrg = data.find(o => o.owner_email === me.email);
+        if (!ownerOrg) {
+          const created = await base44.asServiceRole.entities.Organization.create({
+            name: `${me.full_name || me.email} (Platform Owner)`,
+            org_type: "brokerage",
+            owner_email: me.email,
+            status: "active",
+            subscription_plan: "team",
+            subscription_tier: "team",
+          });
+          data.unshift(created);
+        } else if (ownerOrg.subscription_tier !== "team") {
+          await base44.asServiceRole.entities.Organization.update(ownerOrg.id, {
+            subscription_tier: "team",
+            subscription_plan: ownerOrg.subscription_plan || "team",
+          });
+          ownerOrg.subscription_tier = "team";
+        }
+      }
+
       setOrgs(data);
       setLoading(false);
-    });
+    }
+    load();
   }, []);
 
   const filtered = orgs.filter((o) =>
