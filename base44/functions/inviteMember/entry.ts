@@ -33,8 +33,8 @@ Deno.serve(async (req) => {
     // Determine base44 platform role: platform_owner gets "admin", everyone else "user"
     const platformRole = appRole === "platform_owner" ? "admin" : "user";
 
-    // Send the invite via base44 SDK
-    await base44.asServiceRole.users.inviteUser(email, platformRole);
+    // Send the invite via base44 SDK (must use user-scoped client)
+    await base44.users.inviteUser(email, platformRole);
 
     // Try to update the user record if they already exist, or create a placeholder
     try {
