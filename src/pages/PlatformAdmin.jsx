@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import OrgsList from "../components/admin/platform/OrgsList";
+import { Sparkles } from "lucide-react";
 import PromptLibraryEditor from "../components/admin/platform/PromptLibraryEditor";
 import PlatformAIConfig from "../components/admin/platform/PlatformAIConfig";
 import PlatformAnalytics from "../components/admin/platform/PlatformAnalytics";
@@ -37,6 +38,16 @@ export default function PlatformAdmin() {
         <p className="text-sm text-[#1A3226]/50 mt-1">
           Full access — all orgs, users, prompts, and global configuration.
         </p>
+      </div>
+
+      <div className="flex gap-2 mb-2">
+        <Link
+          to="/admin/ai-settings"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#B8982F]/30 bg-[#B8982F]/5 text-[#B8982F] text-sm font-medium hover:bg-[#B8982F]/10 transition-colors"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          AI Models
+        </Link>
       </div>
 
       <Tabs defaultValue="orgs" className="w-full">

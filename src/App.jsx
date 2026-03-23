@@ -38,6 +38,7 @@ import TrainingAdmin from "./pages/admin/TrainingAdmin";
 import EasternMA from "./pages/admin/territories/EasternMA";
 import DataQuality from "./pages/admin/DataQuality";
 import AlertSettings from "./pages/AlertSettings";
+import AiSettings from "./pages/admin/AiSettings";
 
 function Spinner() {
   return (
@@ -90,6 +91,7 @@ function AuthenticatedApp() {
         <Route path="/admin/claims" element={<ProtectedRoute element={<ClaimsAdmin />} />} />
         <Route path="/admin/training" element={<ProtectedRoute element={<TrainingAdmin />} />} />
         <Route path="/admin/data-quality" element={<ProtectedRoute element={<DataQuality />} />} />
+        <Route path="/admin/ai-settings" element={<ProtectedRoute element={<AiSettings />} />} />
         <Route path="/admin/territories/eastern-ma" element={<ProtectedRoute element={<EasternMA />} />} />
         <Route path="/account/alert-settings" element={<ProtectedRoute element={<AlertSettings />} />} />
         <Route path="/training" element={<ProtectedRoute element={<Training />} />} />
