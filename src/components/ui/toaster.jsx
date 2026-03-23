@@ -24,6 +24,7 @@ export function Toaster() {
             </div>
             {action}
             <ToastClose onClick={() => dismiss(id)} />
+          </Toast>
         );
       })}
       <ToastViewport />
