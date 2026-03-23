@@ -7,28 +7,6 @@
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
-async function getDecryptKey() {
-  const raw = Deno.env.get("ENCRYPTION_KEY");
-  if (!raw) throw new Error("ENCRYPTION_KEY environment variable is required");
-  return crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(raw.slice(0, 32).padEnd(32, "0")),
-    { name: "AES-GCM" },
-    false,
-    ["decrypt"]
-  );
-}
-
-async function decryptKey(encrypted) {
-  if (!encrypted) return null;
-  const key = await getDecryptKey();
-  const combined = Uint8Array.from(atob(encrypted), c => c.charCodeAt(0));
-  const iv = combined.slice(0, 12);
-  const ciphertext = combined.slice(12);
-  const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ciphertext);
-  return new TextDecoder().decode(plain);
-}
-
 // Map platform name to env var for S&C platform keys
 const PLATFORM_ENV_VARS = {
   claude:      "ANTHROPIC_API_KEY",
