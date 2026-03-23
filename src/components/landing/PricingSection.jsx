@@ -224,7 +224,7 @@ export default function PricingSection({ pricing }) {
               '4 agents + 1 team lead + 2 assistants',
               'Add-on seats available',
             ]} />
-            <TierCard name="Broker" price="199" cap={150} features={[
+            <TierCard name="Broker" price="499" cap={150} features={[
               '150 analyses/month',
               'Up to 2 teams',
               'Up to 10 agents',
