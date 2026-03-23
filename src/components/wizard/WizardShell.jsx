@@ -4,7 +4,7 @@ export default function WizardShell({ step, title, subtitle, children, onNext, o
       {/* Step header */}
       <div className="mb-6">
         <p className="text-xs font-medium uppercase tracking-widest text-[#B8982F] mb-1">
-          Step {step} of 6
+          Step {step} of 5
         </p>
         <h2 className="text-xl font-semibold text-[#1A3226]" style={{ fontFamily: "Georgia, serif" }}>
           {title}

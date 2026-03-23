@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import {
   ArrowRight, Check, Star, MapPin, Lock, Play,
-  ChevronDown, Mail, Shield, Zap, TrendingUp, Home
+  ChevronDown, Mail, Shield, Zap, TrendingUp, Home, Layers, Brain, GitMerge
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { usePricing } from "@/components/pricing/usePricing";
@@ -239,6 +239,67 @@ export default function Landing() {
                 <p className={`text-sm font-medium ${row.active ? 'text-white' : 'text-[#1A3226]/70'}`}>{row.states}</p>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Ensemble AI Section */}
+      <section className="bg-white border-t border-[#1A3226]/8 py-20">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="text-center mb-12">
+            <p className="text-[#B8982F] text-xs font-semibold uppercase tracking-widest mb-2">Ensemble AI — Pro & Team</p>
+            <h2 className="text-3xl font-bold text-[#1A3226]" style={{ fontFamily: "Georgia, serif" }}>
+              Five AI Models. One Report. Zero Guesswork.
+            </h2>
+            <p className="text-sm text-[#1A3226]/60 mt-3 max-w-2xl mx-auto">
+              PropPrompt's Ensemble AI doesn't pick one model and hope for the best. It assigns each section of your report to the model best suited for that job — all running in parallel.
+            </p>
+          </div>
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            <div className="space-y-6">
+              {[
+                { icon: Brain, title: 'Pricing Strategy', model: 'Claude (Anthropic)', desc: 'Deep reasoning for defensible price positioning and comp analysis.' },
+                { icon: Zap, title: 'Market Context', model: 'Perplexity AI', desc: 'Real-time web research on current inventory, absorption, and buyer demand.' },
+                { icon: MapPin, title: 'Neighbourhood Intelligence', model: 'Gemini (Google)', desc: 'Location-aware analysis of schools, walkability, and community factors.' },
+                { icon: TrendingUp, title: 'Buyer Archetypes & Listing Copy', model: 'ChatGPT + Grok', desc: 'Psychographic profiling and persuasive listing narrative written to convert.' },
+              ].map(item => (
+                <div key={item.title} className="flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-[#B8982F]/10 flex items-center justify-center flex-shrink-0">
+                    <item.icon className="w-5 h-5 text-[#B8982F]" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <p className="text-sm font-semibold text-[#1A3226]">{item.title}</p>
+                      <span className="text-[10px] bg-[#1A3226]/8 text-[#1A3226]/60 px-2 py-0.5 rounded-full font-medium">{item.model}</span>
+                    </div>
+                    <p className="text-xs text-[#1A3226]/60 leading-relaxed">{item.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="rounded-2xl bg-[#1A3226] p-8 text-white space-y-6">
+              <div className="flex items-center gap-3 mb-2">
+                <GitMerge className="w-6 h-6 text-[#B8982F]" />
+                <p className="font-bold text-lg">How Ensemble Works</p>
+              </div>
+              {[
+                { step: '01', label: 'Parallel Execution', desc: 'All section-specific models run simultaneously — no waiting for one to finish before the next begins.' },
+                { step: '02', label: 'Specialist Assignment', desc: 'Each report section is assigned to the model with the strongest capability for that task.' },
+                { step: '03', label: 'Claude Assembly', desc: 'Claude synthesizes all outputs into a single, cohesive, client-ready report with consistent voice and terminology.' },
+              ].map(s => (
+                <div key={s.step} className="flex items-start gap-4">
+                  <span className="text-[#B8982F] font-bold text-xs mt-0.5 w-6 flex-shrink-0">{s.step}</span>
+                  <div>
+                    <p className="font-semibold text-sm mb-0.5">{s.label}</p>
+                    <p className="text-xs text-white/60 leading-relaxed">{s.desc}</p>
+                  </div>
+                </div>
+              ))}
+              <div className="border-t border-white/10 pt-5">
+                <p className="text-xs text-white/50 mb-1">The result</p>
+                <p className="text-sm font-semibold text-[#B8982F]">A report no single model could produce — faster than any manual process.</p>
+              </div>
+            </div>
           </div>
         </div>
       </section>

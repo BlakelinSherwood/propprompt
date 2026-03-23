@@ -195,9 +195,32 @@ export default function PricingSection({ pricing }) {
         <div className="space-y-4">
           <p className="text-center text-sm text-[#1A3226]/60">One town or city. One seat.</p>
           <div className="grid sm:grid-cols-3 gap-6">
-            <TierCard name="Starter" price={s.toFixed(0)} cap={sCap} features={[`${sCap} analyses/month`, 'Core CMA + prompt library', 'Limited exports', '1 user']} />
-            <TierCard name="Pro" price={p.toFixed(0)} cap={pCap} features={[`${pCap} analyses/month`, 'All analyses + PDF/PPTX exports', 'Archetype library', '1 user']} highlight />
-            <TierCard name="Team" price={t.toFixed(0)} cap={tCap} features={[`${tCap} analyses/month`, 'White-label branding', 'Multi-user (up to 5)', 'Drive sync']} />
+            <TierCard name="Starter" price={s.toFixed(0)} cap={sCap} features={[
+              `${sCap} analyses/month`,
+              'CMA + Buyer Intelligence',
+              'Buyer rep, listing rep & dual rep',
+              'PDF & PPTX exports',
+              'Google Drive sync',
+              '1 user',
+            ]} />
+            <TierCard name="Pro" price={p.toFixed(0)} cap={pCap} features={[
+              `${pCap} analyses/month`,
+              'All analysis types',
+              'All client relationship types',
+              'Ensemble AI — 5 models in parallel',
+              'PDF & PPTX exports',
+              'Google Drive sync',
+              '1 user',
+            ]} highlight />
+            <TierCard name="Team" price={t.toFixed(0)} cap={tCap} features={[
+              `${tCap} analyses/month`,
+              'All analysis types',
+              'Ensemble AI — 5 models in parallel',
+              'White-label branding',
+              'PDF & PPTX exports',
+              'Google Drive sync',
+              'Multi-user (up to 5)',
+            ]} />
           </div>
         </div>
       )}

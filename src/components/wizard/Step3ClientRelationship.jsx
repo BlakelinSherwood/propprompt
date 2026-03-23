@@ -24,10 +24,14 @@ const CLIENT_RELATIONSHIPS = [
     title: "Investor Advisor",
     icon: "📈",
     description: "Client is an investor. Analysis emphasizes income approach, yield metrics, and risk-adjusted return analysis.",
+    proOnly: true,
   },
 ];
 
-export default function Step3ClientRelationship({ intake, update, onNext, onBack }) {
+export default function Step3ClientRelationship({ intake, update, onNext, onBack, userTier }) {
+  const isStarter = !userTier || userTier === 'starter';
+  const available = CLIENT_RELATIONSHIPS.filter(r => !r.proOnly || !isStarter);
+  const locked = isStarter ? CLIENT_RELATIONSHIPS.filter(r => r.proOnly) : [];
   return (
     <div className="p-6 lg:p-8">
       <h2 className="text-lg font-semibold text-[#1A3226] mb-1" style={{ fontFamily: "Georgia, serif" }}>
@@ -37,8 +41,8 @@ export default function Step3ClientRelationship({ intake, update, onNext, onBack
         Your role in this transaction determines how the AI frames its analysis and recommendations.
       </p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
-        {CLIENT_RELATIONSHIPS.map((r) => {
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+        {available.map((r) => {
           const selected = intake.client_relationship === r.id;
           return (
             <button
@@ -59,6 +63,13 @@ export default function Step3ClientRelationship({ intake, update, onNext, onBack
             </button>
           );
         })}
+        {locked.map(r => (
+          <div key={r.id} className="opacity-40 rounded-xl border-2 border-dashed border-[#1A3226]/15 p-5 cursor-not-allowed">
+            <div className="mb-3 text-2xl grayscale">{r.icon}</div>
+            <p className="text-sm font-semibold text-[#1A3226] mb-1">{r.title}</p>
+            <p className="text-xs text-[#1A3226]/50">Available on Pro & Team</p>
+          </div>
+        ))}
       </div>
 
       <WizardNav step={3} onNext={onNext} onBack={onBack} canNext={!!intake.client_relationship} />

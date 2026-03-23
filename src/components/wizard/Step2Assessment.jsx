@@ -3,6 +3,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import WizardNav from "./WizardNav";
 import { ANALYSIS_MODULES } from "@/lib/analysisModules";
 
+const STARTER_ASSESSMENT_IDS = ['cma', 'buyer_intelligence'];
+
 const ASSESSMENT_TYPES = [
   {
     id: "listing_pricing",
@@ -40,6 +42,7 @@ const ASSESSMENT_TYPES = [
     badge: "Retention Tool",
     badgeColor: "green",
     tooltip: "Send this to homeowners in your sphere to re-engage them with their equity story and their options.",
+    proOnly: true,
   },
   {
     id: "investment_analysis",
@@ -48,6 +51,7 @@ const ASSESSMENT_TYPES = [
     description: "Full income approach with cap rate, GRM, cash-on-cash return, and 5-year projection.",
     time: "~10 min",
     tooltip: "Covers single-family and multi-family with rent range overlay and value-add ROI.",
+    proOnly: true,
   },
   {
     id: "rental_analysis",
@@ -56,6 +60,7 @@ const ASSESSMENT_TYPES = [
     description: "Rent range calibration, tenant demand profile, vacancy risk assessment, and rent control exposure check.",
     time: "~5 min",
     tooltip: "For landlord clients, rent-vs-sell decisions, and investment underwriting.",
+    proOnly: true,
   },
   {
     id: "custom",
@@ -66,6 +71,7 @@ const ASSESSMENT_TYPES = [
     badge: "Advanced",
     badgeColor: "blue",
     tooltip: "Not a blank prompt — a structured module builder. Pick what you need, we assemble a complete report.",
+    proOnly: true,
     modules: [
       "comp_valuation",
       "pricing_strategy_scenarios",
@@ -76,9 +82,12 @@ const ASSESSMENT_TYPES = [
   },
 ];
 
-export default function Step2Assessment({ intake, update, onNext, onBack }) {
-  const standardTypes = ASSESSMENT_TYPES.filter(a => a.id !== 'custom');
-  const customType = ASSESSMENT_TYPES.find(a => a.id === 'custom');
+export default function Step2Assessment({ intake, update, onNext, onBack, userTier }) {
+  const isStarter = !userTier || userTier === 'starter';
+  const availableTypes = ASSESSMENT_TYPES.filter(a => !a.proOnly || !isStarter);
+  const lockedTypes = isStarter ? ASSESSMENT_TYPES.filter(a => a.proOnly) : [];
+  const standardTypes = availableTypes.filter(a => a.id !== 'custom');
+  const customType = availableTypes.find(a => a.id === 'custom');
 
   return (
     <TooltipProvider>
@@ -202,6 +211,26 @@ export default function Step2Assessment({ intake, update, onNext, onBack }) {
                   ${intake.assessment_type === 'custom' ? "border-[#1A3226] bg-[#1A3226]" : "border-[#1A3226]/20"}`} />
               </div>
             </button>
+          </div>
+        )}
+
+        {/* Locked types for Starter */}
+        {lockedTypes.filter(a => a.id !== 'custom').length > 0 && (
+          <div className="mb-4">
+            <p className="text-xs font-semibold text-[#1A3226]/30 uppercase tracking-wider mb-2">Pro & Team only</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {lockedTypes.filter(a => a.id !== 'custom').map(a => (
+                <div key={a.id} className="relative opacity-40 rounded-xl border-2 border-dashed border-[#1A3226]/15 p-4 cursor-not-allowed">
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl leading-none mt-0.5 grayscale">{a.icon}</span>
+                    <div>
+                      <p className="text-sm font-semibold text-[#1A3226]">{a.title}</p>
+                      <p className="text-xs text-[#1A3226]/50 mt-0.5">Upgrade to Pro or Team</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
