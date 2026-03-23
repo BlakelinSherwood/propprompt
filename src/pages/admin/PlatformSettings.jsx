@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
-import { Check, AlertCircle, ChevronDown } from 'lucide-react';
+import { Check, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/components/ui/use-toast';
 
 const PLATFORMS = [
   {
@@ -10,61 +11,71 @@ const PLATFORMS = [
     name: 'Claude',
     provider: 'Anthropic',
     description: 'Advanced reasoning and text generation',
-    status: 'active',
-    models: {
-      complex: 'claude-opus-4-5',
-      standard: 'claude-sonnet-4-6',
-      background: 'claude-haiku-4-5-20251001',
-    },
+    configKey: 'anthropic_api_key',
+    enabledKey: 'claude_enabled',
+    wizardId: 'claude',
+    models: { complex: 'claude-opus-4-5', standard: 'claude-sonnet-4-6', background: 'claude-haiku-4-5-20251001' },
   },
   {
     id: 'openai',
     name: 'ChatGPT',
     provider: 'OpenAI',
-    description: 'Strong structured output and financial tables. Future: Agent+ tier.',
-    status: 'inactive',
+    description: 'Fast, reliable, excellent all-purpose model',
+    configKey: 'openai_api_key',
+    enabledKey: 'chatgpt_enabled',
+    wizardId: 'chatgpt',
   },
   {
     id: 'gemini',
     name: 'Gemini',
     provider: 'Google',
-    description: 'Multimodal reasoning and web search. Future: Market research automation.',
-    status: 'inactive',
+    description: 'Multimodal reasoning and web search',
+    configKey: 'google_api_key',
+    enabledKey: 'gemini_enabled',
+    wizardId: 'gemini',
   },
   {
     id: 'perplexity',
     name: 'Perplexity',
     provider: 'Perplexity AI',
-    description: 'Real-time web search and citations. Future: Market data pulls.',
-    status: 'inactive',
+    description: 'Real-time web search and citations',
+    configKey: 'perplexity_api_key',
+    enabledKey: 'perplexity_enabled',
+    wizardId: 'perplexity',
   },
   {
     id: 'grok',
     name: 'Grok',
     provider: 'xAI',
-    description: 'Real-time data and humor. Future: Specialized analysis types.',
-    status: 'inactive',
+    description: 'Real-time data and reasoning',
+    configKey: 'grok_api_key',
+    enabledKey: 'grok_enabled',
+    wizardId: 'grok',
   },
 ];
 
 export default function PlatformSettings() {
   const { user } = useAuth();
-  const [expandedTier, setExpandedTier] = useState(null);
+  const { toast } = useToast();
   const [routing, setRouting] = useState({});
   const [loading, setLoading] = useState(true);
+  const [platformConfig, setPlatformConfig] = useState(null);
+  const [keyInputs, setKeyInputs] = useState({});
+  const [showKey, setShowKey] = useState({});
+  const [savingKey, setSavingKey] = useState({});
 
-  useEffect(() => {
-    loadRouting();
-  }, []);
+  useEffect(() => { loadData(); }, []);
 
-  async function loadRouting() {
+  async function loadData() {
     try {
-      const routes = await base44.asServiceRole.entities.AIModelRouting.filter({});
+      const [routes, configs] = await Promise.all([
+        base44.asServiceRole.entities.AIModelRouting.filter({}),
+        base44.asServiceRole.entities.PlatformConfig.filter({}),
+      ]);
       const map = {};
-      (routes || []).forEach(r => {
-        map[`${r.platform}_${r.routing_tier}`] = r;
-      });
+      (routes || []).forEach(r => { map[`${r.platform}_${r.routing_tier}`] = r; });
       setRouting(map);
+      setPlatformConfig(configs[0] || {});
     } catch (err) {
       console.error(err);
     } finally {
@@ -72,35 +83,39 @@ export default function PlatformSettings() {
     }
   }
 
-  async function updateModel(platform, tier, newModel) {
+  async function saveApiKey(platform) {
+    const val = (keyInputs[platform.id] || '').trim();
+    if (!val) return;
+    setSavingKey(s => ({ ...s, [platform.id]: true }));
     try {
-      const key = `${platform}_${tier}`;
-      const existing = routing[key];
-
-      if (existing) {
-        await base44.asServiceRole.entities.AIModelRouting.update(existing.id, {
-          model_string: newModel,
-          updated_by: user.id,
-          updated_at: new Date().toISOString(),
-        });
+      const update = { [platform.configKey]: val, [platform.enabledKey]: true };
+      if (platformConfig?.id) {
+        await base44.asServiceRole.entities.PlatformConfig.update(platformConfig.id, update);
       } else {
-        await base44.asServiceRole.entities.AIModelRouting.create({
-          platform,
-          routing_tier: tier,
-          model_string: newModel,
-          updated_by: user.id,
-          updated_at: new Date().toISOString(),
-        });
+        const created = await base44.asServiceRole.entities.PlatformConfig.create(update);
+        setPlatformConfig(created);
       }
-
-      loadRouting();
-    } catch (err) {
-      console.error(err);
+      setPlatformConfig(prev => ({ ...prev, ...update }));
+      setKeyInputs(prev => ({ ...prev, [platform.id]: '' }));
+      toast({ title: `${platform.name} API key saved`, description: 'Platform is now enabled.' });
+    } catch (e) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    } finally {
+      setSavingKey(s => ({ ...s, [platform.id]: false }));
     }
   }
 
-  const activePlatform = PLATFORMS.find(p => p.status === 'active');
-  const futurePlatforms = PLATFORMS.filter(p => p.status === 'inactive');
+  async function toggleEnabled(platform, enabled) {
+    try {
+      const update = { [platform.enabledKey]: enabled };
+      if (platformConfig?.id) {
+        await base44.asServiceRole.entities.PlatformConfig.update(platformConfig.id, update);
+        setPlatformConfig(prev => ({ ...prev, ...update }));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
 
   if (loading) {
     return (
@@ -115,107 +130,111 @@ export default function PlatformSettings() {
       <div>
         <h1 className="text-2xl font-bold text-[#1A3226]">AI Platform Configuration</h1>
         <p className="text-sm text-[#1A3226]/60 mt-1">
-          Claude (Anthropic) is the active platform. Additional platforms are configured here when ready to activate.
+          Manage API keys and enable AI platforms for user analyses.
         </p>
       </div>
 
-      {/* Active Platform */}
-      <div className="rounded-2xl border-2 border-[#1A3226] bg-white p-6">
-        <div className="flex items-start justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center">
-              <Check className="w-4 h-4 text-green-700" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-[#1A3226]">{activePlatform.name} — {activePlatform.provider}</h2>
-              <p className="text-sm text-[#1A3226]/60 mt-1">Active platform for all analyses</p>
-            </div>
-          </div>
-          <span className="px-3 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full">ACTIVE</span>
-        </div>
+      <div className="grid gap-4">
+        {PLATFORMS.map(platform => {
+          const isEnabled = platformConfig?.[platform.enabledKey] !== false;
+          const hasKey = !!(platformConfig?.[platform.configKey]);
+          const isClaude = platform.id === 'anthropic';
 
-        <div className="space-y-4 bg-[#1A3226]/[0.03] rounded-xl p-4 mb-6">
-          <p className="text-sm font-semibold text-[#1A3226] mb-3">Model Routing</p>
-
-          {['complex', 'standard', 'background'].map(tier => {
-            const tierLabels = {
-              complex: 'Complex Analyses (Listing Pricing, Portfolio, Custom)',
-              standard: 'Standard Analyses (CMA, Buyer Intel, Investment)',
-              background: 'Background Tasks (Public Records, Quota Checks, Watch Lists)',
-            };
-
-            const key = `anthropic_${tier}`;
-            const currentRoute = routing[key];
-            const defaultModel = activePlatform.models[tier];
-
-            return (
-              <div key={tier} className="border-b border-[#1A3226]/10 last:border-0 pb-3 last:pb-0">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium text-[#1A3226]">{tierLabels[tier]}</label>
-                  <input
-                    type="text"
-                    value={currentRoute?.model_string || defaultModel}
-                    onChange={(e) => updateModel('anthropic', tier, e.target.value)}
-                    className="px-3 py-1.5 border border-[#1A3226]/20 rounded-lg text-sm font-mono bg-white focus:outline-none focus:ring-2 focus:ring-[#B8982F]/30"
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        <p className="text-xs text-[#1A3226]/50 px-4 py-2 bg-[#1A3226]/[0.03] rounded-lg">
-          When Anthropic releases new models, update the model strings above. Changes take effect on the next analysis run.
-        </p>
-      </div>
-
-      {/* Future Platforms */}
-      <div>
-        <h3 className="text-lg font-bold text-[#1A3226] mb-4">Future Platforms — Not Yet Active</h3>
-        <div className="grid gap-4">
-          {futurePlatforms.map(platform => (
-            <div key={platform.id} className="rounded-2xl border-2 border-[#1A3226]/20 bg-[#1A3226]/[0.02] p-6 opacity-60">
+          return (
+            <div key={platform.id} className={`rounded-2xl border-2 bg-white p-6 ${
+              isEnabled && hasKey ? 'border-[#1A3226]' : 'border-[#1A3226]/20'
+            }`}>
               <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h3 className="text-lg font-bold text-[#1A3226]/70">⬜ {platform.name} — {platform.provider}</h3>
-                  <p className="text-sm text-[#1A3226]/50 mt-1">{platform.description}</p>
+                <div className="flex items-center gap-3">
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                    isEnabled && hasKey ? 'bg-green-100' : 'bg-[#1A3226]/10'
+                  }`}>
+                    {isEnabled && hasKey
+                      ? <Check className="w-4 h-4 text-green-700" />
+                      : <span className="w-2 h-2 rounded-full bg-[#1A3226]/30" />}
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold text-[#1A3226]">{platform.name} — {platform.provider}</h2>
+                    <p className="text-xs text-[#1A3226]/50 mt-0.5">{platform.description}</p>
+                  </div>
                 </div>
-                <span className="px-3 py-1 bg-[#1A3226]/10 text-[#1A3226]/70 text-xs font-semibold rounded-full">NOT ACTIVE</span>
+                <div className="flex items-center gap-2">
+                  {hasKey && (
+                    <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${
+                      isEnabled ? 'bg-green-100 text-green-800' : 'bg-[#1A3226]/10 text-[#1A3226]/60'
+                    }`}>{isEnabled ? 'ACTIVE' : 'DISABLED'}</span>
+                  )}
+                  {hasKey && !isClaude && (
+                    <button
+                      onClick={() => toggleEnabled(platform, !isEnabled)}
+                      className="text-xs underline text-[#1A3226]/50 hover:text-[#1A3226]"
+                    >{isEnabled ? 'Disable' : 'Enable'}</button>
+                  )}
+                </div>
               </div>
 
-              <div className="space-y-3">
-                <div>
-                  <label className="text-xs font-semibold text-[#1A3226]/60 uppercase">API Key</label>
-                  <input
-                    type="password"
-                    placeholder="Enter API key for future activation"
-                    className="w-full mt-1.5 px-3 py-2 border border-[#1A3226]/20 rounded-lg text-sm bg-white/50 focus:outline-none focus:ring-2 focus:ring-[#B8982F]/30"
-                  />
+              {/* Model routing for Claude */}
+              {isClaude && (
+                <div className="space-y-3 bg-[#1A3226]/[0.03] rounded-xl p-4 mb-4">
+                  <p className="text-sm font-semibold text-[#1A3226] mb-2">Model Routing</p>
+                  {['complex', 'standard', 'background'].map(tier => {
+                    const tierLabels = {
+                      complex: 'Complex Analyses',
+                      standard: 'Standard Analyses',
+                      background: 'Background Tasks',
+                    };
+                    const defaults = { complex: 'claude-opus-4-5', standard: 'claude-sonnet-4-6', background: 'claude-haiku-4-5-20251001' };
+                    const key = `anthropic_${tier}`;
+                    const currentRoute = routing[key];
+                    return (
+                      <div key={tier} className="flex items-center justify-between border-b border-[#1A3226]/10 last:border-0 pb-2 last:pb-0">
+                        <label className="text-sm text-[#1A3226]">{tierLabels[tier]}</label>
+                        <input
+                          type="text"
+                          value={currentRoute?.model_string || defaults[tier]}
+                          onChange={(e) => updateModel('anthropic', tier, e.target.value)}
+                          className="px-3 py-1 border border-[#1A3226]/20 rounded-lg text-sm font-mono bg-white focus:outline-none w-64"
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
+              )}
 
-                <div className="flex gap-2 pt-2">
+              {/* API Key input */}
+              <div>
+                <label className="text-xs font-semibold text-[#1A3226]/60 uppercase">
+                  {hasKey ? 'Update API Key' : 'API Key'}
+                </label>
+                <div className="flex gap-2 mt-1.5">
+                  <div className="relative flex-1">
+                    <input
+                      type={showKey[platform.id] ? 'text' : 'password'}
+                      placeholder={hasKey ? '••••••••••••••• (saved)' : `Enter ${platform.name} API key`}
+                      value={keyInputs[platform.id] || ''}
+                      onChange={e => setKeyInputs(prev => ({ ...prev, [platform.id]: e.target.value }))}
+                      className="w-full px-3 py-2 border border-[#1A3226]/20 rounded-lg text-sm font-mono bg-white focus:outline-none focus:ring-2 focus:ring-[#B8982F]/30 pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowKey(s => ({ ...s, [platform.id]: !s[platform.id] }))}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#1A3226]/40 hover:text-[#1A3226]"
+                    >
+                      {showKey[platform.id] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                   <Button
-                    size="sm"
-                    variant="outline"
-                    className="text-xs opacity-50 cursor-not-allowed"
-                    disabled
+                    onClick={() => saveApiKey(platform)}
+                    disabled={!(keyInputs[platform.id] || '').trim() || savingKey[platform.id]}
+                    className="bg-[#1A3226] hover:bg-[#1A3226]/90 text-white shrink-0"
                   >
-                    Configure
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="text-xs opacity-50 cursor-not-allowed"
-                    disabled
-                    title="Activation routes analyses to this platform. Only activate when integration is fully tested."
-                  >
-                    Activate
+                    {savingKey[platform.id] ? <Loader2 className="w-4 h-4 animate-spin" /> : hasKey ? 'Update' : 'Save & Enable'}
                   </Button>
                 </div>
               </div>
             </div>
-          ))}
-        </div>
+          );
+        })}
       </div>
     </div>
   );
