@@ -145,7 +145,13 @@ Deno.serve(async (req) => {
     const configs = await base44.asServiceRole.entities.PlatformConfig.filter({});
     const config = configs[0] || {};
 
-    if (config.ensemble_mode_enabled === true) {
+    // Check user's subscription tier — Starter is locked to single-model
+    const userOrgs = await base44.asServiceRole.entities.Organization.filter({ id: analysis.org_id });
+    const userOrg = userOrgs[0];
+    const tier = userOrg?.subscription_tier || 'starter';
+    const ensembleAllowed = tier === 'pro' || tier === 'team';
+
+    if (config.ensemble_mode_enabled === true && ensembleAllowed) {
       const startTime = Date.now();
 
       await base44.asServiceRole.entities.Analysis.update(analysisId, {

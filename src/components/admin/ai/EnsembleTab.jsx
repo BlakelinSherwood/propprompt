@@ -52,12 +52,21 @@ export default function EnsembleTab() {
   const [assignments, setAssignments] = useState({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [ownerTier, setOwnerTier] = useState(null);
 
   async function load() {
-    const configs = await base44.asServiceRole.entities.PlatformConfig.filter({});
+    const [configs, user] = await Promise.all([
+      base44.asServiceRole.entities.PlatformConfig.filter({}),
+      base44.auth.me(),
+    ]);
     const cfg = configs[0] || {};
     setConfig(cfg);
     setAssignments(cfg.ensemble_section_assignments || {});
+    // Check platform owner's own org tier
+    if (user?.email) {
+      const orgs = await base44.asServiceRole.entities.Organization.filter({ owner_email: user.email });
+      setOwnerTier(orgs[0]?.subscription_tier || 'starter');
+    }
   }
 
   useEffect(() => { load(); }, []);
@@ -115,6 +124,13 @@ export default function EnsembleTab() {
 
   return (
     <div className="space-y-6">
+      {ownerTier === 'starter' && (
+        <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
+          <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
+          <span>Ensemble AI is available for your <strong>Pro</strong> and <strong>Team</strong> subscribers.</span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-white border border-[#1A3226]/10 rounded-xl p-6">
         <h2 className="text-lg font-semibold text-[#1A3226] mb-1">Ensemble AI Mode</h2>
