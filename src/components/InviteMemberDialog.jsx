@@ -14,17 +14,22 @@ import {
 import { useToast } from "@/components/ui/use-toast";
 
 const INVITE_ROLES_BY_ROLE = {
-  platform_owner: ["brokerage_admin", "team_lead", "agent", "assistant", "team_agent"],
-  brokerage_admin: ["team_lead", "agent", "assistant", "team_agent"],
-  team_lead: ["agent", "assistant", "team_agent"],
+  platform_owner: ["platform_owner", "brokerage_owner", "team_lead", "brokerage_admin", "team_admin", "individual_agent", "agent", "team_agent", "assistant"],
+  brokerage_owner: ["team_lead", "brokerage_admin", "team_admin", "agent", "team_agent", "assistant"],
+  brokerage_admin: ["team_lead", "team_admin", "agent", "team_agent", "assistant"],
+  team_lead: ["agent", "team_agent", "assistant", "team_admin"],
 };
 
 const ROLE_LABELS = {
-  brokerage_admin: "Brokerage Admin",
+  platform_owner: "Platform Owner",
+  brokerage_owner: "Brokerage Owner",
   team_lead: "Team Lead",
-  agent: "Agent",
-  assistant: "Assistant",
+  brokerage_admin: "Brokerage Admin",
+  team_admin: "Team Admin",
+  agent: "Agent (under Brokerage/Team)",
+  individual_agent: "Individual Agent (with Broker Permissions)",
   team_agent: "Team Agent",
+  assistant: "Assistant",
 };
 
 export default function InviteMemberDialog({ userRole, onClose, onInvited }) {
@@ -39,22 +44,8 @@ export default function InviteMemberDialog({ userRole, onClose, onInvited }) {
     if (!email || !role) return;
     setSending(true);
     try {
-      await base44.users.inviteUser(email, role);
-      toast({
-        title: "Invite sent",
-        description: `${email} has been invited as ${ROLE_LABELS[role] || role}.`,
-      });
-      onInvited();
-    } catch (e) {
-      toast({
-        title: "Error",
-        description: e.message || "Could not send invite.",
-        variant: "destructive",
-      });
-    } finally {
-      setSending(false);
-    }
-  }
+      const res = await base44.functions.invoke("inviteMember", { email, appRole: role });
+      if (res.data?.error) throw new Error(res.data.error);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
