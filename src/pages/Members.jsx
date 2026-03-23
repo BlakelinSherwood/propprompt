@@ -14,6 +14,7 @@ export default function Members() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [showInvite, setShowInvite] = useState(false);
+  const [pendingInvites, setPendingInvites] = useState([]);
 
   useEffect(() => {
     loadData();
@@ -21,8 +22,23 @@ export default function Members() {
 
   async function loadData() {
     try {
-      const users = await base44.entities.User.list();
+      const [users, invites] = await Promise.all([
+        base44.entities.User.list(),
+        base44.entities.OrgMembership.filter({ status: 'pending_invite' }),
+      ]);
       setMembers(users);
+      // Only show pending invites for emails not already in the user list
+      const userEmails = new Set(users.map(u => u.email?.toLowerCase()));
+      const pending = invites
+        .filter(i => !userEmails.has(i.user_email?.toLowerCase()))
+        .map(i => ({
+          id: `pending_${i.id}`,
+          email: i.user_email,
+          full_name: null,
+          role: i.role_in_org || 'agent',
+          status: 'pending_invite',
+        }));
+      setPendingInvites(pending);
     } catch (e) {
       console.error(e);
     } finally {
@@ -30,7 +46,8 @@ export default function Members() {
     }
   }
 
-  const filtered = members.filter(
+  const allMembers = [...members, ...pendingInvites];
+  const filtered = allMembers.filter(
     (m) =>
       (m.full_name || "").toLowerCase().includes(search.toLowerCase()) ||
       (m.email || "").toLowerCase().includes(search.toLowerCase())
@@ -55,7 +72,7 @@ export default function Members() {
         <div>
           <h1 className="text-xl font-semibold text-[#1A3226]">Team Members</h1>
           <p className="text-sm text-[#1A3226]/50 mt-0.5">
-            {members.length} member{members.length !== 1 ? "s" : ""} in your organization
+            {members.length} member{members.length !== 1 ? "s" : ""} in your organization{pendingInvites.length > 0 ? ` · ${pendingInvites.length} pending` : ""}
           </p>
         </div>
         {canInvite && (
