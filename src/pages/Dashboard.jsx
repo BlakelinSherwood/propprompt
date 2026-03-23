@@ -26,13 +26,14 @@ export default function Dashboard() {
         setLoading(false);
         return;
       }
+      // Safety timeout — never spin forever on mobile
+      const timeout = setTimeout(() => setLoading(false), 8000);
       try {
         if (!user.privacy_notice_accepted_at) setShowPrivacyNotice(true);
 
         // Resolve subscribed territory names for the subtitle
         try {
           if (user.role === 'platform_owner') {
-            // Platform owner sees generic label — no specific territory
             setMarketLabel(null);
           } else {
             const subs = await base44.entities.TerritorySubscription.filter({ user_id: user.id, status: 'active' });
@@ -65,7 +66,6 @@ export default function Dashboard() {
           }
         }
 
-        // Fair housing status for brokerage_admin / team_lead
         if (user.role === "brokerage_admin" || user.role === "team_lead") {
           try {
             const reviews = await base44.entities.FairHousingReview.filter({ reviewer_email: user.email });
@@ -82,6 +82,7 @@ export default function Dashboard() {
       } catch (e) {
         console.error(e);
       } finally {
+        clearTimeout(timeout);
         setLoading(false);
       }
     }
