@@ -141,6 +141,162 @@ Deno.serve(async (req) => {
     // Mark as in_progress
     await base44.asServiceRole.entities.Analysis.update(analysisId, { status: "in_progress" });
 
+    // ── ENSEMBLE AI BRANCH ───────────────────────────────────────────────────
+    const configs = await base44.asServiceRole.entities.PlatformConfig.filter({});
+    const config = configs[0] || {};
+
+    if (config.ensemble_mode_enabled === true) {
+      const startTime = Date.now();
+
+      await base44.asServiceRole.entities.Analysis.update(analysisId, {
+        ensemble_mode_used: true,
+        assembly_status: 'in_progress',
+        sections_total: 9
+      });
+
+      const assignments = config.ensemble_section_assignments || {};
+      const fallbackProvider = config.ensemble_fallback_provider || 'chatgpt';
+      const fallbackModel = config[`${fallbackProvider === 'chatgpt' ? 'openai' : fallbackProvider}_model`] || 'gpt-4o';
+
+      // Section-specific focused prompts
+      const sectionPrompts = {
+        pricing_strategy:
+          `${prompt}\n\nTASK: Write ONLY the Pricing Strategy & CMA section. Cover comparable selection, price positioning, days-on-market context, and your recommended list price with clear rationale. Be specific and data-driven.`,
+        market_context:
+          `${prompt}\n\nTASK: Write ONLY the Current Market Context section. Cover active inventory levels, absorption rate, buyer demand signals, interest rate environment, and seasonal factors as of today.`,
+        neighbourhood:
+          `${prompt}\n\nTASK: Write ONLY the Neighbourhood Snapshot. Cover schools, walkability, proximity to amenities, recent comparable sales activity in the immediate area, and location strengths and weaknesses.`,
+        buyer_archetypes:
+          `${prompt}\n\nTASK: Write ONLY the Buyer Archetype Profiles. Identify the top 2-3 most likely buyer types for this specific property. For each: give them a name, describe their motivations, budget range, what they prioritise, and what language resonates with them.`,
+        listing_copy:
+          `${prompt}\n\nTASK: Write ONLY the Listing Copy. Include: (1) MLS description ~250 words, (2) three headline variants, (3) feature sequencing ranked for the most likely buyer archetype. Write to sell.`,
+        net_sheet:
+          `${prompt}\n\nTASK: Write ONLY the Seller Net Sheet. Show three scenarios: 3% below recommended price, at recommended price, 3% above. For each scenario show: gross sale price, estimated commission (use 5%), estimated closing costs, estimated mortgage payoff line (leave blank if unknown), and estimated net proceeds.`,
+        seller_presentation:
+          `${prompt}\n\nTASK: Write ONLY the Seller Presentation Narrative. This is what the agent says in the listing appointment. Open with market context, build trust with data, present the recommendation confidently, handle likely objections, and close with a clear call to action.`,
+        talking_points:
+          `${prompt}\n\nTASK: Write ONLY the Agent Talking Points. Provide 8-10 punchy, confident bullet points the agent uses during the appointment. Conversational tone. Each point should be one or two sentences maximum.`,
+      };
+
+      // Run sections in parallel groups
+      const runSection = async (sectionKey) => {
+        const assignment = assignments[sectionKey] || { provider: 'claude', model: null };
+        const provider = assignment.provider || 'claude';
+        const modelKey = provider === 'chatgpt' ? 'openai' : provider;
+        const model = assignment.model || config[`${modelKey}_model`] || null;
+
+        try {
+          const res = await base44.functions.invoke("runEnsembleSection", {
+            analysisId,
+            sectionKey,
+            sectionPrompt: sectionPrompts[sectionKey],
+            provider,
+            model,
+            fallbackProvider,
+            fallbackModel,
+          });
+          return {
+            sectionKey,
+            output: res.data?.output || '',
+            provider: res.data?.provider || provider,
+            wasFallback: res.data?.wasFallback || false
+          };
+        } catch (e) {
+          console.warn(`[ensemble] section ${sectionKey} failed:`, e.message);
+          return { sectionKey, output: '', error: e.message };
+        }
+      };
+
+      // Group 1 — runs first (pricing sets context for all other sections)
+      const group1 = await Promise.all(['pricing_strategy'].map(runSection));
+
+      // Groups 2-4 — run in parallel waves
+      const group2 = await Promise.all(['market_context', 'neighbourhood', 'net_sheet'].map(runSection));
+      const group3 = await Promise.all(['buyer_archetypes', 'listing_copy'].map(runSection));
+      const group4 = await Promise.all(['seller_presentation', 'talking_points'].map(runSection));
+
+      const allSections = [...group1, ...group2, ...group3, ...group4];
+      const sectionOutputs = {};
+      allSections.forEach(s => { if (s.output) sectionOutputs[s.sectionKey] = s.output; });
+
+      const completedCount = allSections.filter(s => s.output).length;
+
+      await base44.asServiceRole.entities.Analysis.update(analysisId, {
+        sections_completed: completedCount,
+        ensemble_section_outputs: sectionOutputs,
+        assembly_status: 'assembling'
+      });
+
+      // Final assembly — always Claude regardless of section assignments
+      const claudeKeyRes = await base44.functions.invoke("resolveApiKey", {
+        platform: "claude",
+        orgId: analysis.org_id,
+        agentEmail: analysis.run_by_email,
+      });
+      const claudeKey = claudeKeyRes.data?.apiKey;
+
+      const assemblyPrompt = `You are assembling a PropPrompt™ real estate analysis report for a listing appointment.
+The sections below were written by specialised AI models. Your job is to:
+1. Weave them into one cohesive, polished, professionally written report
+2. Ensure consistent tone and terminology throughout
+3. Remove any redundancy between sections
+4. Ensure pricing strategy, listing copy, and buyer archetypes are clearly aligned
+5. Format with clean markdown section headers
+
+SECTIONS TO ASSEMBLE:
+${Object.entries(sectionOutputs).map(([k, v]) => `### ${k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}\n${v}`).join('\n\n---\n\n')}
+
+Return the complete assembled PropPrompt™ report in polished markdown.`;
+
+      const assemblyRes = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": claudeKey,
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          model: config.anthropic_model || "claude-opus-4-5",
+          max_tokens: 6000,
+          messages: [{ role: "user", content: assemblyPrompt }],
+          system: "You are PropPrompt™. You are assembling a final client-ready real estate report. Make it exceptional."
+        })
+      });
+      const assemblyData = await assemblyRes.json();
+      const assembledOutput = assemblyData.content?.[0]?.text || Object.values(sectionOutputs).join('\n\n');
+
+      const generationTime = Date.now() - startTime;
+
+      await base44.asServiceRole.entities.Analysis.update(analysisId, {
+        status: 'complete',
+        output_text: assembledOutput,
+        completed_at: new Date().toISOString(),
+        ai_model: 'ensemble',
+        assembly_status: 'complete',
+        sections_completed: completedCount,
+        ensemble_mode_used: true,
+        fallback_triggered: allSections.some(s => s.wasFallback),
+        generation_time_ms: generationTime,
+      });
+
+      try {
+        await base44.functions.invoke("deductAnalysisQuota", { analysisId, orgId: analysis.org_id });
+      } catch (e) {
+        console.warn("[generateAnalysis] quota deduction failed:", e.message);
+      }
+
+      return Response.json({
+        output: assembledOutput,
+        model: 'ensemble',
+        keySource: 'sc_platform',
+        sectionsCompleted: completedCount,
+        generationTimeMs: generationTime,
+      });
+    }
+    // ── END ENSEMBLE AI BRANCH ────────────────────────────────────────────────
+
+    // Existing single-model logic continues unchanged below...
+
     // Call the appropriate AI provider
     let result;
     const platform = analysis.ai_platform;
