@@ -10,7 +10,7 @@ const ANTHROPIC_MODELS = {
   agent:   "claude-3-5-sonnet-20241022",
 };
 
-async function callClaude(apiKey, prompt, keySource) {
+async function callClaudeOnce(apiKey, prompt, keySource) {
   const model = keySource === "agent" ? ANTHROPIC_MODELS.agent : ANTHROPIC_MODELS.default;
   const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
   const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -29,10 +29,29 @@ async function callClaude(apiKey, prompt, keySource) {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error?.message || `Claude API error ${res.status}`);
+    const msg = err.error?.message || `Claude API error ${res.status}`;
+    const isOverloaded = res.status === 529 || msg.toLowerCase().includes("overloaded");
+    throw Object.assign(new Error(msg), { isOverloaded });
   }
   const data = await res.json();
   return { text: data.content?.[0]?.text || "", model };
+}
+
+async function callClaude(apiKey, prompt, keySource) {
+  const maxRetries = 3;
+  const delayMs = [3000, 8000, 15000];
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await callClaudeOnce(apiKey, prompt, keySource);
+    } catch (err) {
+      if (err.isOverloaded && attempt < maxRetries - 1) {
+        console.warn(`[generateAnalysis] Claude overloaded, retry ${attempt + 1}/${maxRetries - 1} in ${delayMs[attempt]}ms...`);
+        await new Promise(r => setTimeout(r, delayMs[attempt]));
+      } else {
+        throw err;
+      }
+    }
+  }
 }
 
 async function callOpenAI(apiKey, prompt) {
