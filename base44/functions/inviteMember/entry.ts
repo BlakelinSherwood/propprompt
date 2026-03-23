@@ -36,18 +36,28 @@ Deno.serve(async (req) => {
     // Send the invite via base44 SDK (must use user-scoped client)
     await base44.users.inviteUser(email, platformRole);
 
-    // Try to update the user record if they already exist, or create a placeholder
+    // Create an OrgMembership record so the invite shows as pending in the Members list
     try {
-      const users = await base44.asServiceRole.entities.User.filter({ email });
-      if (users && users.length > 0) {
-        await base44.asServiceRole.entities.User.update(users[0].id, {
-          role: appRole,
-          invited_by: user.email,
-        });
+      // Find the inviter's org
+      const orgs = await base44.asServiceRole.entities.Organization.filter({ owner_email: user.email });
+      const orgId = orgs?.[0]?.id;
+      if (orgId) {
+        // Check if membership already exists
+        const existing = await base44.asServiceRole.entities.OrgMembership.filter({ user_email: email, org_id: orgId });
+        if (!existing || existing.length === 0) {
+          await base44.asServiceRole.entities.OrgMembership.create({
+            user_email: email,
+            org_id: orgId,
+            role_in_org: appRole,
+            status: 'pending_invite',
+            invited_by_email: user.email,
+            invite_sent_at: new Date().toISOString(),
+            invite_expires_at: new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString(),
+          });
+        }
       }
     } catch (e) {
-      // User record may not exist yet — that's okay, role will be set on first login
-      console.log("Could not pre-set role (user may not exist yet):", e.message);
+      console.log('Could not create OrgMembership:', e.message);
     }
 
     return Response.json({ success: true, email, appRole, platformRole });

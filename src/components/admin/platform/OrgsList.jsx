@@ -23,7 +23,7 @@ export default function OrgsList() {
   useEffect(() => {
     async function load() {
       const [data, me] = await Promise.all([
-        base44.entities.Organization.list("-created_date", 100),
+        base44.asServiceRole.entities.Organization.list("-created_date", 100),
         base44.auth.me(),
       ]);
 
