@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
-import { Settings, Plug, Palette } from "lucide-react";
+import { Plug, Palette } from "lucide-react";
+import AiApiKeyManager from "../components/AiApiKeyManager";
 import CrmConnectedApps from "../components/CrmConnectedApps";
 import DriveConnectedApp from "../components/DriveConnectedApp";
 import AgentBrandingSettings from "../components/AgentBrandingSettings";
@@ -51,6 +52,15 @@ export default function AccountSettings() {
           <div>
             <h2 className="text-sm font-semibold text-[#1A3226] mb-3">Google Drive</h2>
             <DriveConnectedApp />
+          </div>
+
+          {/* AI API Keys */}
+          <div>
+            <h2 className="text-sm font-semibold text-[#1A3226] mb-1">AI API Keys</h2>
+            <p className="text-xs text-[#1A3226]/40 mb-3">
+              Add your own API keys to use ChatGPT for analyses.
+            </p>
+            <AiApiKeyManager />
           </div>
 
           {/* CRM Integrations */}
