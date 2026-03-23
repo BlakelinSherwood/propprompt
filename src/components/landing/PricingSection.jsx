@@ -26,18 +26,13 @@ const BUYOUT_TIERS = [
 ];
 
 function TierCard({ name, price, cap, features, highlight }) {
-  const isCall = price === 'Call';
   return (
     <div className={`rounded-2xl p-6 flex flex-col gap-4 border-2 transition-all ${highlight ? 'bg-[#1A3226] text-white border-[#1A3226]' : 'bg-white text-[#1A3226] border-[#1A3226]/10 hover:border-[#B8982F]/40'}`}>
       {highlight && <span className="text-[10px] uppercase tracking-wider bg-[#B8982F] text-[#1A3226] font-bold px-3 py-0.5 rounded-full self-start">Most Popular</span>}
       <p className={`font-bold text-lg ${highlight ? 'text-white' : 'text-[#1A3226]'}`}>{name}</p>
-      {isCall ? (
-        <p className={`text-3xl font-bold ${highlight ? 'text-white' : 'text-[#1A3226]'}`}>Custom<span className={`text-sm font-normal block mt-0.5 ${highlight ? 'text-white/50' : 'text-[#1A3226]/40'}`}>Contact us for pricing</span></p>
-      ) : (
-        <p className={`text-3xl font-bold ${highlight ? 'text-white' : 'text-[#1A3226]'}`}>
-          ${price}<span className={`text-sm font-normal ${highlight ? 'text-white/50' : 'text-[#1A3226]/40'}`}>/mo</span>
-        </p>
-      )}      
+      <p className={`text-3xl font-bold ${highlight ? 'text-white' : 'text-[#1A3226]'}`}>
+        ${price}<span className={`text-sm font-normal ${highlight ? 'text-white/50' : 'text-[#1A3226]/40'}`}>/mo</span>
+      </p>
       <ul className="space-y-2 flex-1">
         {features.map(f => (
           <li key={f} className={`flex items-start gap-2 text-sm ${highlight ? 'text-white/80' : 'text-[#1A3226]/70'}`}>
@@ -45,15 +40,9 @@ function TierCard({ name, price, cap, features, highlight }) {
           </li>
         ))}
       </ul>
-      {isCall ? (
-        <a href="mailto:blake.sherwood@compass.com" className={`text-center text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors bg-[#B8982F] text-[#1A3226] hover:bg-[#B8982F]/90`}>
-          Contact Us
-        </a>
-      ) : (
-        <Link to="/territories" className={`text-center text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors ${highlight ? 'bg-[#B8982F] text-[#1A3226] hover:bg-[#B8982F]/90' : 'bg-[#1A3226] text-white hover:bg-[#1A3226]/90'}`}>
-          Claim Territory
-        </Link>
-      )}
+      <Link to="/territories" className={`text-center text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors ${highlight ? 'bg-[#B8982F] text-[#1A3226] hover:bg-[#B8982F]/90' : 'bg-[#1A3226] text-white hover:bg-[#1A3226]/90'}`}>
+        Claim Territory
+      </Link>
     </div>
   );
 }
