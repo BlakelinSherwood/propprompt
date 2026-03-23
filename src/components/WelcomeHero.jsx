@@ -1,4 +1,4 @@
-export default function WelcomeHero({ user, roleLabel }) {
+export default function WelcomeHero({ user, roleLabel, marketLabel }) {
   const firstName = user?.full_name?.split(" ")[0] || "there";
 
   return (
@@ -13,7 +13,9 @@ export default function WelcomeHero({ user, roleLabel }) {
           Welcome back, {firstName}
         </h1>
         <p className="text-white/60 text-sm max-w-lg">
-          AI-Calibrated Real Estate Analysis System for Eastern Massachusetts.
+          {marketLabel
+            ? `AI-Calibrated Real Estate Analysis System for ${marketLabel}.`
+            : "AI-Calibrated Real Estate Analysis System."}
           {roleLabel && (
             <span className="inline-flex ml-2 text-[10px] uppercase tracking-wider bg-[#B8982F]/20 text-[#B8982F] px-2 py-0.5 rounded-full font-medium">
               {roleLabel}

@@ -15,7 +15,8 @@ export default function Dashboard() {
   const { user, isLoading: authLoading } = useAuth();
   const [userCount, setUserCount] = useState(null);
   const [analysisCount, setAnalysisCount] = useState(null);
-  const [fhStatus, setFhStatus] = useState(null); // { signed, overdue, pending }
+  const [fhStatus, setFhStatus] = useState(null);
+  const [marketLabel, setMarketLabel] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showPrivacyNotice, setShowPrivacyNotice] = useState(false);
 
@@ -26,9 +27,28 @@ export default function Dashboard() {
         return;
       }
       try {
-        // Show privacy notice if never accepted
-        if (!user.privacy_notice_accepted_at) {
-          setShowPrivacyNotice(true);
+        if (!user.privacy_notice_accepted_at) setShowPrivacyNotice(true);
+
+        // Resolve subscribed territory names for the subtitle
+        try {
+          if (user.role === 'platform_owner') {
+            // Platform owner sees generic label — no specific territory
+            setMarketLabel(null);
+          } else {
+            const subs = await base44.entities.TerritorySubscription.filter({ user_id: user.id, status: 'active' });
+            if (subs.length > 0) {
+              const territoryIds = [...new Set(subs.map(s => s.territory_id))];
+              const territories = await Promise.all(
+                territoryIds.slice(0, 5).map(id => base44.entities.Territory.filter({ id }))
+              );
+              const names = territories.flatMap(t => t).map(t => t.city_town).filter(Boolean);
+              if (names.length > 0) {
+                setMarketLabel(names.length <= 3 ? names.join(', ') : `${names.slice(0, 2).join(', ')} +${names.length - 2} more`);
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to load territory subscriptions:', e);
         }
 
         const isAdmin = user.role === "platform_owner" || user.role === "brokerage_admin" || user.role === "team_lead";
@@ -98,7 +118,7 @@ export default function Dashboard() {
         {/* Fair housing overdue banner — only for brokerage_admin / team_lead */}
         <FairHousingBanner user={user} />
 
-        <WelcomeHero user={user} roleLabel={ROLE_LABELS[user?.role]} />
+        <WelcomeHero user={user} roleLabel={ROLE_LABELS[user?.role]} marketLabel={marketLabel} />
 
         {/* Quick Stats */}
         {isAdmin && (
@@ -135,7 +155,11 @@ export default function Dashboard() {
         {/* Getting Started */}
         <div className="rounded-2xl border border-[#1A3226]/10 bg-white p-6 lg:p-8">
           <h2 className="text-lg font-semibold text-[#1A3226] mb-1">Getting Started</h2>
-          <p className="text-sm text-[#1A3226]/60 mb-6">PropPrompt™ is your AI-calibrated real estate analysis system for Eastern Massachusetts.</p>
+          <p className="text-sm text-[#1A3226]/60 mb-6">
+            {marketLabel
+              ? `PropPrompt™ is your AI-calibrated real estate analysis system for ${marketLabel}.`
+              : "PropPrompt™ is your AI-calibrated real estate analysis system."}
+          </p>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {isAdmin && (
