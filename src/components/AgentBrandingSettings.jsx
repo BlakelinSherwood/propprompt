@@ -73,7 +73,7 @@ export default function AgentBrandingSettings() {
   useEffect(() => {
     base44.auth.me().then(me => {
       setUser(me);
-      return base44.entities.AgentBranding.filter({ user_email: me.email });
+      return base44.entities.AgentBranding.filter({ user_id: me.email });
     }).then(res => {
       if (res[0]) {
         setExistingId(res[0].id);
@@ -102,7 +102,7 @@ export default function AgentBrandingSettings() {
   const handleSave = async () => {
     if (!user) return;
     setSaving(true);
-    const payload = { user_email: user.email, ...form };
+    const payload = { user_id: user.email, ...form };
     if (existingId) {
       await base44.entities.AgentBranding.update(existingId, payload);
     } else {
