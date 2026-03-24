@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import ApiKeysTab from "../../components/admin/ai/ApiKeysTab";
 import EnsembleTab from "../../components/admin/ai/EnsembleTab";
 import UsageStatsTab from "../../components/admin/ai/UsageStatsTab";
+import ModelReferenceTab from "../../components/admin/ai/ModelReferenceTab";
 
 export default function AiSettings() {
   const [loading, setLoading] = useState(true);
@@ -49,6 +50,7 @@ export default function AiSettings() {
           <TabsTrigger value="keys">API Keys & Providers</TabsTrigger>
           <TabsTrigger value="ensemble">Ensemble AI</TabsTrigger>
           <TabsTrigger value="usage">Usage Stats</TabsTrigger>
+          <TabsTrigger value="reference">Model Reference</TabsTrigger>
         </TabsList>
 
         <TabsContent value="keys" className="mt-6">
@@ -61,6 +63,10 @@ export default function AiSettings() {
 
         <TabsContent value="usage" className="mt-6">
           <UsageStatsTab />
+        </TabsContent>
+
+        <TabsContent value="reference" className="mt-6">
+          <ModelReferenceTab />
         </TabsContent>
       </Tabs>
     </div>
