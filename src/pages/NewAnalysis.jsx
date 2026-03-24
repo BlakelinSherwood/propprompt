@@ -11,6 +11,7 @@ import Step5OutputFormat from "../components/wizard/Step5OutputFormat";
 import Step6Confirm from "../components/wizard/Step6Confirm";
 import StepClientFinancial from "../components/wizard/StepClientFinancial";
 import StepBuyerIntelligence from "../components/wizard/StepBuyerIntelligence";
+import StepReportEnhancements from "../components/wizard/StepReportEnhancements";
 
 function getStepLabels(assessmentType) {
   const base = ["Assessment", "Client Role", "Property"];
@@ -21,6 +22,8 @@ function getStepLabels(assessmentType) {
     afterProperty.push("Financial Context");
   } else if (["listing_pricing", "buyer_intelligence"].includes(assessmentType)) {
     afterProperty.push("Buyer Context");
+  } else if (["cma", "investment_analysis"].includes(assessmentType)) {
+    afterProperty.push("Enhancements");
   }
   
   return [...base, ...afterProperty, "Output", "Confirm"];
@@ -177,6 +180,8 @@ export default function NewAnalysis() {
           },
         },
         drive_sync_status: intake.drive_sync ? "pending" : "not_synced",
+        include_migration: intake.include_migration || false,
+        include_archetypes: intake.include_archetypes || false,
       };
       if (intake.on_behalf_of_email) analysisData.on_behalf_of_email = intake.on_behalf_of_email;
       if (user.org_id) analysisData.org_id = user.org_id;
@@ -194,8 +199,10 @@ export default function NewAnalysis() {
   const stepProps = { intake, update, user, userTier, onNext: next, onBack: back };
   const maxStep = getMaxStep(intake.assessment_type);
   const stepLabels = getStepLabels(intake.assessment_type);
-  const hasContextStep = intake.assessment_type === "client_portfolio" || 
-                         ["listing_pricing", "buyer_intelligence"].includes(intake.assessment_type);
+  const hasFinancialStep = intake.assessment_type === "client_portfolio";
+  const hasBuyerStep = ["listing_pricing", "buyer_intelligence"].includes(intake.assessment_type);
+  const hasEnhancementStep = ["cma", "investment_analysis"].includes(intake.assessment_type);
+  const hasContextStep = hasFinancialStep || hasBuyerStep || hasEnhancementStep;
 
   // Map step number to component based on assessment type
   function getStepComponent() {
@@ -203,15 +210,14 @@ export default function NewAnalysis() {
     if (step === 2) return <Step3ClientRelationship {...stepProps} />;
     if (step === 3) return <Step4PropertyDetails {...stepProps} />;
     
+    // Context step (step 4)
     if (hasContextStep && step === 4) {
-      if (intake.assessment_type === "client_portfolio") {
-        return <StepClientFinancial {...stepProps} />;
-      } else if (["listing_pricing", "buyer_intelligence"].includes(intake.assessment_type)) {
-        return <StepBuyerIntelligence {...stepProps} />;
-      }
+      if (hasFinancialStep) return <StepClientFinancial {...stepProps} />;
+      if (hasBuyerStep) return <StepBuyerIntelligence {...stepProps} />;
+      if (hasEnhancementStep) return <StepReportEnhancements {...stepProps} />;
     }
     
-    // Output step
+    // Output step (5 if context exists, 4 otherwise)
     const outputStep = hasContextStep ? 5 : 4;
     const confirmStep = hasContextStep ? 6 : 5;
     

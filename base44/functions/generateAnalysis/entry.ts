@@ -5,8 +5,51 @@
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.21';
 
+// Inline section matrix (must match assemblePrompt)
+function getRequiredSections(assessmentType, analysis) {
+  const matrix = {
+    listing_pricing: {
+      base: ['migration_analysis', 'buyer_archetype', 'tiered_comps', 'listing_timing', 'attribute_alignment_grid', 'location_priority_characteristics'],
+    },
+    cma: {
+      base: ['tiered_comps', 'location_priority_characteristics'],
+      migration_opt: ['migration_analysis'],
+      archetype_opt: ['buyer_archetype'],
+    },
+    buyer_intelligence: {
+      base: ['migration_analysis', 'buyer_archetype', 'listing_timing', 'attribute_alignment_grid', 'location_priority_characteristics'],
+    },
+    investment_analysis: {
+      base: ['tiered_comps', 'location_priority_characteristics', 'rate_environment'],
+      migration_opt: ['migration_analysis'],
+      archetype_opt: ['buyer_archetype'],
+    },
+    rental_analysis: {
+      base: [],
+    },
+    client_portfolio: {
+      base: ['tiered_comps', 'portfolio_options', 'adu_option', 'location_priority_characteristics', 'rate_environment'],
+    },
+    custom: {
+      base: analysis.selected_modules || [],
+    },
+  };
+  
+  const config = matrix[assessmentType] || { base: [] };
+  const sections = new Set([...config.base]);
+  
+  if (analysis.include_migration && config.migration_opt) {
+    config.migration_opt.forEach(s => sections.add(s));
+  }
+  if (analysis.include_archetypes && config.archetype_opt) {
+    config.archetype_opt.forEach(s => sections.add(s));
+  }
+  
+  return sections;
+}
+
 // Expanded analysis instructions (inlined to avoid import path issues in Deno)
-function getExpandedSystemPrompt(todayString) {
+function getExpandedSystemPrompt(todayString, requiredSections) {
   const ANALYSIS_SYSTEM_PROMPT = `
 ────────────────────────────────────────────────────────────────
 EXPANDED ANALYSIS INSTRUCTIONS — ALL ANALYSIS TYPES
@@ -138,9 +181,40 @@ Property descriptions: Target features and amenities only (SF, finishes, outdoor
 Focus on lifestyle fit without implying buyer demographic.
 Never steer toward/away from protected classes.
 `;
+  
+  // Filter prompt instructions based on required sections
+  let filtered = ANALYSIS_SYSTEM_PROMPT;
+  
+  // Remove sections not in requiredSections
+  if (!requiredSections.has('migration_analysis')) {
+    filtered = filtered.replace(
+      /^FOR MIGRATION ANALYSIS.*?(?=^FOR |^────|\Z)/ms,
+      ''
+    );
+  }
+  if (!requiredSections.has('buyer_archetype')) {
+    filtered = filtered.replace(
+      /^FOR ARCHETYPE GENERATION.*?(?=^FOR |^────|\Z)/ms,
+      ''
+    );
+  }
+  if (!requiredSections.has('portfolio_options')) {
+    filtered = filtered.replace(
+      /^FOR CLIENT PORTFOLIO ANALYSIS ONLY.*?(?=^FOR |^────|\Z)/ms,
+      ''
+    );
+  }
+  if (!requiredSections.has('tiered_comps')) {
+    filtered = filtered.replace(
+      /^FOR TIERED COMP ANALYSIS.*?(?=^FOR |^────|\Z)/ms,
+      ''
+    );
+  }
+  
+  return filtered;
   return `You are PropPrompt™, an elite real estate AI analyst serving New England brokerages. Today's date is ${todayString}. All market analysis, pricing, and trends should reflect current conditions as of this date. Provide thorough, data-driven analysis with professional narrative quality. Use markdown formatting.
 
-${ANALYSIS_SYSTEM_PROMPT}`;
+${filtered}`;
 }
 
 const ANTHROPIC_MODELS = {
@@ -148,10 +222,10 @@ const ANTHROPIC_MODELS = {
   agent:   "claude-3-5-sonnet-20241022",
 };
 
-async function callClaudeOnce(apiKey, prompt, keySource) {
+async function callClaudeOnce(apiKey, prompt, keySource, requiredSections) {
   const model = keySource === "agent" ? ANTHROPIC_MODELS.agent : ANTHROPIC_MODELS.default;
   const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-  const systemPrompt = getExpandedSystemPrompt(today);
+  const systemPrompt = getExpandedSystemPrompt(today, requiredSections);
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -176,12 +250,12 @@ async function callClaudeOnce(apiKey, prompt, keySource) {
   return { text: data.content?.[0]?.text || "", model };
 }
 
-async function callClaude(apiKey, prompt, keySource) {
+async function callClaude(apiKey, prompt, keySource, requiredSections) {
   const maxRetries = 3;
   const delayMs = [3000, 8000, 15000];
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      return await callClaudeOnce(apiKey, prompt, keySource);
+      return await callClaudeOnce(apiKey, prompt, keySource, requiredSections);
     } catch (err) {
       if (err.isOverloaded && attempt < maxRetries - 1) {
         console.warn(`[generateAnalysis] Claude overloaded, retry ${attempt + 1}/${maxRetries - 1} in ${delayMs[attempt]}ms...`);
@@ -309,6 +383,10 @@ Deno.serve(async (req) => {
     // Mark as in_progress
     await base44.asServiceRole.entities.Analysis.update(analysisId, { status: "in_progress" });
 
+    // ── Resolve required sections based on analysis type ────────────────────────
+    const requiredSections = getRequiredSections(analysis.assessment_type, analysis);
+    console.log('[generateAnalysis] required sections:', Array.from(requiredSections));
+    
     // ── TIER-BASED ROUTING ────────────────────────────────────────────────────
     const configs = await base44.asServiceRole.entities.PlatformConfig.filter({});
     const config = configs[0] || {};
@@ -448,7 +526,7 @@ Deno.serve(async (req) => {
     let result;
     const platform = analysis.ai_platform;
     if (platform === "claude") {
-      result = await callClaude(apiKey, prompt, keySource);
+      result = await callClaude(apiKey, prompt, keySource, requiredSections);
     } else if (platform === "chatgpt") {
       result = await callOpenAI(apiKey, prompt);
     } else if (platform === "gemini") {

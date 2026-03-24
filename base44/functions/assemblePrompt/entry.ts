@@ -19,25 +19,42 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 // Inline section inclusion matrix (avoid import issues)
 function getPromptSections(assessmentType, analysis) {
   const matrix = {
-    listing_pricing: ['migration_analysis', 'buyer_archetype', 'valuation_module'],
-    cma: ['valuation_module', 'location_priorities'],
-    buyer_intelligence: ['migration_analysis', 'buyer_archetype'],
-    investment_analysis: ['valuation_module', 'location_priorities', 'rate_environment'],
-    rental_analysis: [],
-    client_portfolio: ['valuation_module', 'portfolio_options', 'location_priorities', 'rate_environment'],
-    custom: analysis.selected_modules || [],
+    listing_pricing: {
+      base: ['migration_analysis', 'buyer_archetype', 'tiered_comps', 'listing_timing', 'attribute_alignment_grid', 'location_priority_characteristics'],
+    },
+    cma: {
+      base: ['tiered_comps', 'location_priority_characteristics'],
+      migration_opt: ['migration_analysis'],
+      archetype_opt: ['buyer_archetype'],
+    },
+    buyer_intelligence: {
+      base: ['migration_analysis', 'buyer_archetype', 'listing_timing', 'attribute_alignment_grid', 'location_priority_characteristics'],
+    },
+    investment_analysis: {
+      base: ['tiered_comps', 'location_priority_characteristics', 'rate_environment'],
+      migration_opt: ['migration_analysis'],
+      archetype_opt: ['buyer_archetype'],
+    },
+    rental_analysis: {
+      base: [],
+    },
+    client_portfolio: {
+      base: ['tiered_comps', 'portfolio_options', 'adu_option', 'location_priority_characteristics', 'rate_environment'],
+    },
+    custom: {
+      base: analysis.selected_modules || [],
+    },
   };
   
-  let sections = ['system_instructions', 'intake_template', 'disclaimer_footer'];
-  const base = matrix[assessmentType] || [];
-  sections = [...sections, ...base];
+  const config = matrix[assessmentType] || { base: [] };
+  let sections = ['system_instructions', 'intake_template', 'disclaimer_footer', ...config.base];
   
-  // Conditionally add opt-in sections for CMA and Investment
-  if ((assessmentType === 'cma' || assessmentType === 'investment_analysis') && analysis.include_migration) {
-    sections.push('migration_analysis');
+  // Add opt-in sections for CMA and Investment
+  if (analysis.include_migration && config.migration_opt) {
+    sections.push(...config.migration_opt);
   }
-  if ((assessmentType === 'cma' || assessmentType === 'investment_analysis') && analysis.include_archetypes) {
-    sections.push('buyer_archetype');
+  if (analysis.include_archetypes && config.archetype_opt) {
+    sections.push(...config.archetype_opt);
   }
   
   return sections;
