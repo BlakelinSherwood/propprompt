@@ -126,16 +126,17 @@ function ProviderCard({ provider, config, onUpdate }) {
 
   const maskedKey = hasKey ? `••••••••${String(config[provider.keyField]).slice(-4)}` : "";
 
+  async function getOrCreate() {
+    const cfgs = await base44.asServiceRole.entities.PlatformConfig.filter({});
+    if (cfgs[0]) return cfgs[0];
+    return await base44.asServiceRole.entities.PlatformConfig.create({ platform_version: "4.0" });
+  }
+
   async function saveKey() {
     if (!keyInput.trim()) return;
     setSaving(true);
-    const configs = await base44.asServiceRole.entities.PlatformConfig.filter({});
-    const cfg = configs[0];
-    if (cfg) {
-      await base44.asServiceRole.entities.PlatformConfig.update(cfg.id, { [provider.keyField]: keyInput.trim() });
-    } else {
-      await base44.asServiceRole.entities.PlatformConfig.create({ [provider.keyField]: keyInput.trim() });
-    }
+    const cfg = await getOrCreate();
+    await base44.asServiceRole.entities.PlatformConfig.update(cfg.id, { [provider.keyField]: keyInput.trim() });
     setKeyInput("");
     onUpdate();
     setSaving(false);
@@ -143,45 +144,26 @@ function ProviderCard({ provider, config, onUpdate }) {
 
   async function removeKey() {
     setSaving(true);
-    const configs = await base44.asServiceRole.entities.PlatformConfig.filter({});
-    const cfg = configs[0];
-    if (cfg) {
-      await base44.asServiceRole.entities.PlatformConfig.update(cfg.id, {
-        [provider.keyField]: null,
-        [provider.enabledField]: false,
-        [provider.pingField]: null,
-      });
-    }
+    const cfg = await getOrCreate();
+    await base44.asServiceRole.entities.PlatformConfig.update(cfg.id, {
+      [provider.keyField]: null,
+      [provider.enabledField]: false,
+      [provider.pingField]: null,
+    });
     onUpdate();
     setSaving(false);
   }
 
   async function saveModel(val) {
     setSelectedModel(val);
-    const configs = await base44.asServiceRole.entities.PlatformConfig.filter({});
-    const cfg = configs[0];
-    if (cfg) {
-      await base44.asServiceRole.entities.PlatformConfig.update(cfg.id, { [provider.modelField]: val });
-    }
-    onUpdate();
-  }
-
-  async function testConnection() {
-    setTesting(true);
-    setTestResult(null);
-    const res = await base44.functions.invoke("testProviderConnection", { platform: provider.id });
-    const data = res.data;
-    setTestResult(data);
-    setTesting(false);
+    const cfg = await getOrCreate();
+    await base44.asServiceRole.entities.PlatformConfig.update(cfg.id, { [provider.modelField]: val });
     onUpdate();
   }
 
   async function toggleEnabled(val) {
-    const configs = await base44.asServiceRole.entities.PlatformConfig.filter({});
-    const cfg = configs[0];
-    if (cfg) {
-      await base44.asServiceRole.entities.PlatformConfig.update(cfg.id, { [provider.enabledField]: val });
-    }
+    const cfg = await getOrCreate();
+    await base44.asServiceRole.entities.PlatformConfig.update(cfg.id, { [provider.enabledField]: val });
     onUpdate();
   }
 
