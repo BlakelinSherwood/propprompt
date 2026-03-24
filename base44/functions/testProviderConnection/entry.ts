@@ -56,7 +56,8 @@ async function callProvider(platform, apiKey, config) {
     });
 
   } else if (platform === "gemini") {
-    const model = config.gemini_model || "gemini-2.0-flash";
+    // Always use a stable model for the ping test regardless of configured model
+    const model = "gemini-2.0-flash";
     url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
     headers = { "content-type": "application/json" };
     body = JSON.stringify({

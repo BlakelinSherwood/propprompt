@@ -51,7 +51,8 @@ const PROVIDERS = [
     pingAtField: "gemini_last_ping_at",
     models: [
       { value: "gemini-2.0-flash", label: "gemini-2.0-flash ★ Recommended — Fast" },
-      { value: "gemini-2.5-pro-preview-03-25", label: "gemini-2.5-pro-preview-03-25 — Highest Quality" },
+      { value: "gemini-2.5-pro-preview-05-06", label: "gemini-2.5-pro-preview-05-06 — Highest Quality" },
+      { value: "gemini-1.5-pro", label: "gemini-1.5-pro — Stable" },
     ],
   },
   {
