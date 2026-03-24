@@ -46,7 +46,7 @@ export default function AiSettings() {
       </div>
 
       <Tabs defaultValue="keys" className="w-full">
-        <TabsList className="bg-[#1A3226]/5 border border-[#1A3226]/10">
+        <TabsList className="bg-[#1A3226]/5 border border-[#1A3226]/10 flex-wrap h-auto gap-1 p-1">
           <TabsTrigger value="keys">API Keys & Providers</TabsTrigger>
           <TabsTrigger value="ensemble">Ensemble AI</TabsTrigger>
           <TabsTrigger value="usage">Usage Stats</TabsTrigger>
