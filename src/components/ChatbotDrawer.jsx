@@ -55,7 +55,7 @@ export default function ChatbotDrawer({ user }) {
       {/* Floating button */}
       <button
         onClick={() => setOpen(true)}
-        className={`fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-[#1A3226] text-white shadow-lg flex items-center justify-center hover:bg-[#1A3226]/90 transition-all ${open ? "scale-0 opacity-0" : "scale-100 opacity-100"}`}
+        className={`fixed bottom-[calc(64px+env(safe-area-inset-bottom,0px)+12px)] right-4 lg:bottom-6 lg:right-6 z-50 w-14 h-14 rounded-full bg-[#1A3226] text-white shadow-lg flex items-center justify-center hover:bg-[#1A3226]/90 transition-all ${open ? "scale-0 opacity-0" : "scale-100 opacity-100"}`}
         aria-label="Open PropBot"
       >
         <MessageCircle className="w-6 h-6" />
@@ -63,7 +63,7 @@ export default function ChatbotDrawer({ user }) {
 
       {/* Drawer */}
       {open && (
-        <div className="fixed bottom-0 right-0 z-50 flex flex-col w-full sm:w-96 h-[520px] sm:bottom-6 sm:right-6 rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl border border-[#1A3226]/10 overflow-hidden">
+        <div className="fixed bottom-[calc(64px+env(safe-area-inset-bottom,0px))] right-0 z-50 flex flex-col w-full sm:w-96 h-[520px] sm:bottom-6 sm:right-6 rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl border border-[#1A3226]/10 overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 bg-[#1A3226] text-white flex-shrink-0">
             <div className="flex items-center gap-2">
