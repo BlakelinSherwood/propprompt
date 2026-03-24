@@ -301,12 +301,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const ensembleAllowed = false; // legacy flag — pipeline above handles pro+ now
-    if (false) {
-    // ── END TIER-BASED ROUTING ────────────────────────────────────────────────
-
-    // Legacy ensemble block placeholder (unreachable) — kept for reference only
-
+    // ── STARTER / FALLBACK: Single-model path ────────────────────────────────
     // Call the appropriate AI provider
     let result;
     const platform = analysis.ai_platform;
@@ -316,8 +311,9 @@ Deno.serve(async (req) => {
       result = await callOpenAI(apiKey, prompt);
     } else if (platform === "gemini") {
       result = await callGemini(apiKey, prompt);
+    } else if (platform === "perplexity") {
+      result = await callPerplexity(apiKey, prompt);
     } else {
-      // Default to Claude for other platforms (perplexity/grok) — extend as needed
       result = await callClaude(apiKey, prompt, keySource);
     }
 
