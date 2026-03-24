@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/AuthContext";
+import PullToRefresh from "../components/PullToRefresh";
 import { Link } from "react-router-dom";
 import { Plus, FileText, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,14 @@ export default function Analyses() {
     load();
   }, [user]);
 
+  const handleRefresh = useCallback(async () => {
+    if (!user) return;
+    const [data] = await Promise.all([
+      base44.entities.Analysis.filter({ run_by_email: user.email }, "-created_date", 30),
+    ]);
+    setAnalyses(data);
+  }, [user]);
+
   if (authLoading || loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -51,6 +60,7 @@ export default function Analyses() {
   }
 
   return (
+    <PullToRefresh onRefresh={handleRefresh}>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -137,5 +147,6 @@ export default function Analyses() {
         </div>
       )}
     </div>
+    </PullToRefresh>
   );
 }

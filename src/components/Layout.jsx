@@ -1,4 +1,5 @@
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
+import BackButton from "./BackButton";
 import { base44 } from "@/api/base44Client";
 import { useState, useEffect } from "react";
 import {
@@ -88,11 +89,11 @@ export default function Layout() {
       `}</style>
 
       {/* Top Bar */}
-      <header className="sticky top-0 z-50 bg-[#1A3226] text-white">
+      <header className="sticky top-0 z-50 bg-[#1A3226] text-white" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="flex items-center justify-between h-16 px-4 lg:px-8">
           <div className="flex items-center gap-3">
             <button
-              className="lg:hidden p-1.5 rounded-md hover:bg-white/10 transition-colors"
+              className="hidden lg:block p-1.5 rounded-md hover:bg-white/10 transition-colors"
               onClick={() => setMobileOpen(!mobileOpen)}
             >
               {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -190,13 +191,44 @@ export default function Layout() {
 
         {/* Main Content */}
         <main className="flex-1 min-h-[calc(100vh-4rem)]">
-          <div className="p-4 lg:p-8 max-w-7xl mx-auto">
+          <div className="p-4 lg:p-8 max-w-7xl mx-auto pb-24 lg:pb-8">
+            <BackButton />
             <FairHousingOverdueBanner user={user} />
             <Outlet />
           </div>
         </main>
       
       </div>
+
+      {/* Bottom Navigation — mobile only */}
+      <nav
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-[#1A3226]/10"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      >
+        <div className="flex items-center justify-around h-16">
+          {[
+            { label: "Home", path: "/Dashboard", icon: LayoutDashboard },
+            { label: "New", path: "/NewAnalysis", icon: PlusCircle },
+            { label: "Analyses", path: "/Analyses", icon: FileText },
+            { label: "Training", path: "/training", icon: GraduationCap },
+            { label: "Account", path: "/AccountSettings", icon: Settings },
+          ].map((item) => {
+            const active = location.pathname === item.path || (item.path === '/training' && location.pathname.startsWith('/training'));
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg transition-colors ${
+                  active ? "text-[#1A3226]" : "text-[#1A3226]/40"
+                }`}
+              >
+                <item.icon className={`w-5 h-5 ${active ? "" : ""}`} />
+                <span className="text-[10px] font-medium">{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
 
       {/* PropBot floating chatbot */}
       <ChatbotDrawer user={user} />

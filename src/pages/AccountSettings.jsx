@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
+import { base44 } from "@/api/base44Client";
+import { useNavigate } from "react-router-dom";
+import { AlertTriangle } from "lucide-react";
 import { Plug, Palette } from "lucide-react";
 import AiApiKeyManager from "../components/AiApiKeyManager";
 import CrmConnectedApps from "../components/CrmConnectedApps";
@@ -13,7 +16,18 @@ const TABS = [
 
 export default function AccountSettings() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [tab, setTab] = useState("connected");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
+
+  async function handleDeleteAccount() {
+    if (confirmText !== "DELETE") return;
+    setDeleteLoading(true);
+    await base44.functions.invoke("deleteAccount", {});
+    base44.auth.logout("/");
+  }
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -73,6 +87,51 @@ export default function AccountSettings() {
           </div>
         </div>
       )}
+
+      {/* Danger Zone */}
+      <div className="border border-red-200 rounded-xl p-4 mt-8">
+        <h2 className="text-sm font-semibold text-red-600 mb-1 flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4" />
+          Danger Zone
+        </h2>
+        <p className="text-xs text-[#1A3226]/50 mb-3">
+          Permanently delete your account and all associated data. This action is irreversible and GDPR-compliant.
+        </p>
+        {!showDeleteConfirm ? (
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="text-sm text-red-600 border border-red-200 rounded-lg px-4 py-2 hover:bg-red-50 transition-colors"
+          >
+            Delete My Account
+          </button>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-xs text-red-600 font-medium">Type DELETE to confirm:</p>
+            <input
+              type="text"
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder="DELETE"
+              className="w-full border border-red-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-red-300"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={handleDeleteAccount}
+                disabled={confirmText !== "DELETE" || deleteLoading}
+                className="text-sm bg-red-600 text-white rounded-lg px-4 py-2 hover:bg-red-700 disabled:opacity-40 transition-colors"
+              >
+                {deleteLoading ? "Deleting…" : "Permanently Delete Account"}
+              </button>
+              <button
+                onClick={() => { setShowDeleteConfirm(false); setConfirmText(""); }}
+                className="text-sm text-[#1A3226]/60 border border-[#1A3226]/10 rounded-lg px-4 py-2 hover:bg-[#1A3226]/5"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
