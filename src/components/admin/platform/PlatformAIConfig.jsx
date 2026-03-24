@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Key, Layers, BarChart2 } from "lucide-react";
+import { ArrowRight, Key, Layers, BarChart2, BookOpen } from "lucide-react";
 
 export default function PlatformAIConfig() {
   const navigate = useNavigate();
@@ -23,6 +23,12 @@ export default function PlatformAIConfig() {
       title: "Usage Stats",
       description: "View token usage and analysis counts per provider.",
       tab: "usage",
+    },
+    {
+      icon: BookOpen,
+      title: "Model Reference",
+      description: "Token pricing, cost estimator, use-case guidance, and right-model-for-the-job recommendations.",
+      tab: "reference",
     },
   ];
 
