@@ -8,6 +8,8 @@ import ApiKeysTab from "../../components/admin/ai/ApiKeysTab";
 import EnsembleTab from "../../components/admin/ai/EnsembleTab";
 import UsageStatsTab from "../../components/admin/ai/UsageStatsTab";
 import ModelReferenceTab from "../../components/admin/ai/ModelReferenceTab";
+import QualityAuditTab from "../../components/admin/ai/QualityAuditTab";
+import ModelRoutingConfig from "../../components/admin/ai/ModelRoutingConfig";
 
 export default function AiSettings() {
   const [loading, setLoading] = useState(true);
@@ -49,6 +51,8 @@ export default function AiSettings() {
         <TabsList className="bg-[#1A3226]/5 border border-[#1A3226]/10 flex-wrap h-auto gap-1 p-1">
           <TabsTrigger value="keys">API Keys & Providers</TabsTrigger>
           <TabsTrigger value="ensemble">Ensemble AI</TabsTrigger>
+          <TabsTrigger value="quality">Quality Audit</TabsTrigger>
+          <TabsTrigger value="routing">Model Routing</TabsTrigger>
           <TabsTrigger value="usage">Usage Stats</TabsTrigger>
           <TabsTrigger value="reference">Model Reference</TabsTrigger>
         </TabsList>
@@ -59,6 +63,14 @@ export default function AiSettings() {
 
         <TabsContent value="ensemble" className="mt-6">
           <EnsembleTab />
+        </TabsContent>
+
+        <TabsContent value="quality" className="mt-6">
+          <QualityAuditTab />
+        </TabsContent>
+
+        <TabsContent value="routing" className="mt-6">
+          <ModelRoutingConfig />
         </TabsContent>
 
         <TabsContent value="usage" className="mt-6">
