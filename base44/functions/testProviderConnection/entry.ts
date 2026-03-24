@@ -110,7 +110,8 @@ Deno.serve(async (req) => {
       return Response.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const { platform } = await req.json();
+    const body = await req.json();
+    const platform = body.platform || body.provider;
     if (!platform || !PLATFORM_CONFIG_KEYS[platform]) {
       return Response.json({ error: "Invalid platform" }, { status: 400 });
     }
