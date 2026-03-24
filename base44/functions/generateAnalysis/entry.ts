@@ -99,6 +99,32 @@ async function callGemini(apiKey, prompt) {
   return { text: data.candidates?.[0]?.content?.parts?.[0]?.text || "", model };
 }
 
+async function callPerplexity(apiKey, prompt) {
+  const model = "sonar-pro";
+  const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  const res = await fetch("https://api.perplexity.ai/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 4096,
+      messages: [
+        { role: "system", content: `You are PropPrompt™, a real estate market research AI. Today's date is ${today}. Provide current, data-rich market research grounded in real conditions.` },
+        { role: "user", content: prompt }
+      ],
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `Perplexity API error ${res.status}`);
+  }
+  const data = await res.json();
+  return { text: data.choices?.[0]?.message?.content || "", model };
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -141,167 +167,145 @@ Deno.serve(async (req) => {
     // Mark as in_progress
     await base44.asServiceRole.entities.Analysis.update(analysisId, { status: "in_progress" });
 
-    // ── ENSEMBLE AI BRANCH ───────────────────────────────────────────────────
+    // ── TIER-BASED ROUTING ────────────────────────────────────────────────────
     const configs = await base44.asServiceRole.entities.PlatformConfig.filter({});
     const config = configs[0] || {};
 
-    // Check user's subscription tier — Starter is locked to single-model
-    const userOrgs = await base44.asServiceRole.entities.Organization.filter({ id: analysis.org_id });
-    const userOrg = userOrgs[0];
-    const tier = userOrg?.subscription_tier || 'starter';
-    const ensembleAllowed = tier === 'pro' || tier === 'team';
+    // Resolve user tier from TerritorySubscription or Org
+    let tier = 'starter';
+    try {
+      const subs = await base44.asServiceRole.entities.TerritorySubscription.filter({ user_id: user.id });
+      const activeSub = subs.find(s => s.status === 'active');
+      if (activeSub?.tier) tier = activeSub.tier;
+      else {
+        const orgs = await base44.asServiceRole.entities.Organization.filter({ id: analysis.org_id });
+        tier = orgs[0]?.subscription_plan || 'starter';
+      }
+    } catch (e) {
+      console.warn('[generateAnalysis] tier lookup failed, defaulting to starter:', e.message);
+    }
 
-    if (config.ensemble_mode_enabled === true && ensembleAllowed) {
+    const isPro = tier === 'pro' || tier === 'team' || tier === 'broker' || tier === 'brokerage' || tier === 'enterprise';
+
+    // Fetch PromptLibrary pipeline prompts if pro+
+    const allLibraryPrompts = await base44.asServiceRole.entities.PromptLibrary.filter({ is_active: true });
+    const pipelinePrompts = allLibraryPrompts
+      .filter(p => p.ensemble_order != null && p.assessment_type === (analysis.assessment_type || 'listing_pricing'))
+      .sort((a, b) => a.ensemble_order - b.ensemble_order);
+
+    const hasPipeline = pipelinePrompts.length > 0;
+
+    if (isPro && hasPipeline) {
+      // ── PRO/TEAM/BROKER: PromptLibrary ensemble pipeline ──────────────────
+      console.log(`[generateAnalysis] Running ${tier} pipeline with ${pipelinePrompts.length} steps`);
       const startTime = Date.now();
+
+      // Helper: resolve API key for a platform
+      const getKey = async (platform) => {
+        const r = await base44.functions.invoke('resolveApiKey', {
+          platform,
+          orgId: analysis.org_id,
+          agentEmail: analysis.run_by_email,
+        });
+        return r.data?.apiKey || null;
+      };
+
+      // Helper: call the right provider
+      const callProvider = async (platform, apiKey, prompt) => {
+        if (!apiKey) throw new Error(`No API key for ${platform}`);
+        if (platform === 'claude') return callClaude(apiKey, prompt, 'platform');
+        if (platform === 'chatgpt') return callOpenAI(apiKey, prompt);
+        if (platform === 'gemini') return callGemini(apiKey, prompt);
+        if (platform === 'perplexity') return callPerplexity(apiKey, prompt);
+        return callClaude(apiKey, prompt, 'platform'); // fallback
+      };
+
+      // Token extras accumulate as pipeline runs
+      const extras = { perplexity_data: null, gemini_data: null, registry_data: null };
+      const sectionOutputs = {};
 
       await base44.asServiceRole.entities.Analysis.update(analysisId, {
         ensemble_mode_used: true,
         assembly_status: 'in_progress',
-        sections_total: 9
+        sections_total: pipelinePrompts.length,
       });
 
-      const assignments = config.ensemble_section_assignments || {};
-      const fallbackProvider = config.ensemble_fallback_provider || 'chatgpt';
-      const fallbackModel = config[`${fallbackProvider === 'chatgpt' ? 'openai' : fallbackProvider}_model`] || 'gpt-4o';
+      for (const promptRecord of pipelinePrompts) {
+        const section = promptRecord.prompt_section;
+        console.log(`[pipeline] step ${promptRecord.ensemble_order}: ${section} via ${promptRecord.ai_platform}`);
 
-      // Section-specific focused prompts
-      const sectionPrompts = {
-        pricing_strategy:
-          `${prompt}\n\nTASK: Write ONLY the Pricing Strategy & CMA section. Cover comparable selection, price positioning, days-on-market context, and your recommended list price with clear rationale. Be specific and data-driven.`,
-        market_context:
-          `${prompt}\n\nTASK: Write ONLY the Current Market Context section. Cover active inventory levels, absorption rate, buyer demand signals, interest rate environment, and seasonal factors as of today.`,
-        neighbourhood:
-          `${prompt}\n\nTASK: Write ONLY the Neighbourhood Snapshot. Cover schools, walkability, proximity to amenities, recent comparable sales activity in the immediate area, and location strengths and weaknesses.`,
-        buyer_archetypes:
-          `${prompt}\n\nTASK: Write ONLY the Buyer Archetype Profiles. Identify the top 2-3 most likely buyer types for this specific property. For each: give them a name, describe their motivations, budget range, what they prioritise, and what language resonates with them.`,
-        listing_copy:
-          `${prompt}\n\nTASK: Write ONLY the Listing Copy. Include: (1) MLS description ~250 words, (2) three headline variants, (3) feature sequencing ranked for the most likely buyer archetype. Write to sell.`,
-        net_sheet:
-          `${prompt}\n\nTASK: Write ONLY the Seller Net Sheet. Show three scenarios: 3% below recommended price, at recommended price, 3% above. For each scenario show: gross sale price, estimated commission (use 5%), estimated closing costs, estimated mortgage payoff line (leave blank if unknown), and estimated net proceeds.`,
-        seller_presentation:
-          `${prompt}\n\nTASK: Write ONLY the Seller Presentation Narrative. This is what the agent says in the listing appointment. Open with market context, build trust with data, present the recommendation confidently, handle likely objections, and close with a clear call to action.`,
-        talking_points:
-          `${prompt}\n\nTASK: Write ONLY the Agent Talking Points. Provide 8-10 punchy, confident bullet points the agent uses during the appointment. Conversational tone. Each point should be one or two sentences maximum.`,
-      };
-
-      // Run sections in parallel groups
-      const runSection = async (sectionKey) => {
-        const assignment = assignments[sectionKey] || { provider: 'claude', model: null };
-        const provider = assignment.provider || 'claude';
-        const modelKey = provider === 'chatgpt' ? 'openai' : provider;
-        const model = assignment.model || config[`${modelKey}_model`] || null;
+        // Substitute tokens into this step's prompt (including outputs from prior steps)
+        let stepPrompt = promptRecord.prompt_text || '';
+        const d = analysis.intake_data || {};
+        stepPrompt = stepPrompt
+          .replace(/\[ADDRESS\]/g, d.address || '')
+          .replace(/\[PROPERTY_TYPE\]/g, analysis.property_type || '')
+          .replace(/\[ASSESSMENT_TYPE\]/g, analysis.assessment_type || '')
+          .replace(/\[LOCATION_CLASS\]/g, analysis.location_class || '')
+          .replace(/\[CLIENT_RELATIONSHIP\]/g, d.client_relationship || '')
+          .replace(/\[OUTPUT_FORMAT\]/g, analysis.output_format || 'narrative')
+          .replace(/\[AGENT_EMAIL\]/g, analysis.run_by_email || '')
+          .replace(/\[INTAKE_JSON\]/g, JSON.stringify(d, null, 2))
+          .replace(/\[PERPLEXITY_DATA\]/g, extras.perplexity_data ? JSON.stringify(extras.perplexity_data, null, 2) : '(not yet available)')
+          .replace(/\[GEMINI_DATA\]/g, extras.gemini_data ? JSON.stringify(extras.gemini_data, null, 2) : '(not yet available)')
+          .replace(/\[REGISTRY_DATA\]/g, extras.registry_data ? JSON.stringify(extras.registry_data, null, 2) : '(not yet available)');
 
         try {
-          const res = await base44.functions.invoke("runEnsembleSection", {
-            analysisId,
-            sectionKey,
-            sectionPrompt: sectionPrompts[sectionKey],
-            provider,
-            model,
-            fallbackProvider,
-            fallbackModel,
+          const stepKey = await getKey(promptRecord.ai_platform);
+          const stepResult = await callProvider(promptRecord.ai_platform, stepKey, stepPrompt);
+          sectionOutputs[section] = stepResult.text;
+
+          // Store outputs into extras for downstream token substitution
+          if (section === 'market_research') extras.perplexity_data = stepResult.text;
+          if (section === 'neighborhood_snapshot') extras.gemini_data = stepResult.text;
+
+          await base44.asServiceRole.entities.Analysis.update(analysisId, {
+            sections_completed: Object.keys(sectionOutputs).length,
+            ensemble_section_outputs: { ...sectionOutputs },
           });
-          return {
-            sectionKey,
-            output: res.data?.output || '',
-            provider: res.data?.provider || provider,
-            wasFallback: res.data?.wasFallback || false
-          };
         } catch (e) {
-          console.warn(`[ensemble] section ${sectionKey} failed:`, e.message);
-          return { sectionKey, output: '', error: e.message };
+          console.warn(`[pipeline] step ${section} failed:`, e.message);
+          sectionOutputs[section] = `[Section unavailable: ${e.message}]`;
         }
-      };
+      }
 
-      // Group 1 — runs first (pricing sets context for all other sections)
-      const group1 = await Promise.all(['pricing_strategy'].map(runSection));
-
-      // Groups 2-4 — run in parallel waves
-      const group2 = await Promise.all(['market_context', 'neighbourhood', 'net_sheet'].map(runSection));
-      const group3 = await Promise.all(['buyer_archetypes', 'listing_copy'].map(runSection));
-      const group4 = await Promise.all(['seller_presentation', 'talking_points'].map(runSection));
-
-      const allSections = [...group1, ...group2, ...group3, ...group4];
-      const sectionOutputs = {};
-      allSections.forEach(s => { if (s.output) sectionOutputs[s.sectionKey] = s.output; });
-
-      const completedCount = allSections.filter(s => s.output).length;
-
-      await base44.asServiceRole.entities.Analysis.update(analysisId, {
-        sections_completed: completedCount,
-        ensemble_section_outputs: sectionOutputs,
-        assembly_status: 'assembling'
-      });
-
-      // Final assembly — always Claude regardless of section assignments
-      const claudeKeyRes = await base44.functions.invoke("resolveApiKey", {
-        platform: "claude",
-        orgId: analysis.org_id,
-        agentEmail: analysis.run_by_email,
-      });
-      const claudeKey = claudeKeyRes.data?.apiKey;
-
-      const assemblyPrompt = `You are assembling a PropPrompt™ real estate analysis report for a listing appointment.
-The sections below were written by specialised AI models. Your job is to:
-1. Weave them into one cohesive, polished, professionally written report
-2. Ensure consistent tone and terminology throughout
-3. Remove any redundancy between sections
-4. Ensure pricing strategy, listing copy, and buyer archetypes are clearly aligned
-5. Format with clean markdown section headers
-
-SECTIONS TO ASSEMBLE:
-${Object.entries(sectionOutputs).map(([k, v]) => `### ${k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}\n${v}`).join('\n\n---\n\n')}
-
-Return the complete assembled PropPrompt™ report in polished markdown.`;
-
-      const assemblyRes = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "x-api-key": claudeKey,
-          "anthropic-version": "2023-06-01",
-          "content-type": "application/json"
-        },
-        body: JSON.stringify({
-          model: config.anthropic_model || "claude-opus-4-5",
-          max_tokens: 6000,
-          messages: [{ role: "user", content: assemblyPrompt }],
-          system: "You are PropPrompt™. You are assembling a final client-ready real estate report. Make it exceptional."
-        })
-      });
-      const assemblyData = await assemblyRes.json();
-      const assembledOutput = assemblyData.content?.[0]?.text || Object.values(sectionOutputs).join('\n\n');
+      const finalOutput = sectionOutputs['report_assembly']
+        || sectionOutputs['narrative_layer']
+        || Object.values(sectionOutputs).join('\n\n---\n\n');
 
       const generationTime = Date.now() - startTime;
 
       await base44.asServiceRole.entities.Analysis.update(analysisId, {
         status: 'complete',
-        output_text: assembledOutput,
+        output_text: finalOutput,
         completed_at: new Date().toISOString(),
-        ai_model: 'ensemble',
+        ai_model: `pipeline-${tier}`,
         assembly_status: 'complete',
-        sections_completed: completedCount,
+        sections_completed: Object.keys(sectionOutputs).length,
         ensemble_mode_used: true,
-        fallback_triggered: allSections.some(s => s.wasFallback),
         generation_time_ms: generationTime,
       });
 
       try {
-        await base44.functions.invoke("deductAnalysisQuota", { analysisId, orgId: analysis.org_id });
+        await base44.functions.invoke('deductAnalysisQuota', { analysisId, orgId: analysis.org_id });
       } catch (e) {
-        console.warn("[generateAnalysis] quota deduction failed:", e.message);
+        console.warn('[generateAnalysis] quota deduction failed:', e.message);
       }
 
       return Response.json({
-        output: assembledOutput,
-        model: 'ensemble',
-        keySource: 'sc_platform',
-        sectionsCompleted: completedCount,
+        output: finalOutput,
+        model: `pipeline-${tier}`,
+        keySource: 'platform',
+        sectionsCompleted: Object.keys(sectionOutputs).length,
         generationTimeMs: generationTime,
       });
     }
-    // ── END ENSEMBLE AI BRANCH ────────────────────────────────────────────────
 
-    // Existing single-model logic continues unchanged below...
+    const ensembleAllowed = false; // legacy flag — pipeline above handles pro+ now
+    if (false) {
+    // ── END TIER-BASED ROUTING ────────────────────────────────────────────────
+
+    // Legacy ensemble block placeholder (unreachable) — kept for reference only
 
     // Call the appropriate AI provider
     let result;

@@ -33,7 +33,7 @@ async function decryptText(encrypted) {
   return new TextDecoder().decode(plain);
 }
 
-function substituteTokens(template, analysis, territory) {
+function substituteTokens(template, analysis, territory, extras = {}) {
   const d = analysis.intake_data || {};
   const t = territory || {};
   return template
@@ -49,6 +49,9 @@ function substituteTokens(template, analysis, territory) {
     .replace(/\[REGISTRY_URL\]/g, t.registry_url || "")
     .replace(/\[GIS_URL\]/g, t.gis_url || "")
     .replace(/\[TOWN_URL\]/g, t.town_url || "")
+    .replace(/\[PERPLEXITY_DATA\]/g, extras.perplexity_data ? JSON.stringify(extras.perplexity_data, null, 2) : "(not available)")
+    .replace(/\[GEMINI_DATA\]/g, extras.gemini_data ? JSON.stringify(extras.gemini_data, null, 2) : "(not available)")
+    .replace(/\[REGISTRY_DATA\]/g, extras.registry_data ? JSON.stringify(extras.registry_data, null, 2) : "(not available)")
     .replace(/\[INTAKE_JSON\]/g, JSON.stringify(d, null, 2));
 }
 
