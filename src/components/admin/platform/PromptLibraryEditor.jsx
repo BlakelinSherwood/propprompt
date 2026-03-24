@@ -16,7 +16,7 @@ const SECTIONS = [
 ];
 
 const BLANK = {
-  version: "3.0", ai_platform: "claude", assessment_type: "listing_pricing",
+  version: "4.0", ai_platform: "claude", assessment_type: "listing_pricing",
   property_type: "all", prompt_section: "system_instructions", prompt_text: "", notes: "", is_active: true,
 };
 

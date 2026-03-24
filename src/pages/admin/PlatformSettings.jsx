@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
-import { Check, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Check, Eye, EyeOff, Loader2, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -125,13 +125,65 @@ export default function PlatformSettings() {
     );
   }
 
+  const [versionInput, setVersionInput] = useState('');
+  const [savingVersion, setSavingVersion] = useState(false);
+
+  async function saveVersion() {
+    const v = versionInput.trim();
+    if (!v) return;
+    setSavingVersion(true);
+    try {
+      if (platformConfig?.id) {
+        await base44.asServiceRole.entities.PlatformConfig.update(platformConfig.id, { platform_version: v });
+        setPlatformConfig(prev => ({ ...prev, platform_version: v }));
+      } else {
+        const created = await base44.asServiceRole.entities.PlatformConfig.create({ platform_version: v });
+        setPlatformConfig(created);
+      }
+      setVersionInput('');
+      toast({ title: `Platform version updated to v${v}` });
+    } catch (e) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    } finally {
+      setSavingVersion(false);
+    }
+  }
+
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-[#1A3226]">AI Platform Configuration</h1>
+        <h1 className="text-2xl font-bold text-[#1A3226]">Platform Settings</h1>
         <p className="text-sm text-[#1A3226]/60 mt-1">
-          Manage API keys and enable AI platforms for user analyses.
+          Manage platform version, API keys, and AI platform availability.
         </p>
+      </div>
+
+      {/* General Settings */}
+      <div className="rounded-2xl border-2 border-[#1A3226]/20 bg-white p-6">
+        <div className="flex items-center gap-3 mb-5">
+          <Tag className="w-5 h-5 text-[#1A3226]/50" />
+          <h2 className="text-base font-bold text-[#1A3226]">General Settings</h2>
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-[#1A3226]/60 uppercase">Platform Version</label>
+          <p className="text-xs text-[#1A3226]/40 mb-2">Current: <span className="font-semibold text-[#1A3226]/70">v{platformConfig?.platform_version || '4.0'}</span> — shown on prompts and throughout the platform.</p>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder={`e.g. ${platformConfig?.platform_version || '4.0'}`}
+              value={versionInput}
+              onChange={e => setVersionInput(e.target.value)}
+              className="px-3 py-2 border border-[#1A3226]/20 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#B8982F]/30 w-40"
+            />
+            <Button
+              onClick={saveVersion}
+              disabled={!versionInput.trim() || savingVersion}
+              className="bg-[#1A3226] hover:bg-[#1A3226]/90 text-white"
+            >
+              {savingVersion ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Update'}
+            </Button>
+          </div>
+        </div>
       </div>
 
       <div className="grid gap-4">
