@@ -1,7 +1,7 @@
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
-import BackButton from "./BackButton";
 import { base44 } from "@/api/base44Client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   LayoutDashboard,
   Users,
@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import FairHousingOverdueBanner from "./FairHousingOverdueBanner";
 import PrivacyNoticeModal from "./PrivacyNoticeModal";
 import ChatbotDrawer from "./ChatbotDrawer";
+import BackButton from "./BackButton";
 
 const PLATFORM_OWNER_EMAIL = "blake.sherwood@compass.com";
 
@@ -31,39 +32,31 @@ const ROLE_LABELS = {
   team_agent: "Team Agent",
 };
 
+// Tab roots for stack preservation
+const TAB_ROOTS = ["/Dashboard", "/NewAnalysis", "/Analyses", "/training", "/AccountSettings"];
+
+function getTabRoot(pathname) {
+  return TAB_ROOTS.find(r => pathname === r || pathname.startsWith(r + "/")) || null;
+}
+
 export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showPrivacyNotice, setShowPrivacyNotice] = useState(false);
+  // Tab stack: stores last visited path per tab root
+  const tabStacks = useRef(Object.fromEntries(TAB_ROOTS.map(r => [r, r])));
 
+  // Update stack on every navigation
   useEffect(() => {
-    base44.auth.me().then((me) => {
-      setUser(me);
-      if (!me?.privacy_notice_accepted_at) setShowPrivacyNotice(true);
-    }).catch(() => {});
-  }, []);
+    const root = getTabRoot(location.pathname);
+    if (root) tabStacks.current[root] = location.pathname;
+  }, [location.pathname]);
 
-  const isAdmin = user?.role === "platform_owner" || user?.role === "brokerage_admin" || user?.role === "team_lead";
-
-  const navItems = [
-    { label: "Dashboard", path: "/Dashboard", icon: LayoutDashboard },
-    { label: "New Analysis", path: "/NewAnalysis", icon: PlusCircle },
-    { label: "Analyses", path: "/Analyses", icon: FileText },
-    ...(isAdmin
-      ? [{ label: "Members", path: "/Members", icon: Users }]
-      : []),
-    ...(isAdmin
-      ? [{ label: "Billing", path: "/Billing", icon: CreditCard }]
-      : []),
-    ...(user?.role === "platform_owner"
-      ? [{ label: "Platform Admin", path: "/PlatformAdmin", icon: Shield }]
-      : []),
-    { label: "Training", path: "/training", icon: GraduationCap },
-    { label: "Account Settings", path: "/AccountSettings", icon: Settings },
-    // Brokerage/Team admin links are accessed via org cards in Dashboard, not sidebar nav
-  ];
+  function navigateTab(tabRoot) {
+    navigate(tabStacks.current[tabRoot] || tabRoot);
+  }
 
   const handleLogout = () => {
     base44.auth.logout("/");
@@ -194,7 +187,17 @@ export default function Layout() {
           <div className="p-4 lg:p-8 max-w-7xl mx-auto pb-24 lg:pb-8">
             <BackButton />
             <FairHousingOverdueBanner user={user} />
-            <Outlet />
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={location.pathname}
+                initial={{ x: 18, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                exit={{ x: -18, opacity: 0 }}
+                transition={{ duration: 0.18, ease: "easeInOut" }}
+              >
+                <Outlet />
+              </motion.div>
+            </AnimatePresence>
           </div>
         </main>
       
@@ -205,7 +208,7 @@ export default function Layout() {
         className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-[#1A3226]/10"
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
-        <div className="flex items-center justify-around h-16">
+        <div className="flex items-center justify-around">
           {[
             { label: "Home", path: "/Dashboard", icon: LayoutDashboard },
             { label: "New", path: "/NewAnalysis", icon: PlusCircle },
@@ -215,16 +218,16 @@ export default function Layout() {
           ].map((item) => {
             const active = location.pathname === item.path || (item.path === '/training' && location.pathname.startsWith('/training'));
             return (
-              <Link
+              <button
                 key={item.path}
-                to={item.path}
-                className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg transition-colors ${
+                onClick={() => navigateTab(item.path)}
+                className={`flex flex-col items-center justify-center gap-0.5 min-w-[44px] min-h-[56px] px-3 transition-colors ${
                   active ? "text-[#1A3226]" : "text-[#1A3226]/40"
                 }`}
               >
-                <item.icon className={`w-5 h-5 ${active ? "" : ""}`} />
+                <item.icon className="w-5 h-5" />
                 <span className="text-[10px] font-medium">{item.label}</span>
-              </Link>
+              </button>
             );
           })}
         </div>
