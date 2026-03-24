@@ -32,9 +32,15 @@ export default function PromptLibraryEditor() {
 
   async function loadPrompts() {
     setLoading(true);
-    const res = await base44.functions.invoke("platformAdminPrompts", { action: "list" });
-    setPrompts(res.data.prompts || []);
-    setLoading(false);
+    try {
+      const prompts = await base44.asServiceRole.entities.PromptLibrary.list('-created_date', 200);
+      setPrompts(prompts || []);
+    } catch (e) {
+      console.error('[PromptLibrary] load error:', e);
+      setPrompts([]);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => { loadPrompts(); }, []);
@@ -51,19 +57,24 @@ export default function PromptLibraryEditor() {
 
   async function handleSave() {
     setSaving(true);
-    await base44.functions.invoke("platformAdminPrompts", {
-      action: "save",
-      id: editing === "new" ? null : editing,
-      data: form,
-    });
-    await loadPrompts();
-    setEditing(null);
-    setSaving(false);
+    try {
+      const me = await base44.auth.me();
+      const payload = { ...form, last_updated_by: me?.email };
+      if (editing === 'new') {
+        await base44.asServiceRole.entities.PromptLibrary.create(payload);
+      } else {
+        await base44.asServiceRole.entities.PromptLibrary.update(editing, payload);
+      }
+      await loadPrompts();
+      setEditing(null);
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleDelete(id) {
-    if (!confirm("Delete this prompt permanently?")) return;
-    await base44.functions.invoke("platformAdminPrompts", { action: "delete", id });
+    if (!confirm('Delete this prompt permanently?')) return;
+    await base44.asServiceRole.entities.PromptLibrary.delete(id);
     setPrompts((prev) => prev.filter((p) => p.id !== id));
     if (editing === id) setEditing(null);
   }
