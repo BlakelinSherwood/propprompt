@@ -45,10 +45,15 @@ export default function Layout() {
   const [user, setUser] = useState(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showPrivacyNotice, setShowPrivacyNotice] = useState(false);
-  // Tab stack: stores last visited path per tab root
   const tabStacks = useRef(Object.fromEntries(TAB_ROOTS.map(r => [r, r])));
 
-  // Update stack on every navigation
+  useEffect(() => {
+    base44.auth.me().then((me) => {
+      setUser(me);
+      if (!me?.privacy_notice_accepted_at) setShowPrivacyNotice(true);
+    }).catch(() => {});
+  }, []);
+
   useEffect(() => {
     const root = getTabRoot(location.pathname);
     if (root) tabStacks.current[root] = location.pathname;
@@ -57,6 +62,19 @@ export default function Layout() {
   function navigateTab(tabRoot) {
     navigate(tabStacks.current[tabRoot] || tabRoot);
   }
+
+  const isAdmin = user?.role === "platform_owner" || user?.role === "brokerage_admin" || user?.role === "team_lead";
+
+  const navItems = [
+    { label: "Dashboard", path: "/Dashboard", icon: LayoutDashboard },
+    { label: "New Analysis", path: "/NewAnalysis", icon: PlusCircle },
+    { label: "Analyses", path: "/Analyses", icon: FileText },
+    ...(isAdmin ? [{ label: "Members", path: "/Members", icon: Users }] : []),
+    ...(isAdmin ? [{ label: "Billing", path: "/Billing", icon: CreditCard }] : []),
+    ...(user?.role === "platform_owner" ? [{ label: "Platform Admin", path: "/PlatformAdmin", icon: Shield }] : []),
+    { label: "Training", path: "/training", icon: GraduationCap },
+    { label: "Account Settings", path: "/AccountSettings", icon: Settings },
+  ];
 
   const handleLogout = () => {
     base44.auth.logout("/");
