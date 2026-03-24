@@ -56,19 +56,10 @@ export default function EnsembleTab() {
 
   async function load() {
     try {
-      const [configs, user] = await Promise.all([
-        base44.asServiceRole.entities.PlatformConfig.filter({}),
-        base44.auth.me(),
-      ]);
-      const cfg = configs[0] || {};
+      const res = await base44.functions.invoke('getPlatformConfig', {});
+      const cfg = res.data?.config || {};
       setConfig(cfg);
       setAssignments(cfg.ensemble_section_assignments || {});
-      if (user?.email) {
-        try {
-          const orgs = await base44.asServiceRole.entities.Organization.filter({ owner_email: user.email });
-          setOwnerTier(orgs[0]?.subscription_tier || 'starter');
-        } catch {}
-      }
     } catch (e) {
       console.error('[EnsembleTab] load error:', e);
       setConfig({});
@@ -87,34 +78,26 @@ export default function EnsembleTab() {
     grok: config.grok_enabled,
   }).filter(([, v]) => v !== false).map(([k]) => k);
 
-  async function getOrCreateConfig() {
-    const configs = await base44.asServiceRole.entities.PlatformConfig.filter({});
-    if (configs[0]) return configs[0];
-    return await base44.asServiceRole.entities.PlatformConfig.create({ platform_version: "4.0" });
+  async function updateConfig(data) {
+    await base44.functions.invoke('updatePlatformConfig', { data });
+    load();
   }
 
   async function toggleEnsemble(val) {
-    const cfg = await getOrCreateConfig();
-    await base44.asServiceRole.entities.PlatformConfig.update(cfg.id, { ensemble_mode_enabled: val });
-    load();
+    await updateConfig({ ensemble_mode_enabled: val });
   }
 
   async function savePrimary(val) {
-    const cfg = await getOrCreateConfig();
-    await base44.asServiceRole.entities.PlatformConfig.update(cfg.id, { ensemble_primary_provider: val });
-    load();
+    await updateConfig({ ensemble_primary_provider: val });
   }
 
   async function saveFallback(val) {
-    const cfg = await getOrCreateConfig();
-    await base44.asServiceRole.entities.PlatformConfig.update(cfg.id, { ensemble_fallback_provider: val });
-    load();
+    await updateConfig({ ensemble_fallback_provider: val });
   }
 
   async function saveAssignments() {
     setSaving(true);
-    const cfg = await getOrCreateConfig();
-    await base44.asServiceRole.entities.PlatformConfig.update(cfg.id, { ensemble_section_assignments: assignments });
+    await base44.functions.invoke('updatePlatformConfig', { data: { ensemble_section_assignments: assignments } });
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);

@@ -126,45 +126,36 @@ function ProviderCard({ provider, config, onUpdate }) {
 
   const maskedKey = hasKey ? `••••••••${String(config[provider.keyField]).slice(-4)}` : "";
 
-  async function getOrCreate() {
-    const cfgs = await base44.asServiceRole.entities.PlatformConfig.filter({});
-    if (cfgs[0]) return cfgs[0];
-    return await base44.asServiceRole.entities.PlatformConfig.create({ platform_version: "4.0" });
+  async function updateCfg(data) {
+    await base44.functions.invoke('updatePlatformConfig', { data });
+    onUpdate();
   }
 
   async function saveKey() {
     if (!keyInput.trim()) return;
     setSaving(true);
-    const cfg = await getOrCreate();
-    await base44.asServiceRole.entities.PlatformConfig.update(cfg.id, { [provider.keyField]: keyInput.trim() });
+    await updateCfg({ [provider.keyField]: keyInput.trim() });
     setKeyInput("");
-    onUpdate();
     setSaving(false);
   }
 
   async function removeKey() {
     setSaving(true);
-    const cfg = await getOrCreate();
-    await base44.asServiceRole.entities.PlatformConfig.update(cfg.id, {
+    await updateCfg({
       [provider.keyField]: null,
       [provider.enabledField]: false,
       [provider.pingField]: null,
     });
-    onUpdate();
     setSaving(false);
   }
 
   async function saveModel(val) {
     setSelectedModel(val);
-    const cfg = await getOrCreate();
-    await base44.asServiceRole.entities.PlatformConfig.update(cfg.id, { [provider.modelField]: val });
-    onUpdate();
+    await updateCfg({ [provider.modelField]: val });
   }
 
   async function toggleEnabled(val) {
-    const cfg = await getOrCreate();
-    await base44.asServiceRole.entities.PlatformConfig.update(cfg.id, { [provider.enabledField]: val });
-    onUpdate();
+    await updateCfg({ [provider.enabledField]: val });
   }
 
   async function testConnection() {
@@ -176,12 +167,10 @@ function ProviderCard({ provider, config, onUpdate }) {
     const data = result?.data;
     if (data?.success) {
       setTestResult({ success: true, latencyMs });
-      const cfg = await getOrCreate();
-      await base44.asServiceRole.entities.PlatformConfig.update(cfg.id, { [provider.pingField]: 'success', [provider.pingAtField]: new Date().toISOString().split('T')[0] });
+      await base44.functions.invoke('updatePlatformConfig', { data: { [provider.pingField]: 'success', [provider.pingAtField]: new Date().toISOString().split('T')[0] } });
     } else {
       setTestResult({ success: false, error: data?.error || 'Connection failed' });
-      const cfg = await getOrCreate();
-      await base44.asServiceRole.entities.PlatformConfig.update(cfg.id, { [provider.pingField]: 'error' });
+      await base44.functions.invoke('updatePlatformConfig', { data: { [provider.pingField]: 'error' } });
     }
     onUpdate();
     setTesting(false);
@@ -310,8 +299,8 @@ export default function ApiKeysTab() {
 
   async function load() {
     try {
-      const configs = await base44.asServiceRole.entities.PlatformConfig.filter({});
-      setConfig(configs[0] || {});
+      const res = await base44.functions.invoke('getPlatformConfig', {});
+      setConfig(res.data?.config || {});
     } catch (e) {
       console.error('[ApiKeysTab] load error:', e);
       setConfig({});
