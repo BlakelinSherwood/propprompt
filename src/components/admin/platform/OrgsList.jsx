@@ -23,27 +23,8 @@ export default function OrgsList() {
   useEffect(() => {
     async function load() {
       try {
-        const [data, me] = await Promise.all([
-          base44.asServiceRole.entities.Organization.list("-created_date", 100),
-          base44.auth.me(),
-        ]);
-
-        // Ensure platform owner has a brokerage org record
-        if (me?.email) {
-          const ownerOrg = data.find(o => o.owner_email === me.email);
-          if (!ownerOrg) {
-            const created = await base44.asServiceRole.entities.Organization.create({
-              name: "Sherwood & Company",
-              org_type: "brokerage",
-              owner_email: me.email,
-              status: "active",
-              subscription_plan: "brokerage",
-            });
-            data.unshift(created);
-          }
-        }
-
-        setOrgs(data || []);
+        const res = await base44.functions.invoke('listOrgs', {});
+        setOrgs(res.data?.orgs || []);
       } catch (e) {
         console.error('[OrgsList] load error:', e);
         setOrgs([]);
