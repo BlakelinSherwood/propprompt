@@ -26,16 +26,12 @@ export default function Analyses() {
     async function load() {
       if (!user) return;
 
-      const [data] = await Promise.all([
-        base44.entities.Analysis.list("-created_date", 50),
+      const [data, memberships] = await Promise.all([
+        base44.entities.Analysis.filter({ run_by_email: user.email }, "-created_date", 30),
+        base44.entities.OrgMembership.filter({ user_email: user.email, status: "active" }),
       ]);
       setAnalyses(data);
 
-      // Check if org allows private toggle
-      const memberships = await base44.entities.OrgMembership.filter({
-        user_email: me.email,
-        status: "active",
-      });
       if (memberships.length > 0) {
         const orgs = await base44.entities.Organization.filter({ id: memberships[0].org_id });
         if (orgs[0]?.allow_agent_private_toggle) setOrgAllowsPrivate(true);
