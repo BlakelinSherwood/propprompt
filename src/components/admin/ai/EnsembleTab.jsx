@@ -55,17 +55,23 @@ export default function EnsembleTab() {
   const [ownerTier, setOwnerTier] = useState(null);
 
   async function load() {
-    const [configs, user] = await Promise.all([
-      base44.asServiceRole.entities.PlatformConfig.filter({}),
-      base44.auth.me(),
-    ]);
-    const cfg = configs[0] || {};
-    setConfig(cfg);
-    setAssignments(cfg.ensemble_section_assignments || {});
-    // Check platform owner's own org tier
-    if (user?.email) {
-      const orgs = await base44.asServiceRole.entities.Organization.filter({ owner_email: user.email });
-      setOwnerTier(orgs[0]?.subscription_tier || 'starter');
+    try {
+      const [configs, user] = await Promise.all([
+        base44.asServiceRole.entities.PlatformConfig.filter({}),
+        base44.auth.me(),
+      ]);
+      const cfg = configs[0] || {};
+      setConfig(cfg);
+      setAssignments(cfg.ensemble_section_assignments || {});
+      if (user?.email) {
+        try {
+          const orgs = await base44.asServiceRole.entities.Organization.filter({ owner_email: user.email });
+          setOwnerTier(orgs[0]?.subscription_tier || 'starter');
+        } catch {}
+      }
+    } catch (e) {
+      console.error('[EnsembleTab] load error:', e);
+      setConfig({});
     }
   }
 
