@@ -15,7 +15,7 @@ export default function AiSettings() {
   useEffect(() => {
     base44.auth.me()
       .then((me) => {
-        if (me?.role !== "admin" && me?.role !== "platform_owner") {
+        if (me?.role !== "platform_owner") {
           navigate("/Dashboard");
         }
       })
