@@ -1,6 +1,10 @@
 /**
  * assemblePrompt — Builds the full prompt for an analysis from the PromptLibrary.
  *
+ * NEW: Honors analysis-type-specific section inclusion matrix.
+ * Conditionally includes migration_analysis, buyer_archetypes, tiered_comps, etc.
+ * based on assessment_type and opt-in flags (include_migration, include_archetypes).
+ *
  * Lookup order:
  * 1. Exact match: ai_platform + assessment_type + property_type + is_active
  * 2. Fallback: ai_platform + assessment_type + property_type=all + is_active
@@ -11,6 +15,33 @@
  * Decrypts prompt_text (ENC: prefix) before substitution.
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
+
+// Inline section inclusion matrix (avoid import issues)
+function getPromptSections(assessmentType, analysis) {
+  const matrix = {
+    listing_pricing: ['migration_analysis', 'buyer_archetype', 'valuation_module'],
+    cma: ['valuation_module', 'location_priorities'],
+    buyer_intelligence: ['migration_analysis', 'buyer_archetype'],
+    investment_analysis: ['valuation_module', 'location_priorities', 'rate_environment'],
+    rental_analysis: [],
+    client_portfolio: ['valuation_module', 'portfolio_options', 'location_priorities', 'rate_environment'],
+    custom: analysis.selected_modules || [],
+  };
+  
+  let sections = ['system_instructions', 'intake_template', 'disclaimer_footer'];
+  const base = matrix[assessmentType] || [];
+  sections = [...sections, ...base];
+  
+  // Conditionally add opt-in sections for CMA and Investment
+  if ((assessmentType === 'cma' || assessmentType === 'investment_analysis') && analysis.include_migration) {
+    sections.push('migration_analysis');
+  }
+  if ((assessmentType === 'cma' || assessmentType === 'investment_analysis') && analysis.include_archetypes) {
+    sections.push('buyer_archetype');
+  }
+  
+  return sections;
+}
 
 async function getDecryptKey() {
   const raw = Deno.env.get("ENCRYPTION_KEY");
@@ -121,33 +152,90 @@ Deno.serve(async (req) => {
       // Territory lookup is best-effort; never block prompt assembly
     }
 
-    let match =
-      allPrompts.find((p) => p.ai_platform === platform && p.assessment_type === assessmentType && p.property_type === propertyType) ||
-      allPrompts.find((p) => p.ai_platform === platform && p.assessment_type === assessmentType && p.property_type === "all") ||
-      allPrompts.find((p) => p.ai_platform === "generic" && p.assessment_type === assessmentType && p.property_type === "all") ||
-      null;
+    // ── NEW: Filter prompts based on analysis type matrix ──────────────────────
+    const requiredSections = getPromptSections(assessmentType, analysis);
+    const libraryPromptsForAnalysis = allPrompts.filter(
+      (p) => requiredSections.includes(p.prompt_section) || p.prompt_section === "full_assembled"
+    );
 
-    if (!match) {
-      return Response.json({ prompt: buildBaselinePrompt(analysis), source: "baseline" });
-    }
+    // If we have modular prompts, assemble from sections
+    let promptText = "";
+    let promptSource = "baseline";
 
-    let promptText = match.prompt_text || "";
-    if (promptText.startsWith("FILE:")) {
-      const fileUri = promptText.slice(5);
-      const { signed_url } = await base44.asServiceRole.integrations.Core.CreateFileSignedUrl({ file_uri: fileUri, expires_in: 120 });
-      const fileRes = await fetch(signed_url);
-      promptText = await fileRes.text();
-    }
-    if (promptText.startsWith("ENC:")) {
-      promptText = await decryptText(promptText.slice(4));
+    if (libraryPromptsForAnalysis.length > 0) {
+      promptSource = "library-modular";
+      // Sort by priority and concatenate
+      const byPlatform = libraryPromptsForAnalysis.filter(
+        (p) => p.ai_platform === platform && p.assessment_type === assessmentType
+      );
+      const toUse = byPlatform.length > 0 ? byPlatform : libraryPromptsForAnalysis;
+      promptText = (await Promise.all(
+        toUse.map(async (p) => {
+          let text = p.prompt_text || "";
+          if (text.startsWith("FILE:")) {
+            const fileUri = text.slice(5);
+            const { signed_url } = await base44.asServiceRole.integrations.Core.CreateFileSignedUrl({
+              file_uri: fileUri,
+              expires_in: 120,
+            });
+            const res = await fetch(signed_url);
+            return res.text();
+          }
+          if (text.startsWith("ENC:")) return decryptText(text.slice(4));
+          return text;
+        })
+      )).then((texts) => texts.join("\n\n"));
+    } else {
+      // Fallback: use full_assembled or baseline
+      const match =
+        allPrompts.find(
+          (p) =>
+            p.ai_platform === platform &&
+            p.assessment_type === assessmentType &&
+            p.property_type === propertyType &&
+            p.prompt_section === "full_assembled"
+        ) ||
+        allPrompts.find(
+          (p) =>
+            p.ai_platform === platform &&
+            p.assessment_type === assessmentType &&
+            p.property_type === "all" &&
+            p.prompt_section === "full_assembled"
+        ) ||
+        allPrompts.find(
+          (p) => p.ai_platform === "generic" && p.assessment_type === assessmentType && p.property_type === "all"
+        ) ||
+        null;
+
+      if (!match) {
+        return Response.json({ prompt: buildBaselinePrompt(analysis), source: "baseline" });
+      }
+
+      promptText = match.prompt_text || "";
+      if (promptText.startsWith("FILE:")) {
+        const fileUri = promptText.slice(5);
+        const { signed_url } = await base44.asServiceRole.integrations.Core.CreateFileSignedUrl({
+          file_uri: fileUri,
+          expires_in: 120,
+        });
+        const fileRes = await fetch(signed_url);
+        promptText = await fileRes.text();
+      }
+      if (promptText.startsWith("ENC:")) {
+        promptText = await decryptText(promptText.slice(4));
+      }
+      promptSource = "library";
     }
 
     const assembled = substituteTokens(promptText, analysis, territory);
 
-    // Store assembled prompt on the analysis
-    await base44.asServiceRole.entities.Analysis.update(analysisId, { prompt_assembled: assembled });
+    // Store assembled prompt and included sections on the analysis
+    await base44.asServiceRole.entities.Analysis.update(analysisId, {
+      prompt_assembled: assembled,
+      selected_modules: requiredSections,
+    });
 
-    return Response.json({ prompt: assembled, source: "library", promptId: match.id });
+    return Response.json({ prompt: assembled, source: promptSource });
 
   } catch (error) {
     console.error("assemblePrompt error:", error);
