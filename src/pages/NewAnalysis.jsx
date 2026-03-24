@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
@@ -9,14 +10,27 @@ import Step3ClientRelationship from "../components/wizard/Step3ClientRelationshi
 import Step4PropertyDetails from "../components/wizard/Step4PropertyDetails";
 import Step5OutputFormat from "../components/wizard/Step5OutputFormat";
 import Step6Confirm from "../components/wizard/Step6Confirm";
+import StepClientFinancial from "../components/wizard/StepClientFinancial";
+import StepBuyerIntelligence from "../components/wizard/StepBuyerIntelligence";
 
-const STEP_LABELS = [
-  "Assessment",
-  "Client Role",
-  "Property",
-  "Output",
-  "Confirm",
-];
+function getStepLabels(assessmentType) {
+  const base = ["Assessment", "Client Role", "Property"];
+  const afterProperty = [];
+  
+  // Add context step based on assessment type
+  if (assessmentType === "client_portfolio") {
+    afterProperty.push("Financial Context");
+  } else if (["listing_pricing", "buyer_intelligence"].includes(assessmentType)) {
+    afterProperty.push("Buyer Context");
+  }
+  
+  return [...base, ...afterProperty, "Output", "Confirm"];
+}
+
+function getMaxStep(assessmentType) {
+  const labels = getStepLabels(assessmentType);
+  return labels.length;
+}
 
 const INITIAL_INTAKE = {
   ai_platform: "claude",
@@ -29,6 +43,17 @@ const INITIAL_INTAKE = {
   on_behalf_of_email: "",
   drive_sync: true,
   selected_modules: [],
+  // Financial context (portfolio)
+  mortgage_balance: null,
+  mortgage_source: "approximate",
+  mortgage_rate: null,
+  known_improvements: "",
+  heloc_info: "",
+  client_interests: [],
+  // Buyer intelligence (listing pricing, buyer intelligence)
+  buyer_pool_expectation: [],
+  known_employer_draws: "",
+  key_selling_attributes: [],
 };
 
 export default function NewAnalysis() {
@@ -70,7 +95,8 @@ export default function NewAnalysis() {
   }
 
   function next() {
-    setStep((s) => Math.min(s + 1, 5));
+    const maxStep = getMaxStep(intake.assessment_type);
+    setStep((s) => Math.min(s + 1, maxStep));
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -137,6 +163,19 @@ export default function NewAnalysis() {
           address: intake.address,
           client_relationship: intake.client_relationship,
           drive_sync: intake.drive_sync,
+          ...(intake.assessment_type === "client_portfolio" && {
+            mortgage_balance: intake.mortgage_balance,
+            mortgage_source: intake.mortgage_source,
+            mortgage_rate: intake.mortgage_rate,
+            known_improvements: intake.known_improvements,
+            heloc_info: intake.heloc_info,
+            client_interests: intake.client_interests,
+          }),
+          ...(intake.assessment_type === "listing_pricing" || intake.assessment_type === "buyer_intelligence") && {
+            buyer_pool_expectation: intake.buyer_pool_expectation,
+            known_employer_draws: intake.known_employer_draws,
+            key_selling_attributes: intake.key_selling_attributes,
+          },
         },
         drive_sync_status: intake.drive_sync ? "pending" : "not_synced",
       };
@@ -154,6 +193,43 @@ export default function NewAnalysis() {
   }
 
   const stepProps = { intake, update, user, userTier, onNext: next, onBack: back };
+  const maxStep = getMaxStep(intake.assessment_type);
+  const stepLabels = getStepLabels(intake.assessment_type);
+  const hasContextStep = intake.assessment_type === "client_portfolio" || 
+                         ["listing_pricing", "buyer_intelligence"].includes(intake.assessment_type);
+
+  // Map step number to component based on assessment type
+  function getStepComponent() {
+    if (step === 1) return <Step2Assessment {...stepProps} />;
+    if (step === 2) return <Step3ClientRelationship {...stepProps} />;
+    if (step === 3) return <Step4PropertyDetails {...stepProps} />;
+    
+    if (hasContextStep && step === 4) {
+      if (intake.assessment_type === "client_portfolio") {
+        return <StepClientFinancial {...stepProps} />;
+      } else if (["listing_pricing", "buyer_intelligence"].includes(intake.assessment_type)) {
+        return <StepBuyerIntelligence {...stepProps} />;
+      }
+    }
+    
+    // Output step
+    const outputStep = hasContextStep ? 5 : 4;
+    const confirmStep = hasContextStep ? 6 : 5;
+    
+    if (step === outputStep) return <Step5OutputFormat {...stepProps} />;
+    if (step === confirmStep) {
+      return (
+        <Step6Confirm
+          {...stepProps}
+          orgMembers={orgMembers}
+          submitting={submitting}
+          onSubmit={handleSubmit}
+        />
+      );
+    }
+    
+    return null;
+  }
 
   if (isLoadingAuth) {
     return (
@@ -175,21 +251,10 @@ export default function NewAnalysis() {
         </p>
       </div>
 
-      <WizardProgress currentStep={step} labels={STEP_LABELS} />
+      <WizardProgress currentStep={step} labels={stepLabels} />
 
       <div className="rounded-2xl border border-[#1A3226]/10 bg-white overflow-hidden shadow-sm">
-        {step === 1 && <Step2Assessment {...stepProps} />}
-        {step === 2 && <Step3ClientRelationship {...stepProps} />}
-        {step === 3 && <Step4PropertyDetails {...stepProps} />}
-        {step === 4 && <Step5OutputFormat {...stepProps} />}
-        {step === 5 && (
-          <Step6Confirm
-            {...stepProps}
-            orgMembers={orgMembers}
-            submitting={submitting}
-            onSubmit={handleSubmit}
-          />
-        )}
+        {getStepComponent()}
       </div>
     </div>
   );
