@@ -56,13 +56,20 @@ export default function UsageStatsTab() {
   useEffect(() => {
     async function load() {
       setLoading(true);
-      const [all, cfg] = await Promise.all([
-        base44.asServiceRole.entities.Analysis.list("-created_date", 500),
-        base44.asServiceRole.entities.PlatformConfig.filter({}),
-      ]);
-      setAnalyses(all);
-      setConfig(cfg[0] || {});
-      setLoading(false);
+      try {
+        const [all, cfg] = await Promise.all([
+          base44.asServiceRole.entities.Analysis.list("-created_date", 500),
+          base44.asServiceRole.entities.PlatformConfig.filter({}),
+        ]);
+        setAnalyses(all || []);
+        setConfig(cfg[0] || {});
+      } catch (e) {
+        console.error('[UsageStatsTab] load error:', e);
+        setAnalyses([]);
+        setConfig({});
+      } finally {
+        setLoading(false);
+      }
     }
     load();
   }, []);

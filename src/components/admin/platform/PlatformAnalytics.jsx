@@ -1,47 +1,77 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import { Building2, Users, FileText, TrendingUp, Shield, MapPin, AlertCircle } from "lucide-react";
+import { Building2, FileText, TrendingUp, Shield, MapPin, AlertCircle, Loader2 } from "lucide-react";
 
 const COLORS = ["#1A3226", "#B8982F", "#4CAF50", "#2196F3", "#9C27B0"];
 
 export default function PlatformAnalytics() {
-  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [orgs, setOrgs] = useState([]);
+  const [analyses, setAnalyses] = useState([]);
+  const [fhReviews, setFhReviews] = useState([]);
 
   useEffect(() => {
-    base44.functions.invoke("platformAggregate", {})
-      .then((res) => {
-        if (res.data?.error) {
-          setError(res.data.error);
-        } else {
-          setData(res.data);
-        }
-      })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+    async function load() {
+      try {
+        const [orgsData, analysesData, fhData] = await Promise.all([
+          base44.asServiceRole.entities.Organization.list("-created_date", 200),
+          base44.asServiceRole.entities.Analysis.list("-created_date", 500),
+          base44.asServiceRole.entities.FairHousingReview.list("-created_date", 200),
+        ]);
+        setOrgs(orgsData || []);
+        setAnalyses(analysesData || []);
+        setFhReviews(fhData || []);
+      } catch (e) {
+        console.error('[PlatformAnalytics] load error:', e);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
   }, []);
 
   if (loading) return (
     <div className="flex items-center justify-center py-12">
-      <div className="w-8 h-8 border-4 border-[#1A3226]/20 border-t-[#1A3226] rounded-full animate-spin" />
+      <Loader2 className="w-8 h-8 animate-spin text-[#1A3226]/30" />
     </div>
   );
 
-  if (error) return (
-    <div className="rounded-xl border border-red-100 bg-red-50 p-6 flex items-center gap-3">
-      <AlertCircle className="w-5 h-5 text-red-500" />
-      <p className="text-sm text-red-700">{error}</p>
-    </div>
-  );
+  // Compute stats
+  const totalOrgs = orgs.length;
+  const totalAnalyses = analyses.length;
+  const fhSigned = fhReviews.filter(r => r.status === "signed").length;
+  const fhOverdue = fhReviews.filter(r => r.status === "overdue").length;
 
-  const { summary, by_type, by_platform, by_month, town_heatmap, org_summary } = data;
+  // By type
+  const byType = {};
+  analyses.forEach(a => { if (a.assessment_type) byType[a.assessment_type] = (byType[a.assessment_type] || 0) + 1; });
+  const typeChart = Object.entries(byType).map(([name, count]) => ({ name: name.replace(/_/g, " "), count }));
 
-  const typeChart = Object.entries(by_type || {}).map(([name, count]) => ({ name: name.replace(/_/g, " "), count }));
-  const platformChart = Object.entries(by_platform || {}).map(([name, count]) => ({ name, count }));
-  const monthChart = Object.entries(by_month || {}).sort().slice(-6).map(([name, count]) => ({ name, count }));
-  const fhStats = summary.fair_housing || {};
+  // By platform
+  const byPlatform = {};
+  analyses.forEach(a => { if (a.ai_platform) byPlatform[a.ai_platform] = (byPlatform[a.ai_platform] || 0) + 1; });
+  const platformChart = Object.entries(byPlatform).map(([name, count]) => ({ name, count }));
+
+  // Monthly (last 6 months)
+  const byMonth = {};
+  analyses.forEach(a => {
+    const d = new Date(a.created_date);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    byMonth[key] = (byMonth[key] || 0) + 1;
+  });
+  const monthChart = Object.entries(byMonth).sort().slice(-6).map(([name, count]) => ({ name, count }));
+
+  // Per-org analysis counts
+  const analysisByOrg = {};
+  analyses.forEach(a => { if (a.org_id) analysisByOrg[a.org_id] = (analysisByOrg[a.org_id] || 0) + 1; });
+
+  const fhByOrg = {};
+  fhReviews.forEach(r => {
+    if (!fhByOrg[r.org_id]) fhByOrg[r.org_id] = { signed: 0, overdue: 0 };
+    if (r.status === "signed") fhByOrg[r.org_id].signed++;
+    if (r.status === "overdue") fhByOrg[r.org_id].overdue++;
+  });
 
   return (
     <div className="space-y-6">
@@ -49,17 +79,17 @@ export default function PlatformAnalytics() {
       <div className="rounded-lg border border-[#B8982F]/30 bg-[#B8982F]/5 px-4 py-3 flex items-start gap-2.5">
         <Shield className="w-4 h-4 text-[#B8982F] mt-0.5 flex-shrink-0" />
         <p className="text-xs text-[#1A3226]/70">
-          <strong className="text-[#1A3226]">Aggregate view only.</strong> Individual analysis content, addresses, and outputs are never accessible here. Private analyses are excluded from all counts. Town data suppressed where n &lt; 3 (k-anonymity).
+          <strong className="text-[#1A3226]">Aggregate view only.</strong> Individual analysis content, addresses, and outputs are never shown here.
         </p>
       </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "Organizations", value: summary.total_orgs, icon: Building2, color: "text-[#1A3226]", bg: "bg-[#1A3226]/5" },
-          { label: "Total Analyses", value: summary.total_analyses, icon: FileText, color: "text-emerald-600", bg: "bg-emerald-50" },
-          { label: "FH Reviews Signed", value: fhStats.signed || 0, icon: Shield, color: "text-[#B8982F]", bg: "bg-[#B8982F]/10" },
-          { label: "FH Overdue", value: fhStats.overdue || 0, icon: AlertCircle, color: fhStats.overdue > 0 ? "text-red-600" : "text-[#1A3226]/40", bg: fhStats.overdue > 0 ? "bg-red-50" : "bg-gray-50" },
+          { label: "Organizations", value: totalOrgs, icon: Building2, color: "text-[#1A3226]", bg: "bg-[#1A3226]/5" },
+          { label: "Total Analyses", value: totalAnalyses, icon: FileText, color: "text-emerald-600", bg: "bg-emerald-50" },
+          { label: "FH Reviews Signed", value: fhSigned, icon: Shield, color: "text-[#B8982F]", bg: "bg-[#B8982F]/10" },
+          { label: "FH Overdue", value: fhOverdue, icon: AlertCircle, color: fhOverdue > 0 ? "text-red-600" : "text-[#1A3226]/40", bg: fhOverdue > 0 ? "bg-red-50" : "bg-gray-50" },
         ].map((kpi) => (
           <div key={kpi.label} className={`rounded-xl border border-[#1A3226]/10 ${kpi.bg} p-4`}>
             <kpi.icon className={`w-5 h-5 ${kpi.color} mb-2`} />
@@ -70,75 +100,72 @@ export default function PlatformAnalytics() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Analyses by Type */}
+        {/* By Type */}
         <div className="rounded-xl border border-[#1A3226]/10 bg-white p-5">
           <h3 className="text-sm font-semibold text-[#1A3226] mb-4">Analyses by Type</h3>
-          <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={typeChart} margin={{ left: -20 }}>
-              <XAxis dataKey="name" tick={{ fontSize: 9 }} />
-              <YAxis tick={{ fontSize: 10 }} />
-              <Tooltip />
-              <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                {typeChart.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+          {typeChart.length === 0 ? <p className="text-xs text-[#1A3226]/40 text-center py-8">No data yet</p> : (
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={typeChart} margin={{ left: -20 }}>
+                <XAxis dataKey="name" tick={{ fontSize: 9 }} />
+                <YAxis tick={{ fontSize: 10 }} />
+                <Tooltip />
+                <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                  {typeChart.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
 
-        {/* Analyses by Platform */}
+        {/* By Platform */}
         <div className="rounded-xl border border-[#1A3226]/10 bg-white p-5">
           <h3 className="text-sm font-semibold text-[#1A3226] mb-4">Analyses by AI Platform</h3>
-          <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={platformChart} margin={{ left: -20 }}>
-              <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-              <YAxis tick={{ fontSize: 10 }} />
-              <Tooltip />
-              <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                {platformChart.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+          {platformChart.length === 0 ? <p className="text-xs text-[#1A3226]/40 text-center py-8">No data yet</p> : (
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={platformChart} margin={{ left: -20 }}>
+                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
+                <Tooltip />
+                <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                  {platformChart.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
 
         {/* Monthly trend */}
         <div className="rounded-xl border border-[#1A3226]/10 bg-white p-5">
           <h3 className="text-sm font-semibold text-[#1A3226] mb-4">Monthly Volume (last 6 months)</h3>
-          <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={monthChart} margin={{ left: -20 }}>
-              <XAxis dataKey="name" tick={{ fontSize: 9 }} />
-              <YAxis tick={{ fontSize: 10 }} />
-              <Tooltip />
-              <Bar dataKey="count" radius={[4, 4, 0, 0]} fill="#1A3226" />
-            </BarChart>
-          </ResponsiveContainer>
+          {monthChart.length === 0 ? <p className="text-xs text-[#1A3226]/40 text-center py-8">No data yet</p> : (
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={monthChart} margin={{ left: -20 }}>
+                <XAxis dataKey="name" tick={{ fontSize: 9 }} />
+                <YAxis tick={{ fontSize: 10 }} />
+                <Tooltip />
+                <Bar dataKey="count" radius={[4, 4, 0, 0]} fill="#1A3226" />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
 
-        {/* Town heatmap (k-anon) */}
+        {/* Orgs placeholder for 4th chart slot */}
         <div className="rounded-xl border border-[#1A3226]/10 bg-white p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-[#1A3226]">Activity by Town</h3>
-            <div className="flex items-center gap-1.5 text-[10px] text-[#1A3226]/40">
-              <MapPin className="w-3 h-3" />
-              k=3 anonymity applied
-            </div>
-          </div>
-          {town_heatmap.length === 0 ? (
-            <p className="text-xs text-[#1A3226]/40 text-center py-8">No town data above threshold yet</p>
-          ) : (
-            <div className="space-y-2 max-h-48 overflow-y-auto">
-              {town_heatmap.slice(0, 15).map((t, i) => (
-                <div key={t.town} className="flex items-center gap-3">
-                  <span className="text-xs text-[#1A3226]/60 w-32 truncate">{t.town}</span>
-                  <div className="flex-1 bg-[#1A3226]/5 rounded-full h-2">
-                    <div
-                      className="bg-[#B8982F] h-2 rounded-full transition-all"
-                      style={{ width: `${Math.round((t.count / town_heatmap[0].count) * 100)}%` }}
-                    />
-                  </div>
-                  <span className="text-xs font-medium text-[#1A3226] w-6 text-right">{t.count}</span>
-                </div>
-              ))}
-            </div>
+          <h3 className="text-sm font-semibold text-[#1A3226] mb-4">Org Status Breakdown</h3>
+          {orgs.length === 0 ? <p className="text-xs text-[#1A3226]/40 text-center py-8">No orgs yet</p> : (
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart
+                data={Object.entries(
+                  orgs.reduce((acc, o) => { acc[o.status || "unknown"] = (acc[o.status || "unknown"] || 0) + 1; return acc; }, {})
+                ).map(([name, count]) => ({ name, count }))}
+                margin={{ left: -20 }}
+              >
+                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
+                <Tooltip />
+                <Bar dataKey="count" radius={[4, 4, 0, 0]} fill="#B8982F" />
+              </BarChart>
+            </ResponsiveContainer>
           )}
         </div>
       </div>
@@ -147,7 +174,7 @@ export default function PlatformAnalytics() {
       <div className="rounded-xl border border-[#1A3226]/10 bg-white overflow-hidden">
         <div className="px-5 py-3 border-b border-[#1A3226]/5">
           <h3 className="text-sm font-semibold text-[#1A3226]">Organization Summary</h3>
-          <p className="text-xs text-[#1A3226]/40 mt-0.5">Aggregate counts only — no analysis content</p>
+          <p className="text-xs text-[#1A3226]/40 mt-0.5">Aggregate counts only</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
@@ -163,8 +190,11 @@ export default function PlatformAnalytics() {
               </tr>
             </thead>
             <tbody>
-              {org_summary.map((org, i) => (
-                <tr key={org.id} className={`${i !== org_summary.length - 1 ? "border-b border-[#1A3226]/5" : ""} hover:bg-[#FAF8F4]/50`}>
+              {orgs.length === 0 && (
+                <tr><td colSpan={7} className="px-5 py-8 text-center text-[#1A3226]/40">No organizations yet</td></tr>
+              )}
+              {orgs.map((org, i) => (
+                <tr key={org.id} className={`${i !== orgs.length - 1 ? "border-b border-[#1A3226]/5" : ""} hover:bg-[#FAF8F4]/50`}>
                   <td className="px-5 py-3 font-medium text-[#1A3226]">{org.name}</td>
                   <td className="px-4 py-3 text-[#1A3226]/50 capitalize">{org.org_type}</td>
                   <td className="px-4 py-3">
@@ -172,15 +202,13 @@ export default function PlatformAnalytics() {
                       org.status === "active" ? "bg-emerald-50 text-emerald-700" :
                       org.status === "suspended" ? "bg-red-50 text-red-600" :
                       "bg-gray-100 text-gray-500"
-                    }`}>
-                      {org.status}
-                    </span>
+                    }`}>{org.status}</span>
                   </td>
-                  <td className="px-4 py-3 text-right text-[#1A3226]/70">{org.seat_count}</td>
-                  <td className="px-4 py-3 text-right text-[#1A3226]/70">{org.analysis_count}</td>
-                  <td className="px-4 py-3 text-right text-emerald-600">{org.fair_housing.signed}</td>
-                  <td className={`px-4 py-3 text-right font-semibold ${org.fair_housing.overdue > 0 ? "text-red-600" : "text-[#1A3226]/30"}`}>
-                    {org.fair_housing.overdue || "—"}
+                  <td className="px-4 py-3 text-right text-[#1A3226]/70">{org.seat_count ?? 0}</td>
+                  <td className="px-4 py-3 text-right text-[#1A3226]/70">{analysisByOrg[org.id] || 0}</td>
+                  <td className="px-4 py-3 text-right text-emerald-600">{fhByOrg[org.id]?.signed || 0}</td>
+                  <td className={`px-4 py-3 text-right font-semibold ${(fhByOrg[org.id]?.overdue || 0) > 0 ? "text-red-600" : "text-[#1A3226]/30"}`}>
+                    {fhByOrg[org.id]?.overdue || "—"}
                   </td>
                 </tr>
               ))}
