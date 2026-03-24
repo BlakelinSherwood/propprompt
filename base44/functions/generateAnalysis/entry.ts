@@ -5,6 +5,144 @@
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.21';
 
+// Expanded analysis instructions (inlined to avoid import path issues in Deno)
+function getExpandedSystemPrompt(todayString) {
+  const ANALYSIS_SYSTEM_PROMPT = `
+────────────────────────────────────────────────────────────────
+EXPANDED ANALYSIS INSTRUCTIONS — ALL ANALYSIS TYPES
+────────────────────────────────────────────────────────────────
+
+OUTPUT STRUCTURE:
+
+All analyses produce TWO outputs simultaneously:
+1. output_text: Narrative markdown report (existing behavior)
+2. output_json: Structured JSON with analysis data (new, detailed below)
+
+The JSON output feeds directly into templates for rendering tables, 
+grids, and data-driven visualizations. The narrative is fallback.
+
+────────────────────────────────────────────────────────────────
+FOR MIGRATION ANALYSIS (Listing Pricing, Buyer Intelligence, CMA)
+────────────────────────────────────────────────────────────────
+
+EXPANDED MIGRATION ANALYSIS INSTRUCTIONS:
+
+1. GEOGRAPHIC ORIGIN: Identify 5-8 feeder markets based on location class, property type, and price point. Use general knowledge of regional migration patterns.
+
+2. MIGRATION SCORING: Assign each market a score (1-10) based on: volume (40%), price differential (30%), lifestyle/commute (20%), growth trend (10%).
+
+3. PUSH/PULL FRAMEWORK: Identify push factors (why they leave) and pull factors (why they target this submarket). Must be economic, lifestyle, or geographic — never demographic.
+
+4. PRICE PSYCHOLOGY: Categorize as stretching_up, cashing_out_equity, lateral_move, or downsizing_into_quality.
+
+5. EMPLOYER TARGETING: Generate 6-14 employer targets with company name, relevance, priority, target roles, commute time, office location. Source from general knowledge — never fabricate specific hiring data. NEVER reference employee demographics.
+
+6. MARKETING CHANNELS: Recommend 4-6 channels with specific targeting rationale tied to feeder markets.
+
+LOCATION-TYPE MIGRATION TEMPLATES:
+
+URBAN: Same neighborhood (upgrade), adjacent neighborhoods (lateral), suburban downsizers, out-of-state relocations, renter-to-buyer
+SUBURBAN: Urban core families, adjacent suburbs, same-town move-ups, corporate transfers, remote workers
+COASTAL/HISTORIC: Inner suburbs (lifestyle change), urban core (second home), same-town moves, lifestyle buyers, retirees
+RURAL: Closer suburbs (priced out), same-region move-ups, remote workers, retirees, agricultural/lifestyle buyers
+
+────────────────────────────────────────────────────────────────
+FOR ARCHETYPE GENERATION (All Analysis Types)
+────────────────────────────────────────────────────────────────
+
+EXPANDED ARCHETYPE GENERATION INSTRUCTIONS:
+
+1. Generate 6-10 buyer archetypes per analysis with full JSON schema.
+
+2. ARCHETYPE NAMING: Use lifestyle and financial descriptors only. Good: Remote-Flex Professional, Move-Up Family, Downsizing Empty Nester. Bad: Any protected class references.
+
+3. DEEP PROFILE: 3-4 sentences on who they are, why property fits, must-haves, concerns. Lifestyle/financial framing only.
+
+4. LANGUAGE CALIBRATION: 3-5 phrases to AVOID and 3-5 phrases to USE. These feed into listing remarks and marketing copy.
+
+5. ATTRIBUTE RESONANCE: Score each archetype (0-3) against property attributes. 3=Decisive, 2=Important, 1=Noted, 0=Not relevant.
+
+6. PROPERTY-TYPE REQUIREMENTS:
+   Multi-family: Local Value-Add Investor, 1031 Exchange Buyer, Owner-Occupant House Hacker, Passive/Remote Investor
+   Condo: Urban Downsizer, Young Professional First-Time, Pied-à-Terre Buyer, Investor/Rental Buyer
+   Single-family: At least 2 family + 2 non-family archetypes
+
+7. PERCENTAGE: estimated_pool_pct must sum to ~100% (95-105% acceptable).
+
+────────────────────────────────────────────────────────────────
+FOR TIERED COMP ANALYSIS (Listing Pricing, CMA, Client Portfolio)
+────────────────────────────────────────────────────────────────
+
+TIERED COMP INSTRUCTIONS:
+
+1. THREE TIERS:
+   TIER A (Direct): Same street/subdivision/closest match. 3-6 comps, 12 months preferred. Weight: PRIMARY
+   TIER B (Nearby): Same town, ±20% size, ±15 years age. 3-6 comps. Weight: SECONDARY
+   TIER C (Context): Different part of town/new construction. 3-6 comps. Weight: REFERENCE_ONLY
+
+2. TOTAL: 12-18 across all tiers. If <12, set thin_comp_flag=true.
+
+3. TIME ADJUSTMENT: Comps >12 months old must be adjusted. Use local appreciation rate. Cap: 5 years max.
+
+4. CONDO: Within-building sales as sub-tier of Tier A. Set within_building=true.
+
+5. MULTI-FAMILY: Include both sale price AND income comps (cap rate/GRM).
+
+6. CONDITION: Assess vs. subject as Superior/Similar/Inferior with key differences.
+
+7. IMPLIED VALUE: Tier A adjusted PPSF range × subject SF.
+
+────────────────────────────────────────────────────────────────
+FOR CLIENT PORTFOLIO ANALYSIS ONLY
+────────────────────────────────────────────────────────────────
+
+PORTFOLIO OPTIONS GENERATION:
+
+Generate ALL SEVEN OPTIONS (A-G) + conditional ADU for every Client Portfolio Analysis.
+
+CRITICAL:
+1. NOT a listing presentation. Never recommend selling.
+2. Never use: "you should list", "now is the time to sell". Frame as: "if you were to sell today..."
+3. All financial figures carry labels: [REGISTRY-CONFIRMED], [ESTIMATED], [CLIENT-PROVIDED], [AVM-RETRIEVED {date}]
+4. Mortgage balance: Estimate from public records if not provided. Label as estimated.
+5. Rates: Use current Freddie Mac PMMS data for 30-yr fixed. If unavailable, note date.
+6. ADU TRIGGER: Single-family, ≥5,000 SF, no zoning disqualifiers. If false, explain why.
+7. Value-Add: Use Remodeling Magazine Cost vs. Value benchmarks. If unavailable, use national averages.
+
+OPTIONS A & B: Hold vs. Refinance comparison
+OPTION C: HELOC (bridge to D & G)
+OPTION D: Value-Add (6-8 improvements with ROI)
+OPTIONS E & F: Move-Up (shows rate shock) & Right-Size (shows equity freed)
+OPTION G: Leverage for 2nd property (investment + second home)
+
+TONE: Warm, honest, data-grounded, forward-looking.
+
+────────────────────────────────────────────────────────────────
+FAIR HOUSING COMPLIANCE — APPLIES TO ALL OUTPUTS
+────────────────────────────────────────────────────────────────
+
+NEVER reference or imply targeting/avoiding protected classes:
+Federal: race, color, national origin, religion, sex, familial status, disability
+State (ME, NH, VT, MA): age, sexual orientation, gender identity, marital status, source of income, ancestry, veteran status
+
+ARCHETYPES: Define by life stage, property use, financial profile, lifestyle preference, migration motivation ONLY.
+NEVER: Protected characteristics or demographic makeup.
+
+MIGRATION DATA: Reference geography and economic motivation only.
+NEVER: Ethnic/cultural/religious composition of feeder markets.
+
+If output could constitute steering, blockbusting, or redlining, flag it.
+Set compliance_flagged = true on analysis record.
+
+Property descriptions: Target features and amenities only (SF, finishes, outdoor space, home office potential).
+Focus on lifestyle fit without implying buyer demographic.
+Never steer toward/away from protected classes.
+`;
+  return `You are PropPrompt™, an elite real estate AI analyst serving New England brokerages. Today's date is ${todayString}. All market analysis, pricing, and trends should reflect current conditions as of this date. Provide thorough, data-driven analysis with professional narrative quality. Use markdown formatting.
+
+${ANALYSIS_SYSTEM_PROMPT}`;
+}
+
 const ANTHROPIC_MODELS = {
   default: "claude-opus-4-5",
   agent:   "claude-3-5-sonnet-20241022",
@@ -13,6 +151,7 @@ const ANTHROPIC_MODELS = {
 async function callClaudeOnce(apiKey, prompt, keySource) {
   const model = keySource === "agent" ? ANTHROPIC_MODELS.agent : ANTHROPIC_MODELS.default;
   const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  const systemPrompt = getExpandedSystemPrompt(today);
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -24,7 +163,7 @@ async function callClaudeOnce(apiKey, prompt, keySource) {
       model,
       max_tokens: 4096,
       messages: [{ role: "user", content: prompt }],
-      system: `You are PropPrompt™, an elite real estate AI analyst serving New England brokerages. Today's date is ${today}. All market analysis, pricing, and trends should reflect current conditions as of this date. Provide thorough, data-driven analysis with professional narrative quality. Use markdown formatting.`,
+      system: systemPrompt,
     }),
   });
   if (!res.ok) {
@@ -56,6 +195,7 @@ async function callClaude(apiKey, prompt, keySource) {
 
 async function callOpenAI(apiKey, prompt) {
   const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  const systemPrompt = getExpandedSystemPrompt(today);
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -66,7 +206,7 @@ async function callOpenAI(apiKey, prompt) {
       model: "gpt-4o",
       max_tokens: 4096,
       messages: [
-        { role: "system", content: `You are PropPrompt™, an elite real estate AI analyst serving New England brokerages. Today's date is ${today}. All market analysis, pricing, and trends should reflect current conditions as of this date. Provide thorough, data-driven analysis with professional narrative quality. Use markdown formatting.` },
+        { role: "system", content: systemPrompt },
         { role: "user", content: prompt }
       ],
     }),
@@ -82,13 +222,14 @@ async function callOpenAI(apiKey, prompt) {
 async function callGemini(apiKey, prompt) {
   const model = "gemini-2.0-flash";
   const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  const systemPrompt = getExpandedSystemPrompt(today);
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: { maxOutputTokens: 4096 },
-      systemInstruction: { parts: [{ text: `You are PropPrompt™, an elite real estate AI analyst serving New England brokerages. Today's date is ${today}. All market analysis, pricing, and trends should reflect current conditions as of this date. Provide thorough, data-driven analysis with professional narrative quality. Use markdown formatting.` }] },
+      systemInstruction: { parts: [{ text: systemPrompt }] },
     }),
   });
   if (!res.ok) {
@@ -102,6 +243,7 @@ async function callGemini(apiKey, prompt) {
 async function callPerplexity(apiKey, prompt) {
   const model = "sonar-pro";
   const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  const systemPrompt = getExpandedSystemPrompt(today);
   const res = await fetch("https://api.perplexity.ai/chat/completions", {
     method: "POST",
     headers: {
@@ -112,7 +254,7 @@ async function callPerplexity(apiKey, prompt) {
       model,
       max_tokens: 4096,
       messages: [
-        { role: "system", content: `You are PropPrompt™, a real estate market research AI. Today's date is ${today}. Provide current, data-rich market research grounded in real conditions.` },
+        { role: "system", content: systemPrompt },
         { role: "user", content: prompt }
       ],
     }),
