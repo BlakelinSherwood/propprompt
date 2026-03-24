@@ -1,131 +1,59 @@
-import { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import { Save, Eye, EyeOff, AlertTriangle } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
-
-const PLATFORMS = [
-  { id: "claude", label: "Claude (Anthropic)", recommended: true },
-  { id: "chatgpt", label: "ChatGPT (OpenAI)" },
-  { id: "gemini", label: "Gemini (Google)" },
-  { id: "perplexity", label: "Perplexity AI" },
-  { id: "grok", label: "Grok (xAI)" },
-];
+import { ArrowRight, Key, Layers, BarChart2 } from "lucide-react";
 
 export default function PlatformAIConfig() {
-  const { toast } = useToast();
-  const [anthropicKeyVisible, setAnthropicKeyVisible] = useState(false);
-  const [anthropicKey, setAnthropicKey] = useState("");
-  const [platformToggles, setPlatformToggles] = useState({
-    claude: true, chatgpt: true, gemini: true, perplexity: false, grok: false,
-  });
-  const [scManagedEnabled, setScManagedEnabled] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [config, setConfig] = useState(null);
-  const [formData, setFormData] = useState({});
+  const navigate = useNavigate();
 
-  async function handleSave() {
-    setSaving(true);
-    try {
-      await base44.entities.PlatformConfig.create({
-        sc_managed_enabled: scManagedEnabled,
-        platform_toggles: platformToggles,
-        updated_at: new Date().toISOString(),
-      });
-      toast({ title: "AI configuration saved", description: "Changes will take effect on next analysis run." });
-    } catch (err) {
-      console.error("Save failed:", err);
-      toast({ title: "Save failed", description: err.message, variant: "destructive" });
-    } finally {
-      setSaving(false);
-    }
-  }
+  const sections = [
+    {
+      icon: Key,
+      title: "API Keys & Providers",
+      description: "Add or update API keys for Claude, ChatGPT, Gemini, Perplexity, and Grok. Test connections and select models.",
+      tab: "keys",
+    },
+    {
+      icon: Layers,
+      title: "Ensemble AI Pipeline",
+      description: "Configure multi-step AI ensemble mode, section assignments, and fallback providers.",
+      tab: "ensemble",
+    },
+    {
+      icon: BarChart2,
+      title: "Usage Stats",
+      description: "View token usage and analysis counts per provider.",
+      tab: "usage",
+    },
+  ];
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      {/* S&C Managed Keys */}
-      <div className="rounded-xl border border-[#1A3226]/10 bg-white p-5 space-y-4">
-        <div>
-          <h3 className="font-semibold text-[#1A3226]">S&C Platform-Managed API Keys</h3>
-          <p className="text-xs text-[#1A3226]/50 mt-1">
-            When enabled, Sherwood & Company's platform API keys are used for orgs in "platform_managed" billing mode.
-          </p>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-[#1A3226]">Enable S&C managed keys</span>
-          <Switch checked={scManagedEnabled} onCheckedChange={setScManagedEnabled} />
-        </div>
-        {scManagedEnabled && (
-          <div className="space-y-2">
-            <label className="text-xs text-[#1A3226]/60">Anthropic (Claude) API Key</label>
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <Input
-                  type={anthropicKeyVisible ? "text" : "password"}
-                  placeholder="sk-ant-…"
-                  value={anthropicKey}
-                  onChange={(e) => setAnthropicKey(e.target.value)}
-                  className="pr-10 text-sm font-mono"
-                />
-                <button
-                  type="button"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#1A3226]/40 hover:text-[#1A3226]"
-                  onClick={() => setAnthropicKeyVisible(!anthropicKeyVisible)}
-                >
-                  {anthropicKeyVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
+    <div className="space-y-4 max-w-2xl">
+      <p className="text-sm text-[#1A3226]/60">
+        All AI configuration has moved to the dedicated AI Settings page.
+      </p>
+      <div className="grid gap-3">
+        {sections.map(({ icon: Icon, title, description, tab }) => (
+          <button
+            key={tab}
+            onClick={() => navigate(`/admin/ai-settings`)}
+            className="flex items-start gap-4 rounded-xl border border-[#1A3226]/10 bg-white p-5 text-left hover:border-[#1A3226]/30 hover:shadow-sm transition-all group"
+          >
+            <div className="mt-0.5 w-9 h-9 rounded-lg bg-[#1A3226]/5 flex items-center justify-center shrink-0">
+              <Icon className="w-4 h-4 text-[#1A3226]/60" />
             </div>
-            <p className="text-xs text-[#1A3226]/40">
-              This updates the ANTHROPIC_API_KEY environment variable used by claudeStream.
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* Platform Toggles */}
-      <div className="rounded-xl border border-[#1A3226]/10 bg-white p-5 space-y-4">
-        <div>
-          <h3 className="font-semibold text-[#1A3226]">Global Platform Availability</h3>
-          <p className="text-xs text-[#1A3226]/50 mt-1">
-            Disable platforms globally. Org-level overrides can further restrict availability.
-          </p>
-        </div>
-        <div className="space-y-3">
-          {PLATFORMS.map((p) => (
-            <div key={p.id} className="flex items-center justify-between py-2 border-b border-[#1A3226]/5 last:border-0">
-              <div>
-                <span className="text-sm text-[#1A3226]">{p.label}</span>
-                {p.recommended && (
-                  <span className="ml-2 text-[10px] bg-[#B8982F]/15 text-[#B8982F] px-2 py-0.5 rounded-full font-medium">Recommended</span>
-                )}
-              </div>
-              <Switch
-                checked={platformToggles[p.id] ?? true}
-                onCheckedChange={(v) => setPlatformToggles({ ...platformToggles, [p.id]: v })}
-              />
+            <div className="flex-1">
+              <div className="font-semibold text-[#1A3226] text-sm">{title}</div>
+              <div className="text-xs text-[#1A3226]/50 mt-0.5">{description}</div>
             </div>
-          ))}
-        </div>
+            <ArrowRight className="w-4 h-4 text-[#1A3226]/30 group-hover:text-[#1A3226]/60 mt-1 transition-colors" />
+          </button>
+        ))}
       </div>
-
-      <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200">
-        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-        <p className="text-xs text-amber-700">
-          Disabling a platform will prevent new analyses from being started on that platform. Existing analyses are not affected.
-        </p>
-      </div>
-
       <Button
         className="bg-[#1A3226] text-white hover:bg-[#1A3226]/90 gap-2"
-        onClick={handleSave}
-        disabled={saving}
+        onClick={() => navigate("/admin/ai-settings")}
       >
-        <Save className="w-4 h-4" />
-        {saving ? "Saving…" : "Save Configuration"}
+        Open AI Settings <ArrowRight className="w-4 h-4" />
       </Button>
     </div>
   );
