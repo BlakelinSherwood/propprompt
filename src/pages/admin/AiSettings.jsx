@@ -13,12 +13,14 @@ export default function AiSettings() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    base44.auth.me().then((me) => {
-      if (me.role !== "platform_owner") {
-        navigate("/Dashboard");
-      }
-      setLoading(false);
-    });
+    base44.auth.me()
+      .then((me) => {
+        if (me?.role !== "admin" && me?.role !== "platform_owner") {
+          navigate("/Dashboard");
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
   if (loading) return (
