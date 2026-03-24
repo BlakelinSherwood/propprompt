@@ -146,6 +146,39 @@ async function generatePdf(base44, analysis, branding) {
   const { jsPDF } = await import('npm:jspdf@2.5.2');
   const doc = new jsPDF({ unit: 'pt', format: 'letter' });
 
+  // Dispatch to assessment-type-specific renderer
+  if (analysis.output_json) {
+    if (analysis.assessment_type === 'cma') {
+      renderCMAPdf(doc, analysis.output_json, branding);
+    } else if (analysis.assessment_type === 'listing_pricing') {
+      renderListingPricingPdf(doc, analysis.output_json, branding);
+    } else if (analysis.assessment_type === 'buyer_intelligence') {
+      renderBuyerIntelligencePdf(doc, analysis.output_json, branding);
+    } else if (analysis.assessment_type === 'client_portfolio') {
+      renderClientPortfolioPdf(doc, analysis.output_json, branding);
+    } else if (analysis.assessment_type === 'investment_analysis') {
+      renderInvestmentPdf(doc, analysis.output_json, branding);
+    } else if (analysis.assessment_type === 'rental_analysis') {
+      renderRentalMarketPdf(doc, analysis.output_json, branding);
+    } else {
+      renderFallbackTextPdf(doc, analysis, branding);
+    }
+  } else {
+    renderFallbackTextPdf(doc, analysis, branding);
+  }
+
+  const arrayBuffer = doc.output('arraybuffer');
+  const address = analysis.intake_data?.address || analysis.id;
+  const assessmentLabel = ASSESSMENT_LABELS[analysis.assessment_type] || 'Analysis';
+  const safeFilename = `${assessmentLabel.replace(/\s+/g, '_')}_${Date.now()}.pdf`;
+
+  return { bytes: arrayBuffer, mimeType: 'application/pdf', filename: safeFilename };
+}
+
+/**
+ * Fallback: Text-based rendering (existing pattern)
+ */
+function renderFallbackTextPdf(doc, analysis, branding) {
   const primaryColor = hexToRgb(branding.primary_color || '#333333');
   const accentColor = hexToRgb(branding.accent_color || '#666666');
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -208,12 +241,6 @@ async function generatePdf(base44, analysis, branding) {
 
   // Footer — agent signature block
   addAgentFooter(doc, branding, pageWidth, pageHeight);
-
-  const arrayBuffer = doc.output('arraybuffer');
-  const address = analysis.intake_data?.address || analysis.id;
-  const safeFilename = `${assessmentLabel.replace(/\s+/g, '_')}_${Date.now()}.pdf`;
-
-  return { bytes: arrayBuffer, mimeType: 'application/pdf', filename: safeFilename };
 }
 
 /**
@@ -390,54 +417,294 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
+// ─── PDF Template Renderers ────────────────────────────────────────────────────
+
+/**
+ * Reusable table drawer for all PDF templates.
+ * Draws header row + data rows with alternating fills and automatic page breaks.
+ */
+function drawTable(doc, x, y, headers, rows, colWidths, options = {}) {
+  const {
+    headerFill = '#333333',
+    headerTextColor = '#FFFFFF',
+    rowFill = '#FFFFFF',
+    altRowFill = '#F4F4F4',
+    fontSize = 8,
+    headerFontSize = 8,
+    rowHeight = 18,
+    padding = 4,
+  } = options;
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const bottomMargin = 80;
+  let currentY = y;
+
+  // Parse color
+  const parseColor = (hex) => {
+    const clean = (hex || '#000000').replace('#', '');
+    return {
+      r: parseInt(clean.slice(0, 2), 16),
+      g: parseInt(clean.slice(2, 4), 16),
+      b: parseInt(clean.slice(4, 6), 16),
+    };
+  };
+
+  // Draw header row
+  const headerColor = parseColor(headerFill);
+  doc.setFillColor(headerColor.r, headerColor.g, headerColor.b);
+  doc.rect(x, currentY, colWidths.reduce((a, b) => a + b, 0), rowHeight, 'F');
+  
+  doc.setFontSize(headerFontSize);
+  doc.setFont('helvetica', 'bold');
+  const headerTextCol = parseColor(headerTextColor);
+  doc.setTextColor(headerTextCol.r, headerTextCol.g, headerTextCol.b);
+  
+  let cellX = x + padding;
+  headers.forEach((header, i) => {
+    doc.text(header, cellX, currentY + rowHeight / 2 + 3, { align: 'left' });
+    cellX += colWidths[i];
+  });
+  
+  currentY += rowHeight;
+
+  // Draw data rows
+  doc.setFontSize(fontSize);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(50, 50, 50);
+
+  for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
+    // Check page break
+    if (currentY + rowHeight > pageHeight - bottomMargin) {
+      doc.addPage();
+      currentY = 60;
+    }
+
+    // Draw row background
+    const rowColor = parseColor(rowIdx % 2 === 0 ? rowFill : altRowFill);
+    doc.setFillColor(rowColor.r, rowColor.g, rowColor.b);
+    doc.rect(x, currentY, colWidths.reduce((a, b) => a + b, 0), rowHeight, 'F');
+
+    // Draw cell text
+    cellX = x + padding;
+    const row = rows[rowIdx];
+    row.forEach((cell, i) => {
+      // Right-align numbers
+      const align = typeof cell === 'number' ? 'right' : 'left';
+      const cellText = String(cell || '');
+      doc.text(cellText, cellX, currentY + rowHeight / 2 + 3, { align });
+      cellX += colWidths[i];
+    });
+
+    currentY += rowHeight;
+  }
+
+  return currentY;
+}
+
+/**
+ * renderCMAPdf — Comparative Market Analysis
+ */
+function renderCMAPdf(doc, data, branding) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const primary = hexToRgb(branding.primary_color || '#333333');
+  const accent = hexToRgb(branding.accent_color || '#666666');
+  const margin = 40;
+  const contentWidth = pageWidth - 2 * margin;
+
+  // ────── PAGE 1: COVER ──────────────────────────────────────────────────
+  doc.setFillColor(primary.r, primary.g, primary.b);
+  doc.rect(0, 0, pageWidth, 100, 'F');
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(28);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Comparative Market Analysis', margin, 35);
+
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'normal');
+  if (data.property_address) {
+    doc.text(data.property_address, margin, 60);
+  }
+  if (data.property_type) {
+    doc.setFontSize(10);
+    doc.text(data.property_type, margin, 80);
+  }
+
+  // Agent info
+  doc.setFontSize(11);
+  doc.setTextColor(200, 200, 200);
+  if (branding.agent_name) {
+    doc.text(`Prepared by ${branding.agent_name}`, margin, pageHeight - 40);
+  }
+  const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  doc.setFontSize(9);
+  doc.text(today, margin, pageHeight - 25);
+
+  // KPI boxes
+  doc.setFontSize(9);
+  const kpiY = 120;
+  const kpiHeight = 50;
+  const kpiWidth = (contentWidth - 20) / 3;
+
+  const kpis = [
+    { label: 'Estimated Value', value: data.implied_value_range?.midpoint ? `$${(data.implied_value_range.midpoint / 1000000).toFixed(1)}M` : 'N/A' },
+    { label: 'Comparable Sales', value: data.tiered_comps?.tiers?.reduce((sum, t) => sum + (t.comps?.length || 0), 0) || 'N/A' },
+    { label: 'Confidence Level', value: data.confidence_level || 'Medium' },
+  ];
+
+  kpis.forEach((kpi, idx) => {
+    const kpiX = margin + idx * (kpiWidth + 10);
+    doc.setFillColor(primary.r, primary.g, primary.b);
+    doc.rect(kpiX, kpiY, kpiWidth, kpiHeight, 'F');
+
+    doc.setTextColor(accent.r, accent.g, accent.b);
+    doc.setFont('helvetica', 'normal');
+    doc.text(kpi.label, kpiX + 8, kpiY + 14);
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text(String(kpi.value), kpiX + 8, kpiY + 32);
+  });
+
+  // ────── PAGE 2: MARKET OVERVIEW ────────────────────────────────────────
+  doc.addPage();
+  let y = margin;
+
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(primary.r, primary.g, primary.b);
+  doc.text('Market Context', margin, y);
+  y += 5;
+
+  doc.setDrawColor(accent.r, accent.g, accent.b);
+  doc.setLineWidth(1.5);
+  doc.line(margin, y, margin + 100, y);
+  y += 15;
+
+  // Market stats
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(50, 50, 50);
+
+  const marketStats = data.market_context || {};
+  const stats = [
+    ['Median Sale Price', marketStats.median_sale_price ? `$${(marketStats.median_sale_price / 1000).toFixed(0)}K` : 'N/A'],
+    ['YoY Appreciation', marketStats.yoy_appreciation ? `${marketStats.yoy_appreciation.toFixed(1)}%` : 'N/A'],
+    ['Avg Days on Market', marketStats.avg_days_on_market ? `${marketStats.avg_days_on_market} days` : 'N/A'],
+    ['Sale-to-List Ratio', marketStats.sale_to_list_ratio ? `${(marketStats.sale_to_list_ratio * 100).toFixed(1)}%` : 'N/A'],
+    ['Months of Inventory', marketStats.months_inventory ? `${marketStats.months_inventory.toFixed(1)}` : 'N/A'],
+  ];
+
+  stats.forEach((stat, idx) => {
+    const rowY = y + idx * 18;
+    if (idx % 2 === 0) {
+      doc.setFillColor(244, 244, 244);
+      doc.rect(margin, rowY - 8, contentWidth, 18, 'F');
+    }
+    doc.setTextColor(50, 50, 50);
+    doc.text(stat[0], margin + 8, rowY + 2);
+    doc.text(stat[1], margin + contentWidth - 8, rowY + 2, { align: 'right' });
+  });
+
+  // ────── PAGE 3-4: TIERED COMPARABLES ──────────────────────────────────
+  doc.addPage();
+  y = margin;
+
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(primary.r, primary.g, primary.b);
+  doc.text('Comparable Sales Analysis', margin, y);
+  y += 20;
+
+  if (data.tiered_comps?.tiers) {
+    data.tiered_comps.tiers.forEach((tier, tierIdx) => {
+      // Tier header
+      const tierColor = tier.tier_id === 'A' ? primary : tier.tier_id === 'B' ? accent : hexToRgb('#999999');
+      doc.setFillColor(tierColor.r, tierColor.g, tierColor.b);
+      doc.rect(margin, y, contentWidth, 20, 'F');
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      const ppsf = tier.ppsf_range ? `$${tier.ppsf_range.low} – $${tier.ppsf_range.high}/SF` : '';
+      doc.text(`${tier.tier_label} (${ppsf})`, margin + 8, y + 14);
+      y += 22;
+
+      // Comp table
+      if (tier.comps && tier.comps.length > 0) {
+        const headers = ['Address', 'Date', 'Price', 'SF', 'Raw $/SF', 'Adj $/SF', 'Condition'];
+        const colWidths = [110, 50, 70, 50, 60, 70, 60];
+        const rows = tier.comps.map(c => [
+          c.address || '',
+          c.sale_date || '',
+          c.sale_price ? `$${(c.sale_price / 1000).toFixed(0)}K` : '',
+          c.square_feet ? `${c.square_feet.toLocaleString()}` : '',
+          c.raw_ppsf ? `$${c.raw_ppsf}` : '',
+          c.adjusted_ppsf ? `$${c.adjusted_ppsf}` : '',
+          c.condition_vs_subject || '',
+        ]);
+
+        y = drawTable(doc, margin, y, headers, rows, colWidths, {
+          headerFill: tierColor.r * 256 * 256 + tierColor.g * 256 + tierColor.b,
+          headerTextColor: '#FFFFFF',
+          fontSize: 8,
+          rowHeight: 16,
+        });
+        y += 10;
+      }
+    });
+  }
+
+  // Implied value range
+  if (data.implied_value_range) {
+    doc.setFillColor(primary.r, primary.g, primary.b);
+    doc.rect(margin, y, contentWidth, 22, 'F');
+    doc.setTextColor(accent.r, accent.g, accent.b);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    const low = data.implied_value_range.low ? `$${(data.implied_value_range.low / 1000000).toFixed(2)}M` : '';
+    const high = data.implied_value_range.high ? `$${(data.implied_value_range.high / 1000000).toFixed(2)}M` : '';
+    doc.text(`Implied Value Range: ${low} – ${high}`, margin + 8, y + 14);
+    y += 26;
+  }
+
+  // Thin comp warning
+  if (data.tiered_comps?.comp_date_window?.thin_comp_flag) {
+    doc.setFontSize(8);
+    doc.setTextColor(200, 0, 0);
+    doc.text('⚠ Thin comp set — fewer than 4 comparable sales within 18 months. Valuation confidence is reduced.', margin, y);
+  }
+}
+
+/**
+ * Placeholder functions for other assessment types (to be built)
+ */
+function renderListingPricingPdf(doc, data, branding) {
+  // TODO: Build listing_pricing template
+}
+
+function renderBuyerIntelligencePdf(doc, data, branding) {
+  // TODO: Build buyer_intelligence template
+}
+
+function renderClientPortfolioPdf(doc, data, branding) {
+  // TODO: Build client_portfolio template
+}
+
+function renderInvestmentPdf(doc, data, branding) {
+  // TODO: Build investment_analysis template
+}
+
+function renderRentalMarketPdf(doc, data, branding) {
+  // TODO: Build rental_analysis template
+}
+
+// ─── Helper: Email HTML Builder ────────────────────────────────────────────
+
 function buildEmailHtml(analysis, branding) {
   const primary = branding.primary_color || '#333333';
   const accent = branding.accent_color || '#666666';
-  const assessmentLabel = escapeHtml(ASSESSMENT_LABELS[analysis.assessment_type] || 'Analysis');
-  const address = escapeHtml(analysis.intake_data?.address || '');
-  const outputText = escapeHtml(analysis.output_text || '').replace(/\n/g, '<br>');
-
-  return `
-<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
-<body style="margin:0;padding:0;font-family:Georgia,serif;background:#f8f8f8;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8f8f8;padding:32px 0;">
-    <tr><td align="center">
-      <table width="640" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
-        <!-- Header -->
-        <tr><td style="background:${primary};padding:28px 36px;">
-          ${branding.org_logo_url ? `<img src="${branding.org_logo_url}" height="44" style="display:block;margin-bottom:10px;" alt="${branding.org_name}">` : ''}
-          <div style="color:#ffffff;font-size:20px;font-weight:bold;">${escapeHtml(branding.org_name || '')}</div>
-          ${branding.org_tagline ? `<div style="color:rgba(255,255,255,0.75);font-size:12px;margin-top:4px;">${escapeHtml(branding.org_tagline)}</div>` : ''}
-        </td></tr>
-        <!-- Subject bar -->
-        <tr><td style="padding:20px 36px 12px;border-bottom:2px solid ${accent};">
-          <div style="font-size:18px;font-weight:bold;color:#222;">${assessmentLabel}</div>
-          ${address ? `<div style="font-size:13px;color:#777;margin-top:4px;">${address}</div>` : ''}
-        </td></tr>
-        <!-- Body -->
-        <tr><td style="padding:24px 36px;font-size:13px;color:#333;line-height:1.7;">
-          ${outputText}
-        </td></tr>
-        <!-- Agent footer -->
-        <tr><td style="padding:20px 36px;background:#f5f5f5;border-top:1px solid #e5e5e5;">
-          ${branding.agent_headshot_url ? `<img src="${branding.agent_headshot_url}" width="48" height="48" style="border-radius:50%;float:left;margin-right:14px;" alt="${branding.agent_name}">` : ''}
-          <div style="font-size:13px;font-weight:bold;color:#222;">${escapeHtml(branding.agent_name || '')}</div>
-          ${branding.agent_title ? `<div style="font-size:12px;color:#555;">${escapeHtml(branding.agent_title)}</div>` : ''}
-          <div style="font-size:12px;color:#777;margin-top:4px;">
-            ${[branding.agent_phone, branding.agent_email].filter(Boolean).map(escapeHtml).join(' &nbsp;|&nbsp; ')}
-          </div>
-        </td></tr>
-        <!-- Disclaimer -->
-        <tr><td style="padding:14px 36px;background:#fafafa;">
-          <p style="font-size:10px;color:#aaa;line-height:1.5;margin:0;">
-            This AI-generated analysis is provided for informational purposes only and does not constitute legal, financial, or professional real estate advice. All valuations and recommendations should be verified by a licensed real estate professional.
-          </p>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
 }
