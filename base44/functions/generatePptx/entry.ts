@@ -63,58 +63,24 @@ export async function buildPptx(analysis, b) {
     year: 'numeric', month: 'long', day: 'numeric',
   });
 
-  // ── SLIDE 1: Cover ──────────────────────────────────────────────────────────
-  const cover = pptx.addSlide();
-  cover.background = { color: pri };
+  // ── Structured deck builders (new) ──────────────────────────────────────────
+  const structuredBuilders = {
+    'cma': buildCMADeck,
+    'listing_pricing': buildListingPricingDeck,
+    'buyer_intelligence': buildBuyerIntelligenceDeck,
+    'client_portfolio': buildClientPortfolioDeck,
+    'investment_analysis': buildInvestmentDeck,
+    'rental_analysis': buildRentalMarketDeck,
+  };
 
-  // Org logo or org name — upper third
-  if (b.org_logo_url) {
-    cover.addImage({ path: b.org_logo_url, x: 4.0, y: 0.6, w: 3.0, h: 1.2, sizing: { type: 'contain', w: 3.0, h: 1.2 } });
-  } else {
-    cover.addText(b.org_name || '', {
-      x: 0.5, y: 0.6, w: 10, h: 1.2,
-      fontSize: 32, bold: true, color: 'FFFFFF',
-      fontFace: 'Georgia', align: 'center',
-    });
+  const builder = structuredBuilders[analysis.assessment_type];
+
+  if (builder && analysis.output_json) {
+    // Use structured deck builder
+    return buildStructuredPptx(pptx, analysis, b, pri, acc, bg, dateStr, builder);
   }
 
-  // Property address
-  const address = analysis.intake_data?.address || '';
-  if (address) {
-    cover.addText(address, {
-      x: 0.5, y: 2.3, w: 10, h: 0.7,
-      fontSize: 20, bold: true, color: 'FFFFFF',
-      fontFace: 'Georgia', align: 'center',
-    });
-  }
-
-  // Assessment type badge
-  const assessLabel = ASSESSMENT_LABELS[analysis.assessment_type] || 'Analysis';
-  cover.addText(assessLabel.toUpperCase(), {
-    x: 3.5, y: 3.2, w: 4, h: 0.45,
-    fontSize: 10, bold: true, color: 'FFFFFF',
-    fontFace: 'Calibri', align: 'center',
-    fill: { color: acc },
-    shape: pptx.ShapeType.roundRect,
-    rectRadius: 0.08,
-  });
-
-  // Horizontal rule
-  cover.addShape(pptx.ShapeType.line, {
-    x: 1.5, y: 4.2, w: 8, h: 0,
-    line: { color: acc, width: 1.5 },
-  });
-
-  // Prepared by / date
-  cover.addText(`Prepared by ${b.agent_name || ''}`, {
-    x: 0.5, y: 4.4, w: 10, h: 0.4,
-    fontSize: 11, color: 'FFFFFF', fontFace: 'Calibri', align: 'center',
-  });
-  cover.addText(dateStr, {
-    x: 0.5, y: 4.85, w: 10, h: 0.35,
-    fontSize: 10, color: 'DDDDDD', fontFace: 'Calibri', align: 'center',
-  });
-
+  // Fall back to narrative deck (existing code)
   // ── Parse sections from output_text ─────────────────────────────────────────
   const sections = parseAnalysisSections(analysis.output_text || '');
 
@@ -283,6 +249,306 @@ export async function buildPptx(analysis, b) {
   const filename = `${safeLabel}_${Date.now()}.pptx`;
 
   return { bytes, filename };
+}
+
+// ─── Structured PPTX Builder Wrapper ──────────────────────────────────────────
+
+async function buildStructuredPptx(pptx, analysis, b, pri, acc, bg, dateStr, builder) {
+  // Cover slide (shared)
+  const cover = pptx.addSlide();
+  cover.background = { color: pri };
+
+  if (b.org_logo_url) {
+    cover.addImage({ path: b.org_logo_url, x: 4.0, y: 0.6, w: 3.0, h: 1.2, sizing: { type: 'contain', w: 3.0, h: 1.2 } });
+  } else {
+    cover.addText(b.org_name || '', {
+      x: 0.5, y: 0.6, w: 10, h: 1.2,
+      fontSize: 32, bold: true, color: 'FFFFFF',
+      fontFace: 'Georgia', align: 'center',
+    });
+  }
+
+  const address = analysis.intake_data?.address || '';
+  if (address) {
+    cover.addText(address, {
+      x: 0.5, y: 2.3, w: 10, h: 0.7,
+      fontSize: 20, bold: true, color: 'FFFFFF',
+      fontFace: 'Georgia', align: 'center',
+    });
+  }
+
+  const assessLabel = ASSESSMENT_LABELS[analysis.assessment_type] || 'Analysis';
+  cover.addText(assessLabel.toUpperCase(), {
+    x: 3.5, y: 3.2, w: 4, h: 0.45,
+    fontSize: 10, bold: true, color: 'FFFFFF',
+    fontFace: 'Calibri', align: 'center',
+    fill: { color: acc },
+    shape: pptx.ShapeType.roundRect,
+    rectRadius: 0.08,
+  });
+
+  cover.addShape(pptx.ShapeType.line, {
+    x: 1.5, y: 4.2, w: 8, h: 0,
+    line: { color: acc, width: 1.5 },
+  });
+
+  cover.addText(`Prepared by ${b.agent_name || ''}`, {
+    x: 0.5, y: 4.4, w: 10, h: 0.4,
+    fontSize: 11, color: 'FFFFFF', fontFace: 'Calibri', align: 'center',
+  });
+  cover.addText(dateStr, {
+    x: 0.5, y: 4.85, w: 10, h: 0.35,
+    fontSize: 10, color: 'DDDDDD', fontFace: 'Calibri', align: 'center',
+  });
+
+  // Call structured builder
+  await builder(pptx, analysis.output_json, b, { pri, acc, bg });
+
+  // Finale slide (shared)
+  const finale = pptx.addSlide();
+  finale.background = { color: pri };
+
+  if (b.org_logo_url) {
+    finale.addImage({ path: b.org_logo_url, x: 4.0, y: 0.5, w: 3.0, h: 1.0, sizing: { type: 'contain', w: 3.0, h: 1.0 } });
+  }
+
+  finale.addShape(pptx.ShapeType.line, {
+    x: 1.5, y: 1.8, w: 8, h: 0,
+    line: { color: acc, width: 1.5 },
+  });
+
+  let agentYStart = 2.1;
+  if (b.agent_headshot_url) {
+    finale.addImage({
+      path: b.agent_headshot_url,
+      x: 4.72, y: 2.1, w: 1.1, h: 1.1,
+      rounding: true,
+    });
+    agentYStart = 3.35;
+  }
+
+  finale.addText(b.agent_name || '', {
+    x: 0.5, y: agentYStart, w: 10, h: 0.6,
+    fontSize: 18, bold: true, color: 'FFFFFF',
+    fontFace: 'Georgia', align: 'center',
+  });
+
+  if (b.agent_title) {
+    finale.addText(b.agent_title, {
+      x: 0.5, y: agentYStart + 0.65, w: 10, h: 0.4,
+      fontSize: 12, color: 'DDDDDD', fontFace: 'Calibri', align: 'center',
+    });
+  }
+
+  const contactLine = [b.agent_phone, b.agent_email].filter(Boolean).join('   |   ');
+  if (contactLine) {
+    finale.addText(contactLine, {
+      x: 0.5, y: agentYStart + 1.15, w: 10, h: 0.4,
+      fontSize: 11, color: 'DDDDDD', fontFace: 'Calibri', align: 'center',
+    });
+  }
+
+  if (b.agent_tagline) {
+    finale.addText(b.agent_tagline, {
+      x: 0.5, y: agentYStart + 1.65, w: 10, h: 0.4,
+      fontSize: 11, italic: true, color: 'CCCCCC',
+      fontFace: 'Calibri', align: 'center',
+    });
+  }
+
+  const orgFooter = [b.org_address, b.org_website].filter(Boolean).join('   ·   ');
+  if (orgFooter) {
+    finale.addText(orgFooter, {
+      x: 0.5, y: 7.9, w: 10, h: 0.35,
+      fontSize: 9, color: 'CCCCCC', fontFace: 'Calibri', align: 'center',
+    });
+  }
+
+  // Write to buffer
+  const pptxBase64 = await pptx.write({ outputType: 'base64' });
+  const bytes = Uint8Array.from(atob(pptxBase64), c => c.charCodeAt(0));
+  const safeLabel = (ASSESSMENT_LABELS[analysis.assessment_type] || 'Analysis').replace(/\s+/g, '_');
+  const filename = `${safeLabel}_${Date.now()}.pptx`;
+
+  return { bytes, filename };
+}
+
+// ─── Structured Deck Builders ─────────────────────────────────────────────────
+
+/**
+ * buildCMADeck — Comparative Market Analysis structured deck
+ */
+async function buildCMADeck(pptx, data, b, colors) {
+  const { pri, acc, bg } = colors;
+  const margin = 0.3;
+  const contentWidth = 11 - 2 * margin;
+
+  // ──── SLIDE 1: Market Context ────────────────────────────────────────────────
+  const s1 = pptx.addSlide();
+  s1.background = { color: bg };
+  addSlideHeader(pptx, s1, 'Market Context', pri, acc, b, margin);
+
+  const marketStats = data.market_context || {};
+  const marketRows = [
+    ['Median Sale Price', marketStats.median_sale_price ? `$${(marketStats.median_sale_price / 1000).toFixed(0)}K` : 'N/A'],
+    ['YoY Appreciation', marketStats.yoy_appreciation ? `${marketStats.yoy_appreciation.toFixed(1)}%` : 'N/A'],
+    ['Avg Days on Market', marketStats.avg_days_on_market ? `${marketStats.avg_days_on_market} days` : 'N/A'],
+    ['Sale-to-List Ratio', marketStats.sale_to_list_ratio ? `${(marketStats.sale_to_list_ratio * 100).toFixed(1)}%` : 'N/A'],
+    ['Months of Inventory', marketStats.months_inventory ? `${marketStats.months_inventory.toFixed(1)}` : 'N/A'],
+  ];
+
+  s1.addTable(marketRows, {
+    x: margin, y: 1.3, w: contentWidth, h: 3.5,
+    border: { pt: 0.5, color: 'CCCCCC' },
+    rowH: 0.6,
+    colW: [contentWidth * 0.5, contentWidth * 0.5],
+    fill: { color: 'F8F8F8' },
+    align: 'left',
+    fontSize: 10,
+    fontFace: 'Calibri',
+  });
+
+  addSlideFooter(pptx, s1, b, margin);
+
+  // ──── SLIDE 2: Tiered Comparables Table ──────────────────────────────────────
+  if (data.tiered_comps?.tiers) {
+    const s2 = pptx.addSlide();
+    s2.background = { color: bg };
+    addSlideHeader(pptx, s2, 'Comparable Sales Analysis', pri, acc, b, margin);
+
+    let currentY = 1.3;
+
+    for (const tier of data.tiered_comps.tiers) {
+      if (!tier.comps || tier.comps.length === 0) continue;
+
+      // Tier label
+      const tierColor = tier.tier_id === 'A' ? pri : tier.tier_id === 'B' ? acc : 'AAAAAA';
+      s2.addShape(pptx.ShapeType.rect, {
+        x: margin, y: currentY, w: contentWidth, h: 0.3,
+        fill: { color: tierColor }, line: { color: tierColor },
+      });
+      s2.addText(`${tier.tier_label} (${tier.ppsf_range?.low || 'N/A'} – ${tier.ppsf_range?.high || 'N/A'}/SF)`, {
+        x: margin + 0.1, y: currentY, w: contentWidth - 0.2, h: 0.3,
+        fontSize: 9, bold: true, color: 'FFFFFF', valign: 'middle',
+      });
+      currentY += 0.4;
+
+      // Comp rows
+      const compRows = tier.comps.map(c => [
+        c.address || '',
+        c.sale_date || '',
+        c.sale_price ? `$${(c.sale_price / 1000).toFixed(0)}K` : '',
+        c.square_feet ? `${c.square_feet.toLocaleString()}` : '',
+        c.raw_ppsf ? `$${c.raw_ppsf}` : '',
+        c.adjusted_ppsf ? `$${c.adjusted_ppsf}` : '',
+      ]);
+
+      s2.addTable(compRows, {
+        x: margin, y: currentY, w: contentWidth, h: Math.min(tier.comps.length * 0.35, 3),
+        border: { pt: 0.5, color: 'CCCCCC' },
+        rowH: 0.35,
+        colW: [contentWidth * 0.25, contentWidth * 0.12, contentWidth * 0.13, contentWidth * 0.12, contentWidth * 0.15, contentWidth * 0.15],
+        fill: { color: 'F8F8F8' },
+        align: 'left',
+        fontSize: 8,
+        fontFace: 'Calibri',
+      });
+      currentY += Math.min(tier.comps.length * 0.35, 3) + 0.3;
+    }
+
+    addSlideFooter(pptx, s2, b, margin);
+  }
+
+  // ──── SLIDE 3: Implied Value Range ──────────────────────────────────────────
+  if (data.implied_value_range) {
+    const s3 = pptx.addSlide();
+    s3.background = { color: bg };
+    addSlideHeader(pptx, s3, 'Valuation Summary', pri, acc, b, margin);
+
+    const low = data.implied_value_range.low ? `$${(data.implied_value_range.low / 1000000).toFixed(2)}M` : 'N/A';
+    const high = data.implied_value_range.high ? `$${(data.implied_value_range.high / 1000000).toFixed(2)}M` : 'N/A';
+
+    s3.addShape(pptx.ShapeType.rect, {
+      x: margin, y: 1.5, w: contentWidth, h: 1.5,
+      fill: { color: pri }, line: { color: pri },
+    });
+    s3.addText('Implied Value Range', {
+      x: margin + 0.15, y: 1.65, w: contentWidth - 0.3, h: 0.35,
+      fontSize: 12, bold: true, color: acc,
+    });
+    s3.addText(`${low} – ${high}`, {
+      x: margin + 0.15, y: 2.05, w: contentWidth - 0.3, h: 0.8,
+      fontSize: 32, bold: true, color: 'FFFFFF', fontFace: 'Georgia',
+    });
+
+    if (data.tiered_comps?.comp_date_window?.thin_comp_flag) {
+      s3.addText('⚠ Thin comp set — fewer than 4 comparable sales within 18 months. Valuation confidence is reduced.', {
+        x: margin, y: 3.3, w: contentWidth, h: 0.6,
+        fontSize: 9, color: 'CC0000', italic: true,
+      });
+    }
+
+    addSlideFooter(pptx, s3, b, margin);
+  }
+}
+
+// ─── Structured Deck Placeholders ─────────────────────────────────────────────
+
+async function buildListingPricingDeck(pptx, data, b, colors) {
+  // TODO: Build listing_pricing deck
+}
+
+async function buildBuyerIntelligenceDeck(pptx, data, b, colors) {
+  // TODO: Build buyer_intelligence deck
+}
+
+async function buildClientPortfolioDeck(pptx, data, b, colors) {
+  // TODO: Build client_portfolio deck
+}
+
+async function buildInvestmentDeck(pptx, data, b, colors) {
+  // TODO: Build investment_analysis deck
+}
+
+async function buildRentalMarketDeck(pptx, data, b, colors) {
+  // TODO: Build rental_analysis deck
+}
+
+// ─── Slide Helper Functions ───────────────────────────────────────────────────
+
+function addSlideHeader(pptx, slide, title, pri, acc, b, margin) {
+  // Top bar
+  slide.addShape(pptx.ShapeType.rect, {
+    x: 0, y: 0, w: 11, h: 0.08,
+    fill: { color: pri }, line: { color: pri },
+  });
+
+  // Breadcrumb
+  slide.addText(`${b.org_name || ''}  /  ${title}`.toUpperCase(), {
+    x: 0.3, y: 0.12, w: 10.4, h: 0.25,
+    fontSize: 7.5, color: acc, fontFace: 'Calibri', charSpacing: 1.5,
+  });
+
+  // Slide title
+  slide.addText(title, {
+    x: 0.3, y: 0.42, w: 10.4, h: 0.6,
+    fontSize: 18, bold: true, color: pri, fontFace: 'Georgia',
+  });
+}
+
+function addSlideFooter(pptx, slide, b, margin) {
+  // Footer bar
+  slide.addShape(pptx.ShapeType.rect, {
+    x: 0, y: 8.25, w: 11, h: 0.25,
+    fill: { color: 'CCCCCC' }, line: { color: 'CCCCCC' },
+  });
+  const footerLeft = [b.org_name, b.org_phone].filter(Boolean).join('  |  ');
+  if (footerLeft) {
+    slide.addText(footerLeft, {
+      x: 0.2, y: 8.27, w: 8, h: 0.2,
+      fontSize: 8, color: '333333', fontFace: 'Calibri',
+    });
+  }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
