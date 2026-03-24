@@ -42,7 +42,7 @@ export default function OrgsList() {
 
   async function toggleStatus(org) {
     const newStatus = org.status === "active" ? "suspended" : "active";
-    await base44.asServiceRole.entities.Organization.update(org.id, { status: newStatus });
+    await base44.functions.invoke('updateOrg', { id: org.id, data: { status: newStatus } });
     setOrgs((prev) => prev.map((o) => (o.id === org.id ? { ...o, status: newStatus } : o)));
   }
 
