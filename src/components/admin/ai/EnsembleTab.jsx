@@ -43,8 +43,9 @@ const MODEL_GROUPS = [
     models: [
       { value: "anthropic::claude-sonnet-4-20250514", label: "claude-sonnet-4-20250514 (Latest)" },
       { value: "anthropic::claude-opus-4-20250514",   label: "claude-opus-4-20250514" },
-      { value: "anthropic::claude-haiku-4-5",         label: "claude-haiku-4-5 (Fast)" },
+      { value: "anthropic::claude-opus-4-5",         label: "claude-opus-4-5" },
       { value: "anthropic::claude-sonnet-3-7",        label: "claude-sonnet-3-7" },
+      { value: "anthropic::claude-haiku-4-5",         label: "claude-haiku-4-5 (Fast)" },
     ],
   },
   {
@@ -54,30 +55,33 @@ const MODEL_GROUPS = [
       { value: "openai::gpt-4o-mini", label: "gpt-4o-mini" },
       { value: "openai::o3-mini",     label: "o3-mini (Reasoning)" },
       { value: "openai::gpt-4-turbo", label: "gpt-4-turbo" },
+      { value: "openai::gpt-4",       label: "gpt-4" },
     ],
   },
   {
     provider: "google",
     models: [
       { value: "google::gemini-2.0-flash",          label: "gemini-2.0-flash (Latest)" },
-      { value: "google::gemini-1.5-pro",            label: "gemini-1.5-pro" },
+      { value: "google::gemini-2.0-flash-thinking", label: "gemini-2.0-flash-thinking" },
       { value: "google::gemini-2.0-pro-exp",        label: "gemini-2.0-pro-exp (Experimental)" },
-      { value: "google::gemini-flash-thinking",     label: "gemini-flash-thinking" },
+      { value: "google::gemini-1.5-pro",            label: "gemini-1.5-pro" },
+      { value: "google::gemini-1.5-flash",          label: "gemini-1.5-flash" },
     ],
   },
   {
     provider: "perplexity",
     models: [
-      { value: "perplexity::sonar-large-online",  label: "sonar-large-online (Latest)" },
-      { value: "perplexity::sonar-small-online",  label: "sonar-small-online" },
-      { value: "perplexity::sonar-huge-online",   label: "sonar-huge-online" },
+      { value: "perplexity::sonar-large-online",            label: "sonar-large-online (Latest)" },
       { value: "perplexity::llama-3.1-sonar-large-128k-online", label: "llama-3.1-sonar-large-128k-online" },
+      { value: "perplexity::sonar-huge-online",             label: "sonar-huge-online" },
+      { value: "perplexity::sonar-small-online",            label: "sonar-small-online" },
     ],
   },
   {
     provider: "xai",
     models: [
       { value: "xai::grok-2-1212", label: "grok-2-1212 (Latest)" },
+      { value: "xai::grok-3",      label: "grok-3 (Reasoning)" },
       { value: "xai::grok-beta",   label: "grok-beta" },
     ],
   },
@@ -94,6 +98,7 @@ const MODEL_GROUPS = [
     models: [
       { value: "meta::llama-3.3-70b",  label: "llama-3.3-70b" },
       { value: "meta::llama-3.1-405b", label: "llama-3.1-405b" },
+      { value: "meta::llama-3.1-70b",  label: "llama-3.1-70b" },
     ],
   },
 ];
