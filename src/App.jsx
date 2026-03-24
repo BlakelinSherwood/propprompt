@@ -69,7 +69,7 @@ function AuthenticatedApp() {
 
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/Landing" replace />} />
+      <Route path="/" element={<Landing />} />
       <Route path="/app" element={<Navigate to="/Dashboard" replace />} />
       <Route path="/app/*" element={<Navigate to="/Dashboard" replace />} />
       <Route element={<Layout />}>
@@ -105,6 +105,7 @@ function AuthenticatedApp() {
         <Route path="/Claim" element={<ProtectedRoute element={<Claim />} />} />
         <Route path="/app/Territories" element={<ProtectedRoute element={<Territories />} />} />
       </Route>
+      <Route path="/Landing" element={<Landing />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );
