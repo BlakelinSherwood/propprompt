@@ -87,39 +87,34 @@ export default function EnsembleTab() {
     grok: config.grok_enabled,
   }).filter(([, v]) => v !== false).map(([k]) => k);
 
-  async function toggleEnsemble(val) {
+  async function getOrCreateConfig() {
     const configs = await base44.asServiceRole.entities.PlatformConfig.filter({});
-    const cfg = configs[0];
-    if (cfg) await base44.asServiceRole.entities.PlatformConfig.update(cfg.id, { ensemble_mode_enabled: val });
+    if (configs[0]) return configs[0];
+    return await base44.asServiceRole.entities.PlatformConfig.create({ platform_version: "4.0" });
+  }
+
+  async function toggleEnsemble(val) {
+    const cfg = await getOrCreateConfig();
+    await base44.asServiceRole.entities.PlatformConfig.update(cfg.id, { ensemble_mode_enabled: val });
     load();
   }
 
   async function savePrimary(val) {
-    const configs = await base44.asServiceRole.entities.PlatformConfig.filter({});
-    const cfg = configs[0];
-    if (cfg) await base44.asServiceRole.entities.PlatformConfig.update(cfg.id, { ensemble_primary_provider: val });
+    const cfg = await getOrCreateConfig();
+    await base44.asServiceRole.entities.PlatformConfig.update(cfg.id, { ensemble_primary_provider: val });
     load();
   }
 
   async function saveFallback(val) {
-    const configs = await base44.asServiceRole.entities.PlatformConfig.filter({});
-    const cfg = configs[0];
-    if (cfg) await base44.asServiceRole.entities.PlatformConfig.update(cfg.id, { ensemble_fallback_provider: val });
+    const cfg = await getOrCreateConfig();
+    await base44.asServiceRole.entities.PlatformConfig.update(cfg.id, { ensemble_fallback_provider: val });
     load();
-  }
-
-  function updateAssignment(sectionKey, field, value) {
-    setAssignments(prev => ({
-      ...prev,
-      [sectionKey]: { ...(prev[sectionKey] || {}), [field]: value }
-    }));
   }
 
   async function saveAssignments() {
     setSaving(true);
-    const configs = await base44.asServiceRole.entities.PlatformConfig.filter({});
-    const cfg = configs[0];
-    if (cfg) await base44.asServiceRole.entities.PlatformConfig.update(cfg.id, { ensemble_section_assignments: assignments });
+    const cfg = await getOrCreateConfig();
+    await base44.asServiceRole.entities.PlatformConfig.update(cfg.id, { ensemble_section_assignments: assignments });
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);

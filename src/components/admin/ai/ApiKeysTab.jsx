@@ -307,8 +307,13 @@ export default function ApiKeysTab() {
   const [config, setConfig] = useState(null);
 
   async function load() {
-    const configs = await base44.asServiceRole.entities.PlatformConfig.filter({});
-    setConfig(configs[0] || {});
+    try {
+      const configs = await base44.asServiceRole.entities.PlatformConfig.filter({});
+      setConfig(configs[0] || {});
+    } catch (e) {
+      console.error('[ApiKeysTab] load error:', e);
+      setConfig({});
+    }
   }
 
   useEffect(() => { load(); }, []);
