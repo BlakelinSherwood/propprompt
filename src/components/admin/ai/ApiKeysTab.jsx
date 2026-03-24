@@ -167,6 +167,26 @@ function ProviderCard({ provider, config, onUpdate }) {
     onUpdate();
   }
 
+  async function testConnection() {
+    setTesting(true);
+    setTestResult(null);
+    const start = Date.now();
+    const result = await base44.functions.invoke('testProviderConnection', { provider: provider.id });
+    const latencyMs = Date.now() - start;
+    const data = result?.data;
+    if (data?.success) {
+      setTestResult({ success: true, latencyMs });
+      const cfg = await getOrCreate();
+      await base44.asServiceRole.entities.PlatformConfig.update(cfg.id, { [provider.pingField]: 'success', [provider.pingAtField]: new Date().toISOString().split('T')[0] });
+    } else {
+      setTestResult({ success: false, error: data?.error || 'Connection failed' });
+      const cfg = await getOrCreate();
+      await base44.asServiceRole.entities.PlatformConfig.update(cfg.id, { [provider.pingField]: 'error' });
+    }
+    onUpdate();
+    setTesting(false);
+  }
+
   if (provider.phase2) {
     return (
       <div className="border border-[#1A3226]/10 rounded-xl p-5 opacity-60 relative overflow-hidden">
