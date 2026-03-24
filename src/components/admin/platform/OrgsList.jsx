@@ -82,7 +82,8 @@ export default function OrgsList() {
         <span className="text-sm text-[#1A3226]/50">{filtered.length} organizations</span>
       </div>
 
-      <div className="rounded-xl border border-[#1A3226]/10 overflow-hidden">
+      {/* Desktop table */}
+      <div className="hidden md:block rounded-xl border border-[#1A3226]/10 overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-[#1A3226]/[0.03] border-b border-[#1A3226]/10">
             <tr>
@@ -108,32 +109,17 @@ export default function OrgsList() {
                 <td className="px-4 py-3 text-[#1A3226]/60 text-xs">{org.owner_email}</td>
                 <td className="px-4 py-3 text-[#1A3226]/60 capitalize">{org.subscription_plan || "—"}</td>
                 <td className="px-4 py-3">
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[org.status] || "bg-gray-100 text-gray-600"}`}>
-                    {org.status}
-                  </span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[org.status] || "bg-gray-100 text-gray-600"}`}>{org.status}</span>
                 </td>
                 <td className="px-4 py-3 text-[#1A3226]/60">
-                  <span className="flex items-center gap-1">
-                    <Users className="w-3.5 h-3.5" />
-                    {org.seat_count ?? 0}{org.seat_limit ? `/${org.seat_limit}` : ""}
-                  </span>
+                  <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />{org.seat_count ?? 0}{org.seat_limit ? `/${org.seat_limit}` : ""}</span>
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2 justify-end">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 text-xs"
-                      onClick={() => toggleStatus(org)}
-                    >
+                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => toggleStatus(org)}>
                       {org.status === "active" ? "Suspend" : "Activate"}
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7"
-                      onClick={() => navigate(`/brokerage/${org.id}/admin`)}
-                    >
+                    <Button variant="ghost" size="sm" className="h-7" onClick={() => navigate(`/brokerage/${org.id}/admin`)}>
                       <ChevronRight className="w-4 h-4" />
                     </Button>
                   </div>
@@ -141,12 +127,43 @@ export default function OrgsList() {
               </tr>
             ))}
             {filtered.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-4 py-12 text-center text-[#1A3226]/40">No organizations found.</td>
-              </tr>
+              <tr><td colSpan={7} className="px-4 py-12 text-center text-[#1A3226]/40">No organizations found.</td></tr>
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile card list */}
+      <div className="md:hidden space-y-3">
+        {filtered.length === 0 && (
+          <p className="text-center py-12 text-[#1A3226]/40 text-sm">No organizations found.</p>
+        )}
+        {filtered.map((org) => (
+          <div key={org.id} className="rounded-xl border border-[#1A3226]/10 bg-white p-4 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <Building2 className="w-4 h-4 text-[#1A3226]/30 flex-shrink-0" />
+                <span className="font-medium text-[#1A3226] truncate">{org.name}</span>
+              </div>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${STATUS_COLORS[org.status] || "bg-gray-100 text-gray-600"}`}>{org.status}</span>
+            </div>
+            <div className="text-xs text-[#1A3226]/50 space-y-0.5">
+              <p className="capitalize">{org.org_type} · {org.subscription_plan || "No plan"}</p>
+              <p className="truncate">{org.owner_email}</p>
+              <p className="flex items-center gap-1"><Users className="w-3 h-3" />{org.seat_count ?? 0}{org.seat_limit ? `/${org.seat_limit}` : ""} seats</p>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => toggleStatus(org)}
+                className="flex-1 min-h-[44px] flex items-center justify-center text-sm font-medium border border-[#1A3226]/15 rounded-lg hover:bg-[#1A3226]/5 text-[#1A3226]/70 transition-colors">
+                {org.status === "active" ? "Suspend" : "Activate"}
+              </button>
+              <button onClick={() => navigate(`/brokerage/${org.id}/admin`)}
+                className="flex-1 min-h-[44px] flex items-center justify-center gap-1.5 text-sm font-medium bg-[#1A3226] text-white rounded-lg hover:bg-[#1A3226]/90 transition-colors">
+                Manage <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

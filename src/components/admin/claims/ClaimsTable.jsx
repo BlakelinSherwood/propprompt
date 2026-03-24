@@ -94,8 +94,8 @@ export default function ClaimsTable({ claims, pricing, stateMap, onApprove, onRe
         })}
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto">
+      {/* Desktop Table */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-[#1A3226]/[0.03] border-b border-[#1A3226]/8">
@@ -121,13 +121,9 @@ export default function ClaimsTable({ claims, pricing, stateMap, onApprove, onRe
                 <tr key={c.id}
                   onClick={() => toggleRow(c.id)}
                   className={`border-b border-[#1A3226]/5 cursor-pointer transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-[#1A3226]/[0.01]'} hover:bg-[#1A3226]/[0.04] ${isExpanded ? 'bg-[#1A3226]/[0.03]' : ''}`}>
-                  <td className="px-4 py-3 text-[#1A3226]/60 whitespace-nowrap">
-                    {moment(c.created_date).fromNow()}
-                  </td>
+                  <td className="px-4 py-3 text-[#1A3226]/60 whitespace-nowrap">{moment(c.created_date).fromNow()}</td>
                   <td className="px-4 py-3">
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${TYPE_COLORS[type]}`}>
-                      {TYPE_LABELS[type]}
-                    </span>
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${TYPE_COLORS[type]}`}>{TYPE_LABELS[type]}</span>
                   </td>
                   <td className="px-4 py-3 font-medium text-[#1A3226]">{c.brokerage_name || '—'}</td>
                   <td className="px-4 py-3 text-[#1A3226]/70 max-w-[240px]">
@@ -138,27 +134,19 @@ export default function ClaimsTable({ claims, pricing, stateMap, onApprove, onRe
                       </div>
                     )}
                   </td>
-                  <td className="px-4 py-3">
-                    <span className="capitalize text-[#1A3226]/70">{c.tier_requested}</span>
-                  </td>
-                  <td className="px-4 py-3 font-medium text-[#1A3226]">
-                    {c._monthlyValue ? `$${c._monthlyValue}/mo` : '—'}
-                  </td>
+                  <td className="px-4 py-3 capitalize text-[#1A3226]/70">{c.tier_requested}</td>
+                  <td className="px-4 py-3 font-medium text-[#1A3226]">{c._monthlyValue ? `$${c._monthlyValue}/mo` : '—'}</td>
                   <td className="px-4 py-3"><Countdown autoApproveAt={c.auto_approve_at} /></td>
                   <td className="px-4 py-3">
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full capitalize ${STATUS_COLORS[c.status] || 'bg-gray-100 text-gray-500'}`}>
-                      {c.status}
-                    </span>
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full capitalize ${STATUS_COLORS[c.status] || 'bg-gray-100 text-gray-500'}`}>{c.status}</span>
                   </td>
                   <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                     {c.status === 'pending' && (
                       <div className="flex items-center gap-2">
-                        <Button size="sm" onClick={() => onApprove(c)}
-                          className="h-7 px-2 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1">
+                        <Button size="sm" onClick={() => onApprove(c)} className="h-7 px-2 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1">
                           <CheckCircle className="w-3 h-3" /> Approve
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => onReject(c)}
-                          className="h-7 px-2 text-xs text-red-600 border-red-200 hover:bg-red-50 gap-1">
+                        <Button size="sm" variant="outline" onClick={() => onReject(c)} className="h-7 px-2 text-xs text-red-600 border-red-200 hover:bg-red-50 gap-1">
                           <XCircle className="w-3 h-3" /> Reject
                         </Button>
                       </div>
@@ -172,15 +160,61 @@ export default function ClaimsTable({ claims, pricing, stateMap, onApprove, onRe
                 </tr>,
                 isExpanded && (
                   <tr key={`${c.id}-detail`} className="bg-[#1A3226]/[0.015]">
-                    <td colSpan={10} className="p-0">
-                      <ClaimDetail claim={c} pricing={pricing} />
-                    </td>
+                    <td colSpan={10} className="p-0"><ClaimDetail claim={c} pricing={pricing} /></td>
                   </tr>
                 ),
               ];
             })}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile Card List */}
+      <div className="md:hidden divide-y divide-[#1A3226]/5">
+        {filtered.length === 0 && (
+          <p className="text-center py-12 text-[#1A3226]/30 text-sm">No claims in this view.</p>
+        )}
+        {filtered.map((c) => {
+          const type = getClaimType(c);
+          const isExpanded = expanded === c.id;
+          return (
+            <div key={c.id} className="p-4 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-[#1A3226] text-sm truncate">{c.brokerage_name || '—'}</p>
+                  <p className="text-xs text-[#1A3226]/50 mt-0.5 truncate">{getTerritorySummary(c, {})}</p>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${TYPE_COLORS[type]}`}>{TYPE_LABELS[type]}</span>
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full capitalize ${STATUS_COLORS[c.status] || 'bg-gray-100 text-gray-500'}`}>{c.status}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-4 text-xs text-[#1A3226]/50">
+                <span className="capitalize">{c.tier_requested}</span>
+                <span>{c._monthlyValue ? `$${c._monthlyValue}/mo` : '—'}</span>
+                <span>{moment(c.created_date).fromNow()}</span>
+                <Countdown autoApproveAt={c.auto_approve_at} />
+              </div>
+              {c.status === 'pending' && (
+                <div className="flex gap-2">
+                  <button onClick={() => onApprove(c)}
+                    className="flex-1 min-h-[44px] flex items-center justify-center gap-1.5 text-sm font-medium bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors">
+                    <CheckCircle className="w-4 h-4" /> Approve
+                  </button>
+                  <button onClick={() => onReject(c)}
+                    className="flex-1 min-h-[44px] flex items-center justify-center gap-1.5 text-sm font-medium text-red-600 border border-red-200 hover:bg-red-50 rounded-lg transition-colors">
+                    <XCircle className="w-4 h-4" /> Reject
+                  </button>
+                </div>
+              )}
+              <button onClick={() => toggleRow(c.id)}
+                className="w-full min-h-[44px] flex items-center justify-center gap-1 text-xs text-[#1A3226]/40 hover:text-[#1A3226]/60 transition-colors">
+                {isExpanded ? <><ChevronUp className="w-3.5 h-3.5" /> Hide details</> : <><ChevronDown className="w-3.5 h-3.5" /> Show details</>}
+              </button>
+              {isExpanded && <ClaimDetail claim={c} pricing={pricing} />}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
