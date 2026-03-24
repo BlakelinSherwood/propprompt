@@ -1,9 +1,11 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
 const DEFAULTS = {
-  primary_color: '#333333',
-  accent_color: '#666666',
+  primary_color: '#1A3226',
+  accent_color: '#B8982F',
   background_color: '#FFFFFF',
+  org_logo_url: null,
+  agent_headshot_url: null,
 };
 
 /**
@@ -55,7 +57,8 @@ export async function resolveBrandingForAnalysis(base44Client, analysisId) {
   }
 
   // 3-5. Load OrgBranding records in parallel
-  const [brokerageBrandingList, teamBrandingList, agentBrandingList, userList] = await Promise.all([
+  // Also look up BrandingConfig records for org-level color branding
+  const [brokerageBrandingList, teamBrandingList, agentBrandingList, userList, brokeragingConfigList, teamBrandingConfigList] = await Promise.all([
     base44Client.asServiceRole.entities.OrgBranding.filter({ org_id: brokerageOrgId }),
     teamOrgId
       ? base44Client.asServiceRole.entities.OrgBranding.filter({ org_id: teamOrgId })
@@ -66,12 +69,18 @@ export async function resolveBrandingForAnalysis(base44Client, analysisId) {
     agentEmail
       ? base44Client.asServiceRole.entities.User.filter({ email: agentEmail })
       : Promise.resolve([]),
+    base44Client.asServiceRole.entities.BrandingConfig.filter({ org_id: brokerageOrgId }),
+    teamOrgId
+      ? base44Client.asServiceRole.entities.BrandingConfig.filter({ org_id: teamOrgId })
+      : Promise.resolve([]),
   ]);
 
   const brokerageBranding = brokerageBrandingList[0] || {};
   const teamBranding = teamBrandingList[0] || {};
   const agentBranding = agentBrandingList[0] || {};
   const agentUser = userList[0] || {};
+  const brokerageBrandingConfig = brokeragingConfigList?.[0] || {};
+  const teamBrandingConfig = teamBrandingConfigList?.[0] || {};
 
   // 6. Merge: brokerage → team → agent
   // For team, only override if the team has explicitly set the field (non-null, non-empty)
@@ -84,10 +93,12 @@ export async function resolveBrandingForAnalysis(base44Client, analysisId) {
     org_phone: teamBranding.phone || brokerageBranding.phone || '',
     org_website: teamBranding.website || brokerageBranding.website || '',
 
-    // Colors — team overrides brokerage, fall back to hard defaults
-    primary_color: teamBranding.primary_color || brokerageBranding.primary_color || DEFAULTS.primary_color,
-    accent_color: teamBranding.accent_color || brokerageBranding.accent_color || DEFAULTS.accent_color,
-    background_color: teamBranding.background_color || brokerageBranding.background_color || DEFAULTS.background_color,
+    // Colors — team overrides brokerage, BrandingConfig overrides OrgBranding, fall back to hard defaults
+    primary_color: teamBrandingConfig.primary_color || brokerageBrandingConfig.primary_color || teamBranding.primary_color || brokerageBranding.primary_color || DEFAULTS.primary_color,
+    accent_color: teamBrandingConfig.accent_color || brokerageBrandingConfig.accent_color || teamBranding.accent_color || brokerageBranding.accent_color || DEFAULTS.accent_color,
+    background_color: teamBrandingConfig.background_color || brokerageBrandingConfig.background_color || teamBranding.background_color || brokerageBranding.background_color || DEFAULTS.background_color,
+    org_logo_url: teamBrandingConfig.org_logo_url || brokerageBrandingConfig.org_logo_url || null,
+    agent_headshot_url: teamBrandingConfig.agent_headshot_url || brokerageBrandingConfig.agent_headshot_url || agentBranding.headshot_url || null,
 
     // Agent personal layer
     agent_name: agentBranding.display_name || agentUser.full_name || agentEmail || '',

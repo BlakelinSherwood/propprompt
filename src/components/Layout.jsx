@@ -13,7 +13,8 @@ import {
   PlusCircle,
   CreditCard,
   Settings,
-  GraduationCap
+  GraduationCap,
+  Palette
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import FairHousingOverdueBanner from "./FairHousingOverdueBanner";
@@ -64,6 +65,8 @@ export default function Layout() {
   }
 
   const isAdmin = user?.role === "platform_owner" || user?.role === "brokerage_admin" || user?.role === "team_lead";
+  const BRANDING_ROLES = ["team_lead", "brokerage_owner", "platform_owner"];
+  const canAccessBranding = BRANDING_ROLES.includes(user?.role);
 
   const navItems = [
     { label: "Dashboard", path: "/Dashboard", icon: LayoutDashboard },
@@ -72,6 +75,7 @@ export default function Layout() {
     ...(isAdmin ? [{ label: "Members", path: "/Members", icon: Users }] : []),
     ...(isAdmin ? [{ label: "Billing", path: "/Billing", icon: CreditCard }] : []),
     ...(user?.role === "platform_owner" ? [{ label: "Platform Admin", path: "/PlatformAdmin", icon: Shield }] : []),
+    ...(canAccessBranding ? [{ label: "Branding", path: "/admin/branding", icon: Palette }] : []),
     { label: "Training", path: "/training", icon: GraduationCap },
     { label: "Account Settings", path: "/AccountSettings", icon: Settings },
   ];
