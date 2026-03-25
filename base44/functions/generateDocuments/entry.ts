@@ -1,5 +1,102 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
+// ─── Shared color helper (mirrors PPTX lightenHex) ────────────────────────────
+function lightenHex(hex, percent) {
+  const clean = (hex || '#333333').replace('#', '');
+  const num = parseInt(clean, 16);
+  const r = Math.min(255, (num >> 16) + Math.round(((num >> 16) * percent) / 100));
+  const g = Math.min(255, ((num >> 8) & 0x00FF) + Math.round((((num >> 8) & 0x00FF) * percent) / 100));
+  const b = Math.min(255, (num & 0x0000FF) + Math.round(((num & 0x0000FF) * percent) / 100));
+  return '#' + ((r << 16) | (g << 8) | b).toString(16).padStart(6, '0');
+}
+
+// ─── Shared PDF CSS (for Handlebars/Puppeteer HTML templates) ────────────────
+// Inject via: <style>{{sharedPdfCss}}</style> in any Handlebars template.
+// All colors use CSS custom properties — zero hardcoded values.
+export const SHARED_PDF_CSS = `
+/* ── SECTION DIVIDER PAGE ── */
+.section-divider {
+  page-break-before: always;
+  background: var(--primary);
+  min-height: 100vh;
+  position: relative;
+  padding: 0;
+  margin: -40px -40px 0 -40px;
+  width: calc(100% + 80px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.section-divider .divider-logo {
+  position: absolute; top: 20px; left: 40px; height: 50px; width: auto;
+}
+.section-divider .divider-accent-line {
+  position: absolute; top: 85px; left: 40px; width: 400px; height: 2px;
+  background: var(--accent);
+}
+.section-divider .divider-watermark {
+  position: absolute; left: -20px; bottom: 80px;
+  font-family: Georgia, serif; font-size: 220pt; font-weight: bold;
+  color: var(--primary-light); line-height: 1; z-index: 1;
+}
+.section-divider .divider-content {
+  position: relative; z-index: 2; padding-left: 90px;
+}
+.section-divider .divider-bar {
+  position: absolute; left: 72px; top: 0; width: 3px; height: 100%;
+  background: var(--accent);
+}
+.section-divider .divider-title {
+  font-family: Georgia, serif; font-size: 36pt; font-weight: bold;
+  color: #FFFFFF; line-height: 1.15; margin: 0 0 12px 0;
+}
+.section-divider .divider-subtitle {
+  font-family: Arial, sans-serif; font-size: 12pt; color: var(--accent); margin: 0;
+}
+.section-divider .divider-footer {
+  position: absolute; bottom: 0; left: 0; right: 0; height: 28px;
+  background: var(--primary); border-top: 1.5px solid var(--accent);
+  display: flex; align-items: center; padding: 0 40px;
+}
+.section-divider .divider-footer-text {
+  font-family: Arial; font-size: 7pt; color: #FFFFFF; flex: 1;
+}
+.section-divider .divider-footer-logo { height: 18px; width: auto; }
+
+/* ── PAGE FOOTER BAR ── */
+.page-footer {
+  position: fixed; bottom: 0; left: 0; right: 0; height: 28px;
+  border-top: 1.5px solid var(--accent); background: var(--primary);
+  display: flex; align-items: center; padding: 0 40px; z-index: 100;
+}
+.page-footer .footer-text {
+  font-family: Arial; font-size: 7pt; color: #FFFFFF; flex: 1;
+}
+.page-footer .footer-logo { height: 18px; width: auto; }
+
+/* ── CONTENT PAGE HEADER ── */
+.content-header { margin-bottom: 20px; }
+.content-header .section-label {
+  font-family: Arial; font-size: 7.5pt; font-weight: bold;
+  text-transform: uppercase; letter-spacing: 0.12em;
+  color: var(--accent); margin: 0 0 4px 0;
+}
+.content-header .page-title {
+  font-family: Georgia, serif; font-size: 20pt; font-weight: bold;
+  color: var(--primary); margin: 0;
+}
+`;
+
+// Builds the :root CSS variable block from a resolved branding object.
+// Call this at the top of any HTML template: <style>{{cssVars}}{{sharedPdfCss}}</style>
+export function buildCssVars(branding) {
+  return `:root {
+  --primary: ${branding.primary_color || '#1A3226'};
+  --accent: ${branding.accent_color || '#B8982F'};
+  --primary-light: ${branding.primary_color_light || lightenHex(branding.primary_color || '#1A3226', 15)};
+}`;
+}
+
 /**
  * generateDocuments — export orchestrator
  * POST body: { analysisId, format: 'pdf' | 'pptx' | 'email', email_to?, email_subject? }
@@ -70,6 +167,8 @@ Deno.serve(async (req) => {
     }
 
     // PDF — generate bytes then store
+    // Compute primary_color_light and attach to branding before all PDF rendering
+    branding.primary_color_light = lightenHex(branding.primary_color || '#1A3226', 15);
     const { bytes, mimeType, filename } = await generateDocument(base44, analysis, branding, format);
 
     // 4. Check if Drive is connected with auto-sync enabled
