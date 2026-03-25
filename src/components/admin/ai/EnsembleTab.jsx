@@ -159,6 +159,8 @@ function TaskRow({ task, selectedTier, onChange, isDirty }) {
 export default function EnsembleTab() {
   const [tasks, setTasks] = useState(null);
   const [localTasks, setLocalTasks] = useState({});  // id → { provider, model }
+  const [assemblyModel, setAssemblyModel] = useState("anthropic::claude-sonnet-4-20250514");
+  const [assemblyDirty, setAssemblyDirty] = useState(false);
   const [dirtyIds, setDirtyIds] = useState(new Set());
   const [ensembleOn, setEnsembleOn] = useState(true);
   const [selectedTier, setSelectedTier] = useState("broker");
@@ -313,17 +315,34 @@ export default function EnsembleTab() {
           ))
         )}
 
-        {/* Final Assembly — locked row */}
-        <div className="grid grid-cols-[1fr_280px_32px] gap-4 items-center px-5 py-4 bg-[#1A3226]/[0.02] border-t border-[#1A3226]/8">
+        {/* Final Assembly — editable row */}
+        <div className="grid grid-cols-[1fr_280px_32px] gap-4 items-start px-5 py-4 bg-[#1A3226]/[0.02] border-t border-[#1A3226]/8">
           <div>
-            <span className="text-[13px] font-medium text-[#1A3226]/60">Final Assembly</span>
-            <p className="text-[12px] text-[#1A3226]/40 mt-0.5">Claude always assembles the final report</p>
+            <span className="text-[13px] font-medium text-[#1A3226]">Final Assembly</span>
+            <p className="text-[12px] text-[#1A3226]/40 mt-0.5">Assembles all sections into the final client report</p>
           </div>
-          <div className="flex items-center gap-1.5 text-xs text-[#1A3226]/40">
-            <Lock className="w-3.5 h-3.5" />
-            <span>Anthropic — Claude (locked)</span>
+          <div>
+            <label className="text-[10px] uppercase tracking-wider text-[#1A3226]/40 font-medium block mb-1">Provider · Model</label>
+            <select
+              value={assemblyModel}
+              onChange={e => { setAssemblyModel(e.target.value); setAssemblyDirty(true); }}
+              className="w-full text-xs border border-[#1A3226]/15 rounded-lg px-2.5 py-1.5 bg-white text-[#1A3226] focus:outline-none focus:ring-1 focus:ring-[#1A3226]/30"
+            >
+              {MODEL_GROUPS.map(group => (
+                <optgroup key={group.provider} label={PROVIDER_LABELS[group.provider]}>
+                  {group.models.map(m => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+            <ModelBadge value={assemblyModel} />
           </div>
-          <div />
+          <div className="flex items-start justify-center pt-7">
+            {assemblyDirty && (
+              <span title="Unsaved change" style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#B8982F", display: "inline-block" }} />
+            )}
+          </div>
         </div>
       </div>
 
