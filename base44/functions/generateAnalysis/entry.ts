@@ -433,9 +433,9 @@ Deno.serve(async (req) => {
       return Response.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // If already complete WITH output_json, return cached
-    if (analysis.status === "complete" && analysis.output_text && analysis.output_json) {
-      return Response.json({ output: analysis.output_text, model: analysis.ai_model, keySource: "cached", outputJson: true });
+    // If already complete with output_text, return cached (don't re-run)
+    if (analysis.status === "complete" && analysis.output_text) {
+      return Response.json({ output: analysis.output_text, model: analysis.ai_model, keySource: "cached", outputJson: !!analysis.output_json });
     }
 
     // Resolve API key
