@@ -24,198 +24,270 @@ function getRequiredSections(assessmentType, analysis) {
       migration_opt: ['migration_analysis'],
       archetype_opt: ['buyer_archetype'],
     },
-    rental_analysis: {
-      base: [],
-    },
+    rental_analysis: { base: [] },
     client_portfolio: {
       base: ['tiered_comps', 'portfolio_options', 'adu_option', 'location_priority_characteristics', 'rate_environment'],
     },
-    custom: {
-      base: analysis.selected_modules || [],
-    },
+    custom: { base: analysis.selected_modules || [] },
   };
-  
+
   const config = matrix[assessmentType] || { base: [] };
   const sections = new Set([...config.base]);
-  
-  if (analysis.include_migration && config.migration_opt) {
-    config.migration_opt.forEach(s => sections.add(s));
-  }
-  if (analysis.include_archetypes && config.archetype_opt) {
-    config.archetype_opt.forEach(s => sections.add(s));
-  }
-  
+  if (analysis.include_migration && config.migration_opt) config.migration_opt.forEach(s => sections.add(s));
+  if (analysis.include_archetypes && config.archetype_opt) config.archetype_opt.forEach(s => sections.add(s));
   return sections;
 }
 
-// Extract structured JSON from AI response and separate from narrative text
-function extractJsonOutput(text) {
+// Parse AI JSON-only response; extract narrative text from JSON fields for output_text
+function extractJsonOutput(rawText) {
+  // Strip markdown fences if present
+  let text = rawText.trim();
+  if (text.startsWith('```')) {
+    text = text.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+  }
+
+  // Attempt full-response parse (JSON-only mode)
+  try {
+    const outputJson = JSON.parse(text);
+    // Build readable output_text from narrative fields inside the JSON
+    const parts = [];
+    if (outputJson.executive_summary) parts.push(`## Executive Summary\n${outputJson.executive_summary}`);
+    if (outputJson.market_context?.narrative) parts.push(`## Market Context\n${outputJson.market_context.narrative}`);
+    if (outputJson.valuation?.narrative) parts.push(`## Valuation\n${outputJson.valuation.narrative}`);
+    if (outputJson.avm_analysis?.narrative) parts.push(`## AVM Analysis\n${outputJson.avm_analysis.narrative}`);
+    const cleanText = parts.length ? parts.join('\n\n') : JSON.stringify(outputJson, null, 2).slice(0, 2000);
+    return { cleanText, outputJson };
+  } catch (e) {
+    console.warn('[extractJsonOutput] Full-response JSON parse failed:', e.message, '| first 300:', text.slice(0, 300));
+  }
+
+  // Fallback: delimiter-based extraction
   const START = '---BEGIN_JSON_OUTPUT---';
   const END = '---END_JSON_OUTPUT---';
   const startIdx = text.indexOf(START);
   const endIdx = text.indexOf(END);
-  if (startIdx === -1 || endIdx === -1) return { cleanText: text, outputJson: null };
-  const jsonStr = text.slice(startIdx + START.length, endIdx).trim();
-  const cleanText = (text.slice(0, startIdx) + text.slice(endIdx + END.length)).trim();
-  try {
-    return { cleanText, outputJson: JSON.parse(jsonStr) };
-  } catch (e) {
-    console.warn('[extractJsonOutput] JSON parse failed:', e.message, '| snippet:', jsonStr.slice(0, 200));
-    return { cleanText: text, outputJson: null };
+  if (startIdx !== -1 && endIdx !== -1) {
+    const jsonStr = text.slice(startIdx + START.length, endIdx).trim();
+    const cleanText = (text.slice(0, startIdx) + text.slice(endIdx + END.length)).trim();
+    try {
+      return { cleanText, outputJson: JSON.parse(jsonStr) };
+    } catch (e2) {
+      console.warn('[extractJsonOutput] Delimiter JSON parse also failed:', e2.message);
+    }
   }
+
+  // Nothing worked — return raw text, no JSON
+  return { cleanText: rawText, outputJson: null };
 }
 
-// Expanded analysis instructions (inlined to avoid import path issues in Deno)
-function getExpandedSystemPrompt(todayString, requiredSections) {
-  const ANALYSIS_SYSTEM_PROMPT = `
-────────────────────────────────────────────────────────────────
-EXPANDED ANALYSIS INSTRUCTIONS — ALL ANALYSIS TYPES
-────────────────────────────────────────────────────────────────
+function getExpandedSystemPrompt(todayString) {
+  const prompt = `OUTPUT FORMAT — CRITICAL
 
-OUTPUT STRUCTURE:
+You must return your entire response as a single valid JSON object.
+Do NOT return markdown. Do NOT return narrative prose outside the JSON.
+Do NOT use markdown fences. Start your response with { and end with }.
 
-All analyses produce TWO outputs simultaneously:
-1. output_text: Narrative markdown report (existing behavior)
-2. output_json: Structured JSON with analysis data (new, detailed below)
-
-The JSON output feeds directly into templates for rendering tables, 
-grids, and data-driven visualizations. The narrative is fallback.
+Every key in the schema below must be present. Populate every field with real, specific analysis data.
+Narrative text goes inside designated string fields within the JSON.
+If a field cannot be determined, use null and explain in the nearest notes field.
 
 ────────────────────────────────────────────────────────────────
-FOR MIGRATION ANALYSIS (Listing Pricing, Buyer Intelligence, CMA)
+JSON OUTPUT SCHEMA — RETURN THIS STRUCTURE POPULATED WITH REAL DATA
 ────────────────────────────────────────────────────────────────
 
-EXPANDED MIGRATION ANALYSIS INSTRUCTIONS:
-
-1. GEOGRAPHIC ORIGIN: Identify 5-8 feeder markets based on location class, property type, and price point. Use general knowledge of regional migration patterns.
-
-2. MIGRATION SCORING: Assign each market a score (1-10) based on: volume (40%), price differential (30%), lifestyle/commute (20%), growth trend (10%).
-
-3. PUSH/PULL FRAMEWORK: Identify push factors (why they leave) and pull factors (why they target this submarket). Must be economic, lifestyle, or geographic — never demographic.
-
-4. PRICE PSYCHOLOGY: Categorize as stretching_up, cashing_out_equity, lateral_move, or downsizing_into_quality.
-
-5. EMPLOYER TARGETING: Generate 6-14 employer targets with company name, relevance, priority, target roles, commute time, office location. Source from general knowledge — never fabricate specific hiring data. NEVER reference employee demographics.
-
-6. MARKETING CHANNELS: Recommend 4-6 channels with specific targeting rationale tied to feeder markets.
-
-LOCATION-TYPE MIGRATION TEMPLATES:
-
-URBAN: Same neighborhood (upgrade), adjacent neighborhoods (lateral), suburban downsizers, out-of-state relocations, renter-to-buyer
-SUBURBAN: Urban core families, adjacent suburbs, same-town move-ups, corporate transfers, remote workers
-COASTAL/HISTORIC: Inner suburbs (lifestyle change), urban core (second home), same-town moves, lifestyle buyers, retirees
-RURAL: Closer suburbs (priced out), same-region move-ups, remote workers, retirees, agricultural/lifestyle buyers
+{
+  "property_address": "full address string",
+  "assessment_type": "listing_pricing",
+  "analysis_date": "March 25, 2026",
+  "executive_summary": "3-4 paragraph narrative summary of the full analysis.",
+  "market_context": {
+    "narrative": "2-3 paragraph narrative on market conditions",
+    "median_sale_price": 412000,
+    "yoy_appreciation": 3.2,
+    "avg_days_on_market": 24,
+    "sale_to_list_ratio": 0.984,
+    "months_inventory": 2.1,
+    "market_characterization": "balanced-to-seller-favorable"
+  },
+  "valuation": {
+    "narrative": "Explanation of valuation methodology and conclusions",
+    "recommended_range_low": 425000,
+    "recommended_range_high": 455000,
+    "strategic_list_price": 439900,
+    "estimated_dom_low": 18,
+    "estimated_dom_high": 35,
+    "confidence_level": "medium"
+  },
+  "tiered_comps": {
+    "tiers": [
+      {
+        "tier_id": "A",
+        "tier_label": "Tier A — Direct Comparables (Same Town)",
+        "ppsf_range": {"low": 320, "high": 380},
+        "comps": [
+          {
+            "address": "123 Example St, Norwood",
+            "sale_date": "Jan 2026",
+            "sale_price": 430000,
+            "square_feet": 1050,
+            "raw_ppsf": 410,
+            "adjusted_ppsf": 385,
+            "condition_vs_subject": "Similar",
+            "within_building": false,
+            "town": "Norwood",
+            "same_town_as_subject": true,
+            "town_adjustment_ratio": null,
+            "town_adjusted_price": null,
+            "town_adjustment_note": null
+          }
+        ]
+      },
+      {
+        "tier_id": "B",
+        "tier_label": "Tier B — Nearby Comparables (Same Town)",
+        "ppsf_range": {"low": 300, "high": 360},
+        "comps": []
+      },
+      {
+        "tier_id": "C",
+        "tier_label": "Tier C — Context Comparables (Adjacent Towns, Reference Only)",
+        "ppsf_range": {"low": 290, "high": 370},
+        "comps": [
+          {
+            "address": "456 Other Rd, Dedham",
+            "sale_date": "Dec 2025",
+            "sale_price": 485000,
+            "square_feet": 1100,
+            "raw_ppsf": 441,
+            "adjusted_ppsf": 382,
+            "condition_vs_subject": "Similar",
+            "within_building": false,
+            "town": "Dedham",
+            "same_town_as_subject": false,
+            "town_adjustment_ratio": 0.867,
+            "town_adjusted_price": 420495,
+            "town_adjustment_note": "Town-adjusted from Dedham to Norwood equivalent using 0.867 ratio (Dedham median $490/SF vs Norwood $425/SF)"
+          }
+        ]
+      }
+    ],
+    "implied_value_range": {"low": 420000, "high": 460000, "midpoint": 440000},
+    "thin_comp_flag": false
+  },
+  "avm_analysis": {
+    "narrative": "Discussion of AVM estimates vs professional valuation and how to address with clients",
+    "platforms": [
+      {"name": "Zillow", "estimate": 445000, "range_low": 420000, "range_high": 465000, "trend": "stable", "date_retrieved": "March 25, 2026", "available": true, "unavailable_reason": null},
+      {"name": "Redfin", "estimate": null, "range_low": null, "range_high": null, "trend": null, "date_retrieved": "March 25, 2026", "available": false, "unavailable_reason": "No estimate found for this unit"},
+      {"name": "Realtor.com", "estimate": null, "range_low": null, "range_high": null, "trend": null, "date_retrieved": "March 25, 2026", "available": false, "unavailable_reason": "No estimate found"},
+      {"name": "Homes.com", "estimate": null, "range_low": null, "range_high": null, "trend": null, "date_retrieved": "March 25, 2026", "available": false, "unavailable_reason": "No estimate found"}
+    ],
+    "composite": {"simple_average": 445000, "median": 445000, "spread": 0},
+    "gap_analysis": {
+      "professional_range_low": 425000,
+      "professional_range_high": 455000,
+      "avm_composite": 445000,
+      "gap_dollars": -5000,
+      "gap_pct": 1.1,
+      "direction": "aligned"
+    },
+    "blind_spots": ["Property-specific reason 1", "Property-specific reason 2", "Property-specific reason 3"],
+    "agent_response_strategy": "Strategy for addressing AVM questions from buyers"
+  },
+  "migration_analysis": {
+    "feeder_markets": [
+      {"market": "Boston", "migration_score": 8, "primary_motivation": "Space/Value trade", "price_psychology": "cashing_out_equity"}
+    ],
+    "push_factors": ["Factor 1", "Factor 2"],
+    "pull_factors": ["Factor 1", "Factor 2"],
+    "employer_targets": [
+      {"company": "Company Name", "relevance": "High", "priority": 1, "target_roles": "Role types", "commute_time": "25-40 min", "office_location": "Location"}
+    ]
+  },
+  "buyer_archetypes": [
+    {
+      "archetype_name": "Archetype Name",
+      "estimated_pool_pct": 30,
+      "profile": "3-4 sentence profile narrative describing who this buyer is and why property fits.",
+      "must_haves": ["Item 1", "Item 2"],
+      "key_concerns": ["Concern 1"],
+      "language_use": ["Phrase to use 1", "Phrase to use 2", "Phrase to use 3"],
+      "language_avoid": ["Phrase to avoid 1", "Phrase to avoid 2"],
+      "attribute_resonance": {"turnkey": 3, "schools": 2}
+    }
+  ],
+  "pricing_scenarios": [
+    {"label": "Aggressive / Test Market", "price": 465000, "rationale": "Tests ceiling pricing.", "expected_dom": "30-45 days"},
+    {"label": "Strategic List", "price": 439900, "rationale": "Maximum buyer pool access.", "expected_dom": "18-28 days"},
+    {"label": "Rapid Sale", "price": 425000, "rationale": "Drive multiple offers.", "expected_dom": "7-14 days"}
+  ]
+}
 
 ────────────────────────────────────────────────────────────────
-FOR ARCHETYPE GENERATION (All Analysis Types)
+ANALYSIS INSTRUCTIONS
 ────────────────────────────────────────────────────────────────
 
-EXPANDED ARCHETYPE GENERATION INSTRUCTIONS:
+COMP SOURCING RULES — STRICTLY ENFORCED
 
-1. Generate 6-10 buyer archetypes per analysis with full JSON schema.
+TIER A comps MUST be from the SAME TOWN as the subject property. No exceptions.
+Priority: same street/building > same neighborhood > same town, similar type/vintage.
 
-2. ARCHETYPE NAMING: Use lifestyle and financial descriptors only. Good: Remote-Flex Professional, Move-Up Family, Downsizing Empty Nester. Bad: Any protected class references.
+TIER B comps MUST also be from the SAME TOWN. Expand radius within town only.
 
-3. DEEP PROFILE: 3-4 sentences on who they are, why property fits, must-haves, concerns. Lifestyle/financial framing only.
+TIER C may include ADJACENT TOWNS for market context ONLY. Every Tier C comp from a
+different town MUST include a town premium/discount adjustment:
+  Ratio = subject_town_median_ppsf / comp_town_median_ppsf
+  Town-adjusted price = comp_sale_price × ratio
+  Label: "Town-adjusted from [CompTown] to [SubjectTown] using X.XXX ratio"
 
-4. LANGUAGE CALIBRATION: 3-5 phrases to AVOID and 3-5 phrases to USE. These feed into listing remarks and marketing copy.
+Tier C comps are REFERENCE ONLY. implied_value_range uses Tier A and B ONLY.
+Every comp JSON object must include: town, same_town_as_subject, town_adjustment_ratio,
+town_adjusted_price, town_adjustment_note.
 
-5. ATTRIBUTE RESONANCE: Score each archetype (0-3) against property attributes. 3=Decisive, 2=Important, 1=Noted, 0=Not relevant.
+AVM CONSUMER PERCEPTION ANALYSIS — REQUIRED (Listing Pricing & CMA)
 
-6. PROPERTY-TYPE REQUIREMENTS:
-   Multi-family: Local Value-Add Investor, 1031 Exchange Buyer, Owner-Occupant House Hacker, Passive/Remote Investor
-   Condo: Urban Downsizer, Young Professional First-Time, Pied-à-Terre Buyer, Investor/Rental Buyer
-   Single-family: At least 2 family + 2 non-family archetypes
+Search for AVM estimates for the subject property from:
+- Zillow (zillow.com) — "Zestimate"
+- Redfin (redfin.com) — "Redfin Estimate"
+- Realtor.com — "Home Value"
+- Homes.com — "Estimated Value"
 
-7. PERCENTAGE: estimated_pool_pct must sum to ~100% (95-105% acceptable).
+Record estimate, range low/high, trend, date. If unavailable: available=false with reason.
+Compute: simple average, median, spread of available estimates.
+Compare AVM composite to professional range: gap dollars, gap pct, direction (overvalue/undervalue/aligned ±3%).
+Identify 3-5 property-specific reasons AVMs miss THIS address.
+Never attack platforms. Acknowledge buyers have already seen these numbers.
 
-────────────────────────────────────────────────────────────────
-FOR TIERED COMP ANALYSIS (Listing Pricing, CMA, Client Portfolio)
-────────────────────────────────────────────────────────────────
+MIGRATION ANALYSIS:
+1. 5-8 feeder markets scored 1-10 (volume 40%, price differential 30%, lifestyle/commute 20%, growth 10%)
+2. Push/pull factors: economic, lifestyle, geographic ONLY — never demographic
+3. Price psychology: stretching_up | cashing_out_equity | lateral_move | downsizing_into_quality
+4. 6-14 employer targets with company, relevance, priority, target_roles, commute_time, office_location
 
-TIERED COMP INSTRUCTIONS:
+BUYER ARCHETYPES:
+1. 6-10 archetypes, estimated_pool_pct sums to ~100%
+2. Names: lifestyle and financial descriptors only. Never protected class references.
+3. Profile: 3-4 sentences, lifestyle/financial framing only
+4. language_use: 3-5 phrases to USE in marketing copy
+5. language_avoid: 3-5 phrases to AVOID
+6. Condo required: Urban Downsizer, Young Professional First-Time, Pied-à-Terre Buyer, Investor/Rental Buyer
 
-1. THREE TIERS:
-   TIER A (Direct): Same street/subdivision/closest match. 3-6 comps, 12 months preferred. Weight: PRIMARY
-   TIER B (Nearby): Same town, ±20% size, ±15 years age. 3-6 comps. Weight: SECONDARY
-   TIER C (Context): Different part of town/new construction. 3-6 comps. Weight: REFERENCE_ONLY
+TIERED COMPS:
+1. 12-18 total comps. If <12, set thin_comp_flag=true.
+2. Comps >12 months old must be time-adjusted (local appreciation rate, max 5 yr cap)
+3. Condo: within-building sales as sub-tier of Tier A; set within_building=true
+4. implied_value_range from Tier A adjusted PPSF × subject SF
 
-2. TOTAL: 12-18 across all tiers. If <12, set thin_comp_flag=true.
+FAIR HOUSING COMPLIANCE — ALL OUTPUTS
+NEVER reference protected classes: race, color, national origin, religion, sex, familial status,
+disability, age, sexual orientation, gender identity, marital status, source of income, ancestry, veteran status.
+Archetypes: life stage, property use, financial profile, lifestyle ONLY.
+Migration data: geography and economic motivation ONLY.
 
-3. TIME ADJUSTMENT: Comps >12 months old must be adjusted. Use local appreciation rate. Cap: 5 years max.
+REMINDER: Your ENTIRE response must be a single valid JSON object.
+Start with { and end with }. No markdown. No text outside the JSON.`;
 
-4. CONDO: Within-building sales as sub-tier of Tier A. Set within_building=true.
-
-5. MULTI-FAMILY: Include both sale price AND income comps (cap rate/GRM).
-
-6. CONDITION: Assess vs. subject as Superior/Similar/Inferior with key differences.
-
-7. IMPLIED VALUE: Tier A adjusted PPSF range × subject SF.
-
-────────────────────────────────────────────────────────────────
-FOR CLIENT PORTFOLIO ANALYSIS ONLY
-────────────────────────────────────────────────────────────────
-
-PORTFOLIO OPTIONS GENERATION:
-
-Generate ALL SEVEN OPTIONS (A-G) + conditional ADU for every Client Portfolio Analysis.
-
-CRITICAL:
-1. NOT a listing presentation. Never recommend selling.
-2. Never use: "you should list", "now is the time to sell". Frame as: "if you were to sell today..."
-3. All financial figures carry labels: [REGISTRY-CONFIRMED], [ESTIMATED], [CLIENT-PROVIDED], [AVM-RETRIEVED {date}]
-4. Mortgage balance: Estimate from public records if not provided. Label as estimated.
-5. Rates: Use current Freddie Mac PMMS data for 30-yr fixed. If unavailable, note date.
-6. ADU TRIGGER: Single-family, ≥5,000 SF, no zoning disqualifiers. If false, explain why.
-7. Value-Add: Use Remodeling Magazine Cost vs. Value benchmarks. If unavailable, use national averages.
-
-OPTIONS A & B: Hold vs. Refinance comparison
-OPTION C: HELOC (bridge to D & G)
-OPTION D: Value-Add (6-8 improvements with ROI)
-OPTIONS E & F: Move-Up (shows rate shock) & Right-Size (shows equity freed)
-OPTION G: Leverage for 2nd property (investment + second home)
-
-TONE: Warm, honest, data-grounded, forward-looking.
-
-────────────────────────────────────────────────────────────────
-FAIR HOUSING COMPLIANCE — APPLIES TO ALL OUTPUTS
-────────────────────────────────────────────────────────────────
-
-NEVER reference or imply targeting/avoiding protected classes:
-Federal: race, color, national origin, religion, sex, familial status, disability
-State (ME, NH, VT, MA): age, sexual orientation, gender identity, marital status, source of income, ancestry, veteran status
-
-ARCHETYPES: Define by life stage, property use, financial profile, lifestyle preference, migration motivation ONLY.
-NEVER: Protected characteristics or demographic makeup.
-
-MIGRATION DATA: Reference geography and economic motivation only.
-NEVER: Ethnic/cultural/religious composition of feeder markets.
-
-If output could constitute steering, blockbusting, or redlining, flag it.
-Set compliance_flagged = true on analysis record.
-
-Property descriptions: Target features and amenities only (SF, finishes, outdoor space, home office potential).
-Focus on lifestyle fit without implying buyer demographic.
-Never steer toward/away from protected classes.
-`;
-
-  let filtered = ANALYSIS_SYSTEM_PROMPT;
-  if (!requiredSections || !requiredSections.has('migration_analysis')) {
-    filtered = filtered.replace(/FOR MIGRATION ANALYSIS \(Listing Pricing.*?(?=FOR ARCHETYPE|FOR TIERED|FOR CLIENT|FAIR HOUSING)/s, '');
-  }
-  if (!requiredSections || !requiredSections.has('buyer_archetype')) {
-    filtered = filtered.replace(/FOR ARCHETYPE GENERATION \(All.*?(?=FOR TIERED|FOR CLIENT|FAIR HOUSING)/s, '');
-  }
-  if (!requiredSections || !requiredSections.has('portfolio_options')) {
-    filtered = filtered.replace(/FOR CLIENT PORTFOLIO ANALYSIS ONLY.*?(?=FAIR HOUSING)/s, '');
-  }
-  if (!requiredSections || !requiredSections.has('tiered_comps')) {
-    filtered = filtered.replace(/FOR TIERED COMP ANALYSIS \(Listing Pricing.*?(?=FOR CLIENT|FAIR HOUSING)/s, '');
-  }
-
-  return `You are PropPrompt™, an elite real estate AI analyst serving New England brokerages. Today's date is ${todayString}. All market analysis, pricing, and trends reflect current conditions as of this date. Write your full narrative analysis in markdown. After completing all narrative sections, append the structured JSON block exactly as specified in the JSON OUTPUT section above.
-
-${filtered}`;
+  return `You are PropPrompt™, an elite real estate AI analyst serving New England brokerages. Today's date is ${todayString}.\n\n${prompt}`;
 }
 
 const ANTHROPIC_MODELS = {
@@ -223,10 +295,10 @@ const ANTHROPIC_MODELS = {
   agent:   "claude-3-5-sonnet-20241022",
 };
 
-async function callClaudeOnce(apiKey, prompt, keySource, requiredSections) {
+async function callClaudeOnce(apiKey, prompt, keySource) {
   const model = keySource === "agent" ? ANTHROPIC_MODELS.agent : ANTHROPIC_MODELS.default;
   const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-  const systemPrompt = getExpandedSystemPrompt(today, requiredSections);
+  const systemPrompt = getExpandedSystemPrompt(today);
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -236,7 +308,7 @@ async function callClaudeOnce(apiKey, prompt, keySource, requiredSections) {
     },
     body: JSON.stringify({
       model,
-      max_tokens: 8000,
+      max_tokens: 16000,
       messages: [{ role: "user", content: prompt }],
       system: systemPrompt,
     }),
@@ -251,12 +323,12 @@ async function callClaudeOnce(apiKey, prompt, keySource, requiredSections) {
   return { text: data.content?.[0]?.text || "", model };
 }
 
-async function callClaude(apiKey, prompt, keySource, requiredSections) {
+async function callClaude(apiKey, prompt, keySource) {
   const maxRetries = 3;
   const delayMs = [3000, 8000, 15000];
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      return await callClaudeOnce(apiKey, prompt, keySource, requiredSections);
+      return await callClaudeOnce(apiKey, prompt, keySource);
     } catch (err) {
       if (err.isOverloaded && attempt < maxRetries - 1) {
         console.warn(`[generateAnalysis] Claude overloaded, retry ${attempt + 1}/${maxRetries - 1} in ${delayMs[attempt]}ms...`);
@@ -279,7 +351,7 @@ async function callOpenAI(apiKey, prompt) {
     },
     body: JSON.stringify({
       model: "gpt-4o",
-      max_tokens: 4096,
+      max_tokens: 16000,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: prompt }
@@ -303,7 +375,7 @@ async function callGemini(apiKey, prompt) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { maxOutputTokens: 4096 },
+      generationConfig: { maxOutputTokens: 16000 },
       systemInstruction: { parts: [{ text: systemPrompt }] },
     }),
   });
@@ -327,7 +399,7 @@ async function callPerplexity(apiKey, prompt) {
     },
     body: JSON.stringify({
       model,
-      max_tokens: 4096,
+      max_tokens: 16000,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: prompt }
@@ -361,9 +433,9 @@ Deno.serve(async (req) => {
       return Response.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // If already complete, return stored output
-    if (analysis.status === "complete" && analysis.output_text) {
-      return Response.json({ output: analysis.output_text, model: analysis.ai_model, keySource: "cached" });
+    // If already complete WITH output_json, return cached
+    if (analysis.status === "complete" && analysis.output_text && analysis.output_json) {
+      return Response.json({ output: analysis.output_text, model: analysis.ai_model, keySource: "cached", outputJson: true });
     }
 
     // Resolve API key
@@ -379,20 +451,12 @@ Deno.serve(async (req) => {
 
     // Assemble prompt
     const promptRes = await base44.functions.invoke("assemblePrompt", { analysisId });
-    const prompt = promptRes.data?.prompt || `You are a PropPrompt™ real estate AI. Analyze this property: ${JSON.stringify(analysis.intake_data)}`;
+    const prompt = promptRes.data?.prompt || `Analyze this property for a PropPrompt™ listing pricing analysis: ${JSON.stringify(analysis.intake_data)}`;
 
     // Mark as in_progress
     await base44.asServiceRole.entities.Analysis.update(analysisId, { status: "in_progress" });
 
-    // ── Resolve required sections based on analysis type ────────────────────────
-    const requiredSections = getRequiredSections(analysis.assessment_type, analysis);
-    console.log('[generateAnalysis] required sections:', Array.from(requiredSections));
-    
-    // ── TIER-BASED ROUTING ────────────────────────────────────────────────────
-    const configs = await base44.asServiceRole.entities.PlatformConfig.filter({});
-    const config = configs[0] || {};
-
-    // Resolve user tier from TerritorySubscription or Org
+    // ── TIER-BASED ROUTING ──────────────────────────────────────────────────
     let tier = 'starter';
     try {
       const subs = await base44.asServiceRole.entities.TerritorySubscription.filter({ user_id: user.id });
@@ -417,31 +481,26 @@ Deno.serve(async (req) => {
     const hasPipeline = pipelinePrompts.length > 0;
 
     if (isPro && hasPipeline) {
-      // ── PRO/TEAM/BROKER: PromptLibrary ensemble pipeline ──────────────────
+      // ── PRO/TEAM: PromptLibrary ensemble pipeline ─────────────────────────
       console.log(`[generateAnalysis] Running ${tier} pipeline with ${pipelinePrompts.length} steps`);
       const startTime = Date.now();
 
-      // Helper: resolve API key for a platform
       const getKey = async (platform) => {
         const r = await base44.functions.invoke('resolveApiKey', {
-          platform,
-          orgId: analysis.org_id,
-          agentEmail: analysis.run_by_email,
+          platform, orgId: analysis.org_id, agentEmail: analysis.run_by_email,
         });
         return r.data?.apiKey || null;
       };
 
-      // Helper: call the right provider
-      const callProvider = async (platform, apiKey, prompt) => {
-        if (!apiKey) throw new Error(`No API key for ${platform}`);
-        if (platform === 'claude') return callClaude(apiKey, prompt, 'platform');
-        if (platform === 'chatgpt') return callOpenAI(apiKey, prompt);
-        if (platform === 'gemini') return callGemini(apiKey, prompt);
-        if (platform === 'perplexity') return callPerplexity(apiKey, prompt);
-        return callClaude(apiKey, prompt, 'platform'); // fallback
+      const callProvider = async (platform, key, p) => {
+        if (!key) throw new Error(`No API key for ${platform}`);
+        if (platform === 'claude') return callClaude(key, p, 'platform');
+        if (platform === 'chatgpt') return callOpenAI(key, p);
+        if (platform === 'gemini') return callGemini(key, p);
+        if (platform === 'perplexity') return callPerplexity(key, p);
+        return callClaude(key, p, 'platform');
       };
 
-      // Token extras accumulate as pipeline runs
       const extras = { perplexity_data: null, gemini_data: null, registry_data: null };
       const sectionOutputs = {};
 
@@ -455,7 +514,6 @@ Deno.serve(async (req) => {
         const section = promptRecord.prompt_section;
         console.log(`[pipeline] step ${promptRecord.ensemble_order}: ${section} via ${promptRecord.ai_platform}`);
 
-        // Substitute tokens into this step's prompt (including outputs from prior steps)
         let stepPrompt = promptRecord.prompt_text || '';
         const d = analysis.intake_data || {};
         stepPrompt = stepPrompt
@@ -475,11 +533,8 @@ Deno.serve(async (req) => {
           const stepKey = await getKey(promptRecord.ai_platform);
           const stepResult = await callProvider(promptRecord.ai_platform, stepKey, stepPrompt);
           sectionOutputs[section] = stepResult.text;
-
-          // Store outputs into extras for downstream token substitution
           if (section === 'market_research') extras.perplexity_data = stepResult.text;
           if (section === 'neighborhood_snapshot') extras.gemini_data = stepResult.text;
-
           await base44.asServiceRole.entities.Analysis.update(analysisId, {
             sections_completed: Object.keys(sectionOutputs).length,
             ensemble_section_outputs: { ...sectionOutputs },
@@ -523,11 +578,10 @@ Deno.serve(async (req) => {
     }
 
     // ── STARTER / FALLBACK: Single-model path ────────────────────────────────
-    // Call the appropriate AI provider
     let result;
     const platform = analysis.ai_platform;
     if (platform === "claude") {
-      result = await callClaude(apiKey, prompt, keySource, requiredSections);
+      result = await callClaude(apiKey, prompt, keySource);
     } else if (platform === "chatgpt") {
       result = await callOpenAI(apiKey, prompt);
     } else if (platform === "gemini") {
@@ -538,9 +592,16 @@ Deno.serve(async (req) => {
       result = await callClaude(apiKey, prompt, keySource);
     }
 
+    // Truncation check
+    const lastChar = result.text.trim().slice(-1);
+    const looksComplete = lastChar === '}' || lastChar === '"';
+    if (!looksComplete) {
+      console.warn('[generateAnalysis] WARNING: response may be truncated. Last char:', JSON.stringify(lastChar), '| length:', result.text.length);
+    }
+
     // Extract structured JSON from AI response
     const { cleanText, outputJson } = extractJsonOutput(result.text);
-    console.log('[generateAnalysis] output_json populated:', !!outputJson);
+    console.log('[generateAnalysis] output_json populated:', !!outputJson, '| response length:', result.text.length);
 
     // Persist output
     const saveData = {
