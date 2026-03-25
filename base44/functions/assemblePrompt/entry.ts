@@ -233,7 +233,13 @@ Deno.serve(async (req) => {
       promptSource = "library";
     }
 
-    const assembled = substituteTokens(promptText, analysis, territory);
+    // Strip any conflicting output-format instructions from library prompts
+    const cleanedPromptText = promptText
+      .replace(/use markdown formatting\.?/gi, '')
+      .replace(/respond with (?:a )?(?:markdown|narrative|prose).*?\./gi, '')
+      .trim();
+
+    const assembled = substituteTokens(cleanedPromptText, analysis, territory);
 
     // Store assembled prompt and included sections on the analysis
     await base44.asServiceRole.entities.Analysis.update(analysisId, {
