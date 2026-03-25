@@ -14,6 +14,24 @@ export default function PlatformSettings() {
   const [versionInput, setVersionInput] = useState('');
   const [savingVersion, setSavingVersion] = useState(false);
   const [runningCleanup, setRunningCleanup] = useState(false);
+  const [runningPL, setRunningPL] = useState(false);
+
+  async function runPLSnapshot() {
+    setRunningPL(true);
+    try {
+      const res = await base44.functions.invoke('generateWeeklyPLSnapshot', {});
+      const d = res.data;
+      if (d?.skipped) {
+        toast({ title: 'Already exists', description: d.message });
+      } else {
+        toast({ title: 'P/L snapshot created', description: `Week of ${d?.week} — Net: ${d?.summary?.net_pl ?? 'see record'}` });
+      }
+    } catch (e) {
+      toast({ title: 'Snapshot error', description: e.message, variant: 'destructive' });
+    } finally {
+      setRunningPL(false);
+    }
+  }
 
   async function runFlipbookCleanup() {
     setRunningCleanup(true);
@@ -104,6 +122,24 @@ export default function PlatformSettings() {
             {savingVersion ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Update'}
           </Button>
         </div>
+      </div>
+
+      {/* P/L Snapshot */}
+      <div className="rounded-2xl border border-[#1A3226]/10 bg-[#1A3226]/[0.02] p-5 flex items-center justify-between">
+        <div>
+          <p className="text-sm font-semibold text-[#1A3226]">Weekly P/L Snapshot</p>
+          <p className="text-xs text-[#1A3226]/50 mt-0.5">Generate last week's P/L record manually. Runs automatically every Monday at 6am.</p>
+        </div>
+        <Button
+          onClick={runPLSnapshot}
+          disabled={runningPL}
+          variant="outline"
+          size="sm"
+          className="gap-1.5 border-[#1A3226]/20"
+        >
+          {runningPL ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Tag className="w-3.5 h-3.5" />}
+          Run P/L snapshot now
+        </Button>
       </div>
 
       {/* Flipbook Cleanup */}
