@@ -106,28 +106,17 @@ function substituteTokens(template, analysis, territory, extras = {}) {
 function buildBaselinePrompt(analysis) {
   const d = analysis.intake_data || {};
   const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-  return `You are PropPrompt™, an elite AI real estate analyst for Eastern Massachusetts. Today's date is ${today}. All market data, pricing trends, and comparable sales should reflect conditions as of this date.
-
-ASSESSMENT TYPE: ${analysis.assessment_type?.replace(/_/g, " ").toUpperCase()}
+  return `ASSESSMENT TYPE: ${analysis.assessment_type?.replace(/_/g, " ").toUpperCase()}
 PROPERTY TYPE: ${analysis.property_type?.replace(/_/g, " ")}
 ADDRESS: ${d.address || "Not provided"}
 LOCATION CLASS: ${analysis.location_class || "unknown"}
 CLIENT RELATIONSHIP: ${d.client_relationship || "buyer's agent"}
-OUTPUT FORMAT: ${analysis.output_format || "narrative"}
+TODAY'S DATE: ${today}
 
 INTAKE DATA:
 ${JSON.stringify(d, null, 2)}
 
-Provide a thorough, professional real estate analysis. Include:
-1. Executive Summary
-2. Market Context (current conditions, recent trends)
-3. Property/Pricing Analysis
-4. Comparable Properties
-5. Strategic Recommendations
-6. Risk Factors
-7. Conclusion
-
-Use current market knowledge for Eastern Massachusetts. Be data-driven and specific. Use markdown formatting.`;
+Perform a complete PropPrompt™ analysis for the above property. Follow the JSON schema and all instructions in the system prompt exactly. Return a single JSON object with all required fields populated with real, specific data for this property, location, and market conditions.`;
 }
 
 Deno.serve(async (req) => {
