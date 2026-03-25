@@ -1,5 +1,86 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
+// ─── Shared PPTX Helpers (inlined from functions/pptxHelpers.js) ────────────
+// CRITICAL: All colors come from the brand object. Never hardcode hex values.
+
+function lightenHex(hex, percent) {
+  const num = parseInt(hex.replace('#', ''), 16);
+  const r = Math.min(255, (num >> 16) + Math.round(((num >> 16) * percent) / 100));
+  const g = Math.min(255, ((num >> 8) & 0x00FF) + Math.round((((num >> 8) & 0x00FF) * percent) / 100));
+  const b = Math.min(255, (num & 0x0000FF) + Math.round(((num & 0x0000FF) * percent) / 100));
+  return ((r << 16) | (g << 8) | b).toString(16).padStart(6, '0');
+}
+
+function addFooterBar(slide, pptx, brand) {
+  const PRIMARY = brand.primary_color.replace('#', '');
+  const ACCENT = brand.accent_color.replace('#', '');
+  slide.addShape(pptx.shapes.RECTANGLE, {
+    x: 0, y: 5.25, w: 10, h: 0.015, fill: { color: ACCENT }
+  });
+  slide.addShape(pptx.shapes.RECTANGLE, {
+    x: 0, y: 5.27, w: 10, h: 0.23, fill: { color: PRIMARY }
+  });
+  const footerText = brand.team_name
+    ? brand.team_name + ' · ' + (brand.email || '') + ' · ' + (brand.website || '')
+    : (brand.org_name || '') + ' · ' + (brand.email || '') + ' · ' + (brand.website || '');
+  slide.addText(footerText, {
+    x: 0.3, y: 5.27, w: 7, h: 0.23,
+    fontSize: 7, fontFace: 'Arial', color: 'FFFFFF',
+    align: 'left', valign: 'middle'
+  });
+  if (brand.logo_url) {
+    slide.addImage({ path: brand.logo_url, x: 9.0, y: 5.27, w: 0.6, h: 0.22, sizing: { type: 'contain' } });
+  }
+}
+
+function addContentSlideHeader(slide, sectionLabel, pageTitle, brand) {
+  const ACCENT = brand.accent_color.replace('#', '');
+  const PRIMARY = brand.primary_color.replace('#', '');
+  slide.addText(sectionLabel, {
+    x: 0.5, y: 0.25, w: 5, h: 0.2,
+    fontSize: 8, fontFace: 'Arial', color: ACCENT, bold: true, charSpacing: 1.5
+  });
+  slide.addText(pageTitle, {
+    x: 0.5, y: 0.45, w: 8, h: 0.45,
+    fontSize: 22, fontFace: 'Georgia', color: PRIMARY, bold: true
+  });
+}
+
+function addSectionDivider(pptx, sectionNumber, title, subtitle, brand) {
+  const PRIMARY = brand.primary_color.replace('#', '');
+  const ACCENT = brand.accent_color.replace('#', '');
+  const WATERMARK = lightenHex(brand.primary_color, 15);
+  const slide = pptx.addSlide();
+  slide.background = { color: PRIMARY };
+  slide.addShape(pptx.shapes.RECTANGLE, {
+    x: 0.5, y: 0.95, w: 5.5, h: 0.025, fill: { color: ACCENT }
+  });
+  slide.addText(sectionNumber.toString().padStart(2, '0'), {
+    x: -0.3, y: 1.2, w: 4.5, h: 4.0,
+    fontSize: 220, fontFace: 'Georgia', color: WATERMARK,
+    bold: true, align: 'left', valign: 'bottom'
+  });
+  slide.addShape(pptx.shapes.RECTANGLE, {
+    x: 0.88, y: 1.65, w: 0.035, h: 2.0, fill: { color: ACCENT }
+  });
+  slide.addText(title, {
+    x: 1.05, y: 1.65, w: 8.0, h: 1.5,
+    fontSize: 42, fontFace: 'Georgia', color: 'FFFFFF',
+    bold: true, align: 'left', valign: 'top', lineSpacing: 48
+  });
+  slide.addText(subtitle, {
+    x: 1.05, y: 3.15, w: 8.0, h: 0.45,
+    fontSize: 13, fontFace: 'Arial', color: ACCENT,
+    align: 'left', valign: 'top'
+  });
+  if (brand.logo_url) {
+    slide.addImage({ path: brand.logo_url, x: 0.35, y: 0.12, w: 0.7, h: 0.7, sizing: { type: 'contain' } });
+  }
+  addFooterBar(slide, pptx, brand);
+  return slide;
+}
+// ─── End Shared PPTX Helpers ─────────────────────────────────────────────────
+
 /**
  * generatePptx — Server-side branded PPTX generator.
  * Called internally by generateDocuments when format = 'pptx'.
