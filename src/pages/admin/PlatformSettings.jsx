@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
-import { Loader2, Tag, ExternalLink } from 'lucide-react';
+import { Loader2, Tag, ExternalLink, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { Link } from 'react-router-dom';
@@ -13,6 +13,19 @@ export default function PlatformSettings() {
   const [platformConfig, setPlatformConfig] = useState(null);
   const [versionInput, setVersionInput] = useState('');
   const [savingVersion, setSavingVersion] = useState(false);
+  const [runningCleanup, setRunningCleanup] = useState(false);
+
+  async function runFlipbookCleanup() {
+    setRunningCleanup(true);
+    try {
+      const res = await base44.functions.invoke('cleanupExpiredFlipbooks', {});
+      toast({ title: 'Cleanup complete', description: res.data?.summary || 'Done.' });
+    } catch (e) {
+      toast({ title: 'Cleanup error', description: e.message, variant: 'destructive' });
+    } finally {
+      setRunningCleanup(false);
+    }
+  }
 
   useEffect(() => { loadData(); }, []);
 
@@ -91,6 +104,24 @@ export default function PlatformSettings() {
             {savingVersion ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Update'}
           </Button>
         </div>
+      </div>
+
+      {/* Flipbook Cleanup */}
+      <div className="rounded-2xl border border-[#1A3226]/10 bg-[#1A3226]/[0.02] p-5 flex items-center justify-between">
+        <div>
+          <p className="text-sm font-semibold text-[#1A3226]">Flipbook Link Cleanup</p>
+          <p className="text-xs text-[#1A3226]/50 mt-0.5">Expire overdue flipbook links and delete associated PDF files. Runs automatically nightly at 3am.</p>
+        </div>
+        <Button
+          onClick={runFlipbookCleanup}
+          disabled={runningCleanup}
+          variant="outline"
+          size="sm"
+          className="gap-1.5 border-[#1A3226]/20"
+        >
+          {runningCleanup ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+          Run flipbook cleanup now
+        </Button>
       </div>
 
       {/* Link to AI Settings */}
