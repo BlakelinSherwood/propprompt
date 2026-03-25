@@ -38,7 +38,66 @@ function getRequiredSections(assessmentType, analysis) {
   return sections;
 }
 
-// Parse AI JSON-only response; extract narrative text from JSON fields for output_text
+// ── AI Cost Logging ─────────────────────────────────────────────────────────
+
+const PRICING = {
+  anthropic: {
+    'claude-sonnet-4-20250514': { inputPer1M: 3.00,  outputPer1M: 15.00 },
+    'claude-opus-4-20250514':   { inputPer1M: 5.00,  outputPer1M: 25.00 },
+    'claude-haiku-4-5':         { inputPer1M: 0.25,  outputPer1M: 1.25  },
+    default:                    { inputPer1M: 3.00,  outputPer1M: 15.00 },
+  },
+  openai: {
+    'gpt-4o':                   { inputPer1M: 2.50,  outputPer1M: 10.00 },
+    'gpt-4o-mini':              { inputPer1M: 0.15,  outputPer1M: 0.60  },
+    default:                    { inputPer1M: 2.50,  outputPer1M: 10.00 },
+  },
+  google: {
+    'gemini-2.0-flash':         { inputPer1M: 0.075, outputPer1M: 0.30  },
+    'gemini-1.5-pro':           { inputPer1M: 1.25,  outputPer1M: 5.00  },
+    default:                    { inputPer1M: 0.075, outputPer1M: 0.30  },
+  },
+  perplexity: {
+    default:                    { inputPer1M: 1.00,  outputPer1M: 1.00  },
+  },
+  xai: {
+    'grok-2-1212':              { inputPer1M: 5.00,  outputPer1M: 15.00 },
+    default:                    { inputPer1M: 5.00,  outputPer1M: 15.00 },
+  },
+  mistral: {
+    'mistral-large-latest':     { inputPer1M: 2.00,  outputPer1M: 6.00  },
+    'mistral-small-latest':     { inputPer1M: 0.10,  outputPer1M: 0.30  },
+    default:                    { inputPer1M: 2.00,  outputPer1M: 6.00  },
+  },
+  meta: {
+    default:                    { inputPer1M: 0.18,  outputPer1M: 0.18  },
+  },
+};
+
+function calculateCostCents(provider, model, inputTokens, outputTokens) {
+  const providerRates = PRICING[provider] || {};
+  const rates = providerRates[model] || providerRates['default'] || { inputPer1M: 0, outputPer1M: 0 };
+  const inputCost  = (inputTokens  / 1_000_000) * rates.inputPer1M;
+  const outputCost = (outputTokens / 1_000_000) * rates.outputPer1M;
+  return Math.round((inputCost + outputCost) * 100);
+}
+
+async function createAITokenLog(base44, payload) {
+  await base44.asServiceRole.entities.AITokenLog.create(payload);
+}
+
+const SECTION_TO_TASK = {
+  market_research:      'live_market_context',
+  neighborhood_snapshot: 'neighbourhood_demand',
+  buyer_archetype:      'buyer_archetypes',
+  report_assembly:      'seller_narrative',
+  narrative_layer:      'seller_narrative',
+  pricing_strategy:     'pricing_strategy',
+  net_sheet:            'net_sheet',
+};
+
+// ── Parse AI JSON-only response ───────────────────────────────────────────────
+
 function extractJsonOutput(rawText) {
   // Strip markdown fences if present
   let text = rawText.trim();
@@ -384,7 +443,14 @@ async function callClaudeOnce(apiKey, prompt, keySource) {
   if (data.stop_reason === 'max_tokens') {
     console.warn('[callClaude] WARNING: Listing Pricing Analysis truncated at max_tokens');
   }
-  return { text: data.content?.[0]?.text || "", model };
+  return {
+    text: data.content?.[0]?.text || "",
+    model,
+    usage: {
+      input_tokens:  data.usage?.input_tokens  || 0,
+      output_tokens: data.usage?.output_tokens || 0,
+    },
+  };
 }
 
 async function callClaude(apiKey, prompt, keySource) {
@@ -430,7 +496,14 @@ async function callOpenAI(apiKey, prompt) {
   if (data.choices?.[0]?.finish_reason === 'length') {
     console.warn('[callOpenAI] WARNING: Analysis truncated at max_tokens');
   }
-  return { text: data.choices?.[0]?.message?.content || "", model: "gpt-4o" };
+  return {
+    text: data.choices?.[0]?.message?.content || "",
+    model: "gpt-4o",
+    usage: {
+      input_tokens:  data.usage?.prompt_tokens     || 0,
+      output_tokens: data.usage?.completion_tokens || 0,
+    },
+  };
 }
 
 async function callGemini(apiKey, prompt) {
@@ -451,7 +524,14 @@ async function callGemini(apiKey, prompt) {
     throw new Error(err.error?.message || `Gemini API error ${res.status}`);
   }
   const data = await res.json();
-  return { text: data.candidates?.[0]?.content?.parts?.[0]?.text || "", model };
+  return {
+    text: data.candidates?.[0]?.content?.parts?.[0]?.text || "",
+    model,
+    usage: {
+      input_tokens:  data.usageMetadata?.promptTokenCount     || 0,
+      output_tokens: data.usageMetadata?.candidatesTokenCount || 0,
+    },
+  };
 }
 
 async function callPerplexity(apiKey, prompt) {
@@ -478,7 +558,14 @@ async function callPerplexity(apiKey, prompt) {
     throw new Error(err.error?.message || `Perplexity API error ${res.status}`);
   }
   const data = await res.json();
-  return { text: data.choices?.[0]?.message?.content || "", model };
+  return {
+    text: data.choices?.[0]?.message?.content || "",
+    model,
+    usage: {
+      input_tokens:  data.usage?.prompt_tokens     || 0,
+      output_tokens: data.usage?.completion_tokens || 0,
+    },
+  };
 }
 
 Deno.serve(async (req) => {
@@ -602,6 +689,29 @@ Deno.serve(async (req) => {
           sectionOutputs[section] = stepResult.text;
           if (section === 'market_research') extras.perplexity_data = stepResult.text;
           if (section === 'neighborhood_snapshot') extras.gemini_data = stepResult.text;
+          // Log token usage — fail silently
+          try {
+            const stepUsage = stepResult.usage || {};
+            await createAITokenLog(base44, {
+              analysis_id:   analysisId,
+              agent_id:      user?.id || null,
+              provider:      promptRecord.ai_platform === 'chatgpt' ? 'openai' : promptRecord.ai_platform === 'gemini' ? 'google' : promptRecord.ai_platform,
+              model:         stepResult.model || '',
+              task:          SECTION_TO_TASK[section] || 'other',
+              report_type:   analysis.assessment_type || null,
+              input_tokens:  stepUsage.input_tokens  || 0,
+              output_tokens: stepUsage.output_tokens || 0,
+              cost_cents:    calculateCostCents(
+                promptRecord.ai_platform === 'chatgpt' ? 'openai' : promptRecord.ai_platform === 'gemini' ? 'google' : promptRecord.ai_platform,
+                stepResult.model || '',
+                stepUsage.input_tokens  || 0,
+                stepUsage.output_tokens || 0
+              ),
+              agent_tier: tier,
+            });
+          } catch (logError) {
+            console.warn('[generateAnalysis] AITokenLog (pipeline step) failed silently:', logError.message);
+          }
           await base44.asServiceRole.entities.Analysis.update(analysisId, {
             sections_completed: Object.keys(sectionOutputs).length,
             ensemble_section_outputs: { ...sectionOutputs },
@@ -664,6 +774,26 @@ Deno.serve(async (req) => {
     const looksComplete = lastChar === '}' || lastChar === '"';
     if (!looksComplete) {
       console.warn('[generateAnalysis] WARNING: response may be truncated. Last char:', JSON.stringify(lastChar), '| length:', result.text.length);
+    }
+
+    // Log token usage for Starter single-model call — fail silently
+    try {
+      const resultUsage = result.usage || {};
+      const providerKey = platform === 'chatgpt' ? 'openai' : platform === 'gemini' ? 'google' : platform;
+      await createAITokenLog(base44, {
+        analysis_id:   analysisId,
+        agent_id:      user?.id || null,
+        provider:      providerKey,
+        model:         result.model || '',
+        task:          'other',
+        report_type:   analysis.assessment_type || null,
+        input_tokens:  resultUsage.input_tokens  || 0,
+        output_tokens: resultUsage.output_tokens || 0,
+        cost_cents:    calculateCostCents(providerKey, result.model || '', resultUsage.input_tokens || 0, resultUsage.output_tokens || 0),
+        agent_tier:    tier,
+      });
+    } catch (logError) {
+      console.warn('[generateAnalysis] AITokenLog (starter) failed silently:', logError.message);
     }
 
     // Extract structured JSON from AI response
