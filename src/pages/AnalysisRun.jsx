@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import ReactMarkdown from "react-markdown";
 import { Button } from "@/components/ui/button";
-import { Copy, Download, Mail, CheckCircle, AlertCircle, Loader2, ArrowLeft, Cloud, Database, Presentation, Send } from "lucide-react";
+import { Copy, Download, Mail, CheckCircle, AlertCircle, Loader2, ArrowLeft, Cloud, Database, Presentation, Send, Link, ExternalLink } from "lucide-react";
 import StreamProgressBar from "../components/StreamProgressBar";
 
 const DISCLAIMER = `**DISCLAIMER:** This AI-generated analysis is provided for informational purposes only and does not constitute legal, financial, or professional real estate advice. All valuations and recommendations should be verified by a licensed real estate professional. PropPrompt™ analyses are tools to augment, not replace, professional judgment. © 2026 Sherwood & Company, Brokered by Compass.`;
@@ -40,6 +40,9 @@ export default function AnalysisRun() {
   const [emailTo, setEmailTo] = useState("");
   const [emailSending, setEmailSending] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const [flipbookLink, setFlipbookLink] = useState(null); // existing active link
+  const [flipbookGenerating, setFlipbookGenerating] = useState(false);
+  const [flipbookCopied, setFlipbookCopied] = useState(false);
   const outputRef = useRef(null);
   const hasStarted = useRef(false);
 
@@ -89,6 +92,14 @@ export default function AnalysisRun() {
       }
       if (rec.drive_url) setDriveUrl(rec.drive_url);
       if (rec.crm_push_status === "pushed") setCrmPushed(true);
+
+      // Load existing flipbook link for this analysis
+      try {
+        const links = await base44.entities.FlipbookLink.filter({ analysis_id: analysisId });
+        const now = new Date().toISOString();
+        const active = links.find(l => !l.is_expired && l.expires_at > now);
+        if (active) setFlipbookLink(active);
+      } catch (e) { /* non-fatal */ }
 
       setStatus("streaming");
 
@@ -172,6 +183,70 @@ export default function AnalysisRun() {
     } finally {
       setEmailSending(false);
     }
+  };
+
+  const handleShareFlipbook = async () => {
+    // Reuse existing active link
+    const now = new Date().toISOString();
+    if (flipbookLink && !flipbookLink.is_expired && flipbookLink.expires_at > now) return;
+
+    setFlipbookGenerating(true);
+    try {
+      // Ensure PDF exists — generate if needed
+      let pdfUrl = analysis?.output_pdf_url;
+      if (!pdfUrl) {
+        const pdfRes = await base44.functions.invoke('generateDocuments', { analysisId, format: 'pdf' });
+        pdfUrl = pdfRes?.data?.url;
+        if (!pdfUrl) throw new Error('PDF generation failed');
+      }
+
+      // Fetch PDF bytes and re-upload to flipbooks/ path
+      const pdfBlob = await fetch(pdfUrl).then(r => r.blob());
+      const today = new Date().toISOString().slice(0, 10);
+      const filename = `${analysisId}.pdf`;
+      const file = new File([pdfBlob], filename, { type: 'application/pdf' });
+      const uploadRes = await base44.asServiceRole.integrations.Core.UploadFile({ file });
+      const publicUrl = uploadRes?.file_url;
+      if (!publicUrl) throw new Error('File upload failed');
+
+      const token = crypto.randomUUID();
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      const me = await base44.auth.me();
+
+      const record = await base44.entities.FlipbookLink.create({
+        analysis_id: analysisId,
+        created_by: me?.email || '',
+        pdf_storage_path: `flipbooks/${today}/${filename}`,
+        pdf_public_url: publicUrl,
+        share_token: token,
+        expires_at: expiresAt,
+        is_expired: false,
+        view_count: 0,
+      });
+
+      setFlipbookLink(record);
+    } catch (err) {
+      console.error('[flipbook] error:', err);
+      alert('Couldn\'t generate flipbook link — please try again.');
+    } finally {
+      setFlipbookGenerating(false);
+    }
+  };
+
+  function getFlipbookUrl(token) {
+    return `${window.location.origin}/flipbook/${token}`;
+  }
+
+  function isLinkActive(link) {
+    if (!link) return false;
+    const now = new Date().toISOString();
+    return !link.is_expired && link.expires_at > now;
+  }
+
+  const handleCopyFlipbook = async () => {
+    await navigator.clipboard.writeText(getFlipbookUrl(flipbookLink.share_token));
+    setFlipbookCopied(true);
+    setTimeout(() => setFlipbookCopied(false), 2000);
   };
 
   const handleCrmPush = async () => {
@@ -288,6 +363,16 @@ export default function AnalysisRun() {
                     ? <a href={driveUrl} target="_blank" rel="noopener noreferrer" className="text-emerald-600 hidden sm:inline">Drive ↗</a>
                     : <span className="hidden sm:inline">Drive</span>}
                 </Button>
+                <Button variant="outline" size="sm"
+                  onClick={handleShareFlipbook}
+                  disabled={status !== "complete" || flipbookGenerating || isLinkActive(flipbookLink)}
+                  className="h-7 text-xs gap-1 border-[#1A3226]/15 flex-shrink-0">
+                  {flipbookGenerating
+                    ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span className="hidden sm:inline">Generating…</span></>
+                    : isLinkActive(flipbookLink)
+                    ? <><Link className="w-3.5 h-3.5 text-emerald-500" /><span className="hidden sm:inline">Link active</span></>
+                    : <><Link className="w-3.5 h-3.5" /><span className="hidden sm:inline">Flipbook</span></>}
+                </Button>
                 {crmConnections.length > 0 && (
                   <Button variant="outline" size="sm" onClick={handleCrmPush}
                     disabled={status !== "complete" || crmPushing || crmPushed}
@@ -319,6 +404,37 @@ export default function AnalysisRun() {
               </div>
             )}
           </div>
+
+          {/* Flipbook success panel */}
+          {isLinkActive(flipbookLink) && (
+            <div className="px-4 sm:px-6 py-4 border-t border-[#1A3226]/8 bg-emerald-50">
+              <p className="text-xs font-semibold text-emerald-700 mb-1">
+                Flipbook link ready — expires {new Date(flipbookLink.expires_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                {flipbookLink.view_count > 0 && <span className="ml-2 font-normal text-emerald-600">· {flipbookLink.view_count} view{flipbookLink.view_count !== 1 ? 's' : ''} so far</span>}
+              </p>
+              <div className="flex items-center gap-2 mt-2">
+                <input
+                  readOnly
+                  value={getFlipbookUrl(flipbookLink.share_token)}
+                  className="flex-1 text-xs border border-emerald-200 rounded-lg px-3 py-1.5 bg-white text-[#1A3226]/70 focus:outline-none min-w-0"
+                />
+                <button
+                  onClick={handleCopyFlipbook}
+                  className="flex-shrink-0 text-xs px-3 py-1.5 rounded-lg bg-[#1A3226] text-white hover:bg-[#1A3226]/90 transition"
+                >
+                  {flipbookCopied ? 'Copied!' : 'Copy link'}
+                </button>
+                <a
+                  href={getFlipbookUrl(flipbookLink.share_token)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-shrink-0 flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-[#1A3226]/20 text-[#1A3226] hover:bg-[#1A3226]/5 transition"
+                >
+                  <ExternalLink className="w-3 h-3" /> Open preview
+                </a>
+              </div>
+            </div>
+          )}
 
           {/* Disclaimer footer — always last, visually distinct */}
           {(status === "complete" || output.length > 100) && (
