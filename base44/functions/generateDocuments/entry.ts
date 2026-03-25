@@ -420,80 +420,337 @@ function escapeHtml(str) {
 // ─── PDF Template Renderers ────────────────────────────────────────────────────
 
 /**
- * Reusable table drawer for all PDF templates.
- * Draws header row + data rows with alternating fills and automatic page breaks.
+ * drawPageFrame — draws the top accent bar, bottom accent bar, and footer bar
+ * on every content page. Call at the start of each new page.
+ */
+function drawPageFrame(doc, branding, breadcrumb, pageTitle) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const primary = hexToRgb(branding.primary_color || '#1A3226');
+  const accent = hexToRgb(branding.accent_color || '#B8982F');
+
+  // Cream background
+  doc.setFillColor(250, 248, 244);
+  doc.rect(0, 0, pageWidth, pageHeight, 'F');
+
+  // Top accent bar
+  doc.setFillColor(accent.r, accent.g, accent.b);
+  doc.rect(0, 0, pageWidth, 3, 'F');
+
+  // Bottom accent bar
+  doc.rect(0, 789, pageWidth, 3, 'F');
+
+  // Footer bar
+  doc.setFillColor(primary.r, primary.g, primary.b);
+  doc.rect(0, 735, pageWidth, 57, 'F');
+
+  // Footer text
+  const footerParts = [];
+  if (branding.agent_name) footerParts.push(branding.agent_name);
+  if (branding.org_name) footerParts.push(branding.org_name);
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(255, 255, 255);
+  doc.text(footerParts.join(' · '), 40, 758);
+
+  // Monogram badge (right side)
+  const monogram = (branding.org_name || 'PP').split(' ').map(w => w[0]).join('').slice(0, 3).toUpperCase();
+  doc.setFillColor(accent.r, accent.g, accent.b);
+  doc.roundedRect(pageWidth - 60, 741, 32, 20, 3, 3, 'F');
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(primary.r, primary.g, primary.b);
+  doc.text(monogram, pageWidth - 44, 754, { align: 'center' });
+
+  // Section breadcrumb
+  if (breadcrumb) {
+    doc.setFillColor(accent.r, accent.g, accent.b);
+    doc.rect(38, 12, 2, 14, 'F');
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(accent.r, accent.g, accent.b);
+    doc.text(breadcrumb.toUpperCase(), 44, 22);
+  }
+
+  // Page title
+  if (pageTitle) {
+    const titleSize = pageTitle.length > 40 ? 17 : 20;
+    doc.setFontSize(titleSize);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(primary.r, primary.g, primary.b);
+    doc.text(pageTitle, 40, 62);
+    // Underline accent
+    doc.setDrawColor(accent.r, accent.g, accent.b);
+    doc.setLineWidth(1.5);
+    doc.line(40, 68, 150, 68);
+  }
+}
+
+/**
+ * drawCoverPage — draws the cover page for any assessment type
+ */
+function drawCoverPage(doc, branding, reportType, address, kpis) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const primary = hexToRgb(branding.primary_color || '#1A3226');
+  const accent = hexToRgb(branding.accent_color || '#B8982F');
+
+  // Full primary background
+  doc.setFillColor(primary.r, primary.g, primary.b);
+  doc.rect(0, 0, pageWidth, pageHeight, 'F');
+
+  // Top accent bar
+  doc.setFillColor(accent.r, accent.g, accent.b);
+  doc.rect(0, 0, pageWidth, 4, 'F');
+
+  // Bottom accent bar
+  doc.rect(0, 789, pageWidth, 3, 'F');
+
+  // Org name / logo zone
+  doc.setFontSize(28);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(255, 255, 255);
+  const orgDisplay = branding.org_name || 'PropPrompt';
+  doc.text(orgDisplay, pageWidth / 2, 110, { align: 'center' });
+
+  if (branding.org_tagline) {
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(accent.r, accent.g, accent.b);
+    doc.text(branding.org_tagline, pageWidth / 2, 130, { align: 'center' });
+  }
+
+  // Gold divider
+  doc.setDrawColor(accent.r, accent.g, accent.b);
+  doc.setLineWidth(1);
+  doc.line(pageWidth / 2 - 150, 155, pageWidth / 2 + 150, 155);
+
+  // Report type badge
+  doc.setFillColor(primary.r + 20, primary.g + 20, primary.b + 20);
+  doc.roundedRect(pageWidth / 2 - 140, 165, 280, 26, 4, 4, 'F');
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(accent.r, accent.g, accent.b);
+  doc.text(reportType.toUpperCase(), pageWidth / 2, 182, { align: 'center' });
+
+  // Property address
+  const addrParts = (address || '').split(',');
+  const street = addrParts[0]?.trim() || '';
+  const cityState = addrParts.slice(1).join(',').trim();
+
+  doc.setFontSize(26);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(255, 255, 255);
+  doc.text(street, pageWidth / 2, 230, { align: 'center', maxWidth: 480 });
+
+  if (cityState) {
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(accent.r, accent.g, accent.b);
+    doc.text(cityState, pageWidth / 2, 252, { align: 'center' });
+  }
+
+  // Second gold divider
+  doc.setDrawColor(accent.r, accent.g, accent.b);
+  doc.setLineWidth(1);
+  doc.line(pageWidth / 2 - 150, 272, pageWidth / 2 + 150, 272);
+
+  // KPI boxes
+  if (kpis && kpis.length) {
+    const boxW = 150;
+    const boxH = 80;
+    const totalW = kpis.length * boxW + (kpis.length - 1) * 12;
+    const startX = (pageWidth - totalW) / 2;
+    const boxY = 295;
+
+    kpis.forEach((kpi, i) => {
+      const bx = startX + i * (boxW + 12);
+      // Box: slightly lighter primary + accent border
+      doc.setFillColor(primary.r + 15, primary.g + 15, primary.b + 15);
+      doc.roundedRect(bx, boxY, boxW, boxH, 4, 4, 'F');
+      doc.setDrawColor(accent.r, accent.g, accent.b);
+      doc.setLineWidth(1);
+      doc.roundedRect(bx, boxY, boxW, boxH, 4, 4, 'S');
+
+      // Value
+      doc.setFontSize(20);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(accent.r, accent.g, accent.b);
+      doc.text(String(kpi.value || 'N/A'), bx + boxW / 2, boxY + 40, { align: 'center', maxWidth: boxW - 10 });
+
+      // Label
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(200, 200, 200);
+      doc.text(kpi.label, bx + boxW / 2, boxY + 58, { align: 'center', maxWidth: boxW - 10 });
+    });
+  }
+
+  // Prepared by block
+  const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(200, 200, 200);
+  doc.text(`${today}  ·  CONFIDENTIAL`, pageWidth / 2, 430, { align: 'center' });
+
+  if (branding.agent_name) {
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(accent.r, accent.g, accent.b);
+    doc.text(`Prepared by ${branding.agent_name}`, pageWidth / 2, 448, { align: 'center' });
+  }
+
+  // Footer
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(180, 180, 180);
+  doc.text(orgDisplay, pageWidth / 2, 760, { align: 'center' });
+}
+
+/**
+ * drawSectionDivider — dark full-page section break slide
+ */
+function drawSectionDivider(doc, branding, sectionNum, sectionTitle, subtitle) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const primary = hexToRgb(branding.primary_color || '#1A3226');
+  const accent = hexToRgb(branding.accent_color || '#B8982F');
+
+  doc.setFillColor(primary.r, primary.g, primary.b);
+  doc.rect(0, 0, pageWidth, pageHeight, 'F');
+
+  // Top accent bar
+  doc.setFillColor(accent.r, accent.g, accent.b);
+  doc.rect(0, 0, pageWidth, 4, 'F');
+  doc.rect(0, 789, pageWidth, 3, 'F');
+
+  // Gold divider line
+  doc.setDrawColor(accent.r, accent.g, accent.b);
+  doc.setLineWidth(1);
+  doc.line(40, 140, 390, 140);
+
+  // Section label
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(accent.r, accent.g, accent.b);
+  doc.text(`SECTION ${String(sectionNum).padStart(2, '0')}`, 40, 160);
+
+  // Vertical accent bar + title
+  doc.setFillColor(accent.r, accent.g, accent.b);
+  doc.rect(40, 185, 3, 60, 'F');
+
+  doc.setFontSize(32);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(255, 255, 255);
+  const titleLines = doc.splitTextToSize(sectionTitle, 480);
+  doc.text(titleLines.slice(0, 2), 52, 210);
+
+  if (subtitle) {
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(accent.r, accent.g, accent.b);
+    doc.text(subtitle, 52, 265, { maxWidth: 480 });
+  }
+
+  // Footer
+  const footerText = [branding.agent_name, branding.org_name].filter(Boolean).join(' · ');
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(180, 180, 180);
+  doc.text(footerText, 40, 758);
+}
+
+/**
+ * Upgraded drawTable — presentation-grade table with accent headers,
+ * alternating cream/white rows, auto page overflow.
  */
 function drawTable(doc, x, y, headers, rows, colWidths, options = {}) {
   const {
-    headerFill = '#333333',
+    headerFill = '#1A3226',
     headerTextColor = '#FFFFFF',
-    rowFill = '#FFFFFF',
-    altRowFill = '#F4F4F4',
+    altRowFill = '#F4F1EA',
     fontSize = 8,
     headerFontSize = 8,
-    rowHeight = 18,
-    padding = 4,
+    rowHeight = 24,
+    padding = 8,
+    branding = null,
   } = options;
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const bottomMargin = 80;
+  const bottomMargin = 65;
+  const totalWidth = colWidths.reduce((a, b) => a + b, 0);
   let currentY = y;
 
-  // Parse color
   const parseColor = (hex) => {
     const clean = (hex || '#000000').replace('#', '');
-    return {
-      r: parseInt(clean.slice(0, 2), 16),
-      g: parseInt(clean.slice(2, 4), 16),
-      b: parseInt(clean.slice(4, 6), 16),
-    };
+    return { r: parseInt(clean.slice(0, 2), 16), g: parseInt(clean.slice(2, 4), 16), b: parseInt(clean.slice(4, 6), 16) };
   };
 
-  // Draw header row
-  const headerColor = parseColor(headerFill);
-  doc.setFillColor(headerColor.r, headerColor.g, headerColor.b);
-  doc.rect(x, currentY, colWidths.reduce((a, b) => a + b, 0), rowHeight, 'F');
-  
-  doc.setFontSize(headerFontSize);
-  doc.setFont('helvetica', 'bold');
-  const headerTextCol = parseColor(headerTextColor);
-  doc.setTextColor(headerTextCol.r, headerTextCol.g, headerTextCol.b);
-  
-  let cellX = x + padding;
-  headers.forEach((header, i) => {
-    doc.text(header, cellX, currentY + rowHeight / 2 + 3, { align: 'left' });
-    cellX += colWidths[i];
-  });
-  
-  currentY += rowHeight;
+  const drawHeaderRow = () => {
+    const hc = parseColor(headerFill);
+    doc.setFillColor(hc.r, hc.g, hc.b);
+    doc.rect(x, currentY, totalWidth, rowHeight + 4, 'F');
+    // Accent bottom border on header
+    if (branding?.accent_color) {
+      const ac = parseColor(branding.accent_color);
+      doc.setFillColor(ac.r, ac.g, ac.b);
+      doc.rect(x, currentY + rowHeight + 4 - 2, totalWidth, 2, 'F');
+    }
+    doc.setFontSize(headerFontSize);
+    doc.setFont('helvetica', 'bold');
+    const htc = parseColor(headerTextColor);
+    doc.setTextColor(htc.r, htc.g, htc.b);
+    let cellX = x + padding;
+    headers.forEach((h, i) => {
+      doc.text(h, cellX, currentY + (rowHeight + 4) / 2 + 3);
+      cellX += colWidths[i];
+    });
+    currentY += rowHeight + 4;
+  };
 
-  // Draw data rows
+  drawHeaderRow();
+
   doc.setFontSize(fontSize);
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(50, 50, 50);
 
-  for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
-    // Check page break
+  for (let ri = 0; ri < rows.length; ri++) {
     if (currentY + rowHeight > pageHeight - bottomMargin) {
       doc.addPage();
-      currentY = 60;
+      if (branding) drawPageFrame(doc, branding, null, null);
+      currentY = 90;
+      drawHeaderRow();
+      doc.setFontSize(fontSize);
+      doc.setFont('helvetica', 'normal');
     }
 
-    // Draw row background
-    const rowColor = parseColor(rowIdx % 2 === 0 ? rowFill : altRowFill);
-    doc.setFillColor(rowColor.r, rowColor.g, rowColor.b);
-    doc.rect(x, currentY, colWidths.reduce((a, b) => a + b, 0), rowHeight, 'F');
+    const isAlt = ri % 2 !== 0;
+    if (isAlt) {
+      const arc = parseColor(altRowFill);
+      doc.setFillColor(arc.r, arc.g, arc.b);
+    } else {
+      doc.setFillColor(255, 255, 255);
+    }
+    doc.rect(x, currentY, totalWidth, rowHeight, 'F');
 
-    // Draw cell text
-    cellX = x + padding;
-    const row = rows[rowIdx];
-    row.forEach((cell, i) => {
-      // Right-align numbers
-      const align = typeof cell === 'number' ? 'right' : 'left';
-      const cellText = String(cell || '');
-      doc.text(cellText, cellX, currentY + rowHeight / 2 + 3, { align });
-      cellX += colWidths[i];
+    // Row bottom border
+    doc.setDrawColor(224, 221, 214);
+    doc.setLineWidth(0.5);
+    doc.line(x, currentY + rowHeight, x + totalWidth, currentY + rowHeight);
+
+    doc.setTextColor(26, 26, 26);
+    let cellX = x + padding;
+    const row = rows[ri];
+    row.forEach((cell, ci) => {
+      const cellText = String(cell ?? '');
+      const isNum = !isNaN(cell) && cell !== '' && cell !== null;
+      const align = isNum ? 'right' : 'left';
+      const cx = isNum ? cellX + colWidths[ci] - padding : cellX;
+      // Clip long text
+      const maxW = colWidths[ci] - padding * 2;
+      const wrapped = doc.splitTextToSize(cellText, maxW);
+      doc.text(wrapped[0], cx, currentY + rowHeight / 2 + 3, { align });
+      cellX += colWidths[ci];
     });
 
     currentY += rowHeight;
@@ -507,294 +764,81 @@ function drawTable(doc, x, y, headers, rows, colWidths, options = {}) {
  */
 function renderCMAPdf(doc, data, branding) {
   const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const primary = hexToRgb(branding.primary_color || '#333333');
-  const accent = hexToRgb(branding.accent_color || '#666666');
-  const margin = 40;
-  const contentWidth = pageWidth - 2 * margin;
-
-  // ────── PAGE 1: COVER ──────────────────────────────────────────────────
-  doc.setFillColor(primary.r, primary.g, primary.b);
-  doc.rect(0, 0, pageWidth, 100, 'F');
-
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(28);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Comparative Market Analysis', margin, 35);
-
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'normal');
-  if (data.property_address) {
-    doc.text(data.property_address, margin, 60);
-  }
-  if (data.property_type) {
-    doc.setFontSize(10);
-    doc.text(data.property_type, margin, 80);
-  }
-
-  // Agent info
-  doc.setFontSize(11);
-  doc.setTextColor(200, 200, 200);
-  if (branding.agent_name) {
-    doc.text(`Prepared by ${branding.agent_name}`, margin, pageHeight - 40);
-  }
-  const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-  doc.setFontSize(9);
-  doc.text(today, margin, pageHeight - 25);
-
-  // KPI boxes
-  doc.setFontSize(9);
-  const kpiY = 120;
-  const kpiHeight = 50;
-  const kpiWidth = (contentWidth - 20) / 3;
-
-  const kpis = [
-    { label: 'Estimated Value', value: data.implied_value_range?.midpoint ? `$${(data.implied_value_range.midpoint / 1000000).toFixed(1)}M` : 'N/A' },
-    { label: 'Comparable Sales', value: data.tiered_comps?.tiers?.reduce((sum, t) => sum + (t.comps?.length || 0), 0) || 'N/A' },
-    { label: 'Confidence Level', value: data.confidence_level || 'Medium' },
-  ];
-
-  kpis.forEach((kpi, idx) => {
-    const kpiX = margin + idx * (kpiWidth + 10);
-    doc.setFillColor(primary.r, primary.g, primary.b);
-    doc.rect(kpiX, kpiY, kpiWidth, kpiHeight, 'F');
-
-    doc.setTextColor(accent.r, accent.g, accent.b);
-    doc.setFont('helvetica', 'normal');
-    doc.text(kpi.label, kpiX + 8, kpiY + 14);
-
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
-    doc.text(String(kpi.value), kpiX + 8, kpiY + 32);
-  });
-
-  // ────── PAGE 2: MARKET OVERVIEW ────────────────────────────────────────
-  doc.addPage();
-  let y = margin;
-
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(primary.r, primary.g, primary.b);
-  doc.text('Market Context', margin, y);
-  y += 5;
-
-  doc.setDrawColor(accent.r, accent.g, accent.b);
-  doc.setLineWidth(1.5);
-  doc.line(margin, y, margin + 100, y);
-  y += 15;
-
-  // Market stats
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(50, 50, 50);
-
-  const marketStats = data.market_context || {};
-  const stats = [
-    ['Median Sale Price', marketStats.median_sale_price ? `$${(marketStats.median_sale_price / 1000).toFixed(0)}K` : 'N/A'],
-    ['YoY Appreciation', marketStats.yoy_appreciation ? `${marketStats.yoy_appreciation.toFixed(1)}%` : 'N/A'],
-    ['Avg Days on Market', marketStats.avg_days_on_market ? `${marketStats.avg_days_on_market} days` : 'N/A'],
-    ['Sale-to-List Ratio', marketStats.sale_to_list_ratio ? `${(marketStats.sale_to_list_ratio * 100).toFixed(1)}%` : 'N/A'],
-    ['Months of Inventory', marketStats.months_inventory ? `${marketStats.months_inventory.toFixed(1)}` : 'N/A'],
-  ];
-
-  stats.forEach((stat, idx) => {
-    const rowY = y + idx * 18;
-    if (idx % 2 === 0) {
-      doc.setFillColor(244, 244, 244);
-      doc.rect(margin, rowY - 8, contentWidth, 18, 'F');
-    }
-    doc.setTextColor(50, 50, 50);
-    doc.text(stat[0], margin + 8, rowY + 2);
-    doc.text(stat[1], margin + contentWidth - 8, rowY + 2, { align: 'right' });
-  });
-
-  // ────── PAGE 3-4: TIERED COMPARABLES ──────────────────────────────────
-  doc.addPage();
-  y = margin;
-
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(primary.r, primary.g, primary.b);
-  doc.text('Comparable Sales Analysis', margin, y);
-  y += 20;
-
-  if (data.tiered_comps?.tiers) {
-    data.tiered_comps.tiers.forEach((tier, tierIdx) => {
-      // Tier header
-      const tierColor = tier.tier_id === 'A' ? primary : tier.tier_id === 'B' ? accent : hexToRgb('#999999');
-      doc.setFillColor(tierColor.r, tierColor.g, tierColor.b);
-      doc.rect(margin, y, contentWidth, 20, 'F');
-
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      const ppsf = tier.ppsf_range ? `$${tier.ppsf_range.low} – $${tier.ppsf_range.high}/SF` : '';
-      doc.text(`${tier.tier_label} (${ppsf})`, margin + 8, y + 14);
-      y += 22;
-
-      // Comp table
-      if (tier.comps && tier.comps.length > 0) {
-        const headers = ['Address', 'Date', 'Price', 'SF', 'Raw $/SF', 'Adj $/SF', 'Condition'];
-        const colWidths = [110, 50, 70, 50, 60, 70, 60];
-        const rows = tier.comps.map(c => [
-          c.address || '',
-          c.sale_date || '',
-          c.sale_price ? `$${(c.sale_price / 1000).toFixed(0)}K` : '',
-          c.square_feet ? `${c.square_feet.toLocaleString()}` : '',
-          c.raw_ppsf ? `$${c.raw_ppsf}` : '',
-          c.adjusted_ppsf ? `$${c.adjusted_ppsf}` : '',
-          c.condition_vs_subject || '',
-        ]);
-
-        y = drawTable(doc, margin, y, headers, rows, colWidths, {
-          headerFill: tierColor.r * 256 * 256 + tierColor.g * 256 + tierColor.b,
-          headerTextColor: '#FFFFFF',
-          fontSize: 8,
-          rowHeight: 16,
-        });
-        y += 10;
-      }
-    });
-  }
-
-  // Implied value range
-  if (data.implied_value_range) {
-    doc.setFillColor(primary.r, primary.g, primary.b);
-    doc.rect(margin, y, contentWidth, 22, 'F');
-    doc.setTextColor(accent.r, accent.g, accent.b);
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    const low = data.implied_value_range.low ? `$${(data.implied_value_range.low / 1000000).toFixed(2)}M` : '';
-    const high = data.implied_value_range.high ? `$${(data.implied_value_range.high / 1000000).toFixed(2)}M` : '';
-    doc.text(`Implied Value Range: ${low} – ${high}`, margin + 8, y + 14);
-    y += 26;
-  }
-
-  // Thin comp warning
-  if (data.tiered_comps?.comp_date_window?.thin_comp_flag) {
-    doc.setFontSize(8);
-    doc.setTextColor(200, 0, 0);
-    doc.text('⚠ Thin comp set — fewer than 4 comparable sales within 18 months. Valuation confidence is reduced.', margin, y);
-  }
-}
-
-/**
- * renderListingPricingPdf — Full Listing Pricing Analysis template
- */
-function renderListingPricingPdf(doc, data, branding) {
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
   const primary = hexToRgb(branding.primary_color || '#1A3226');
   const accent = hexToRgb(branding.accent_color || '#B8982F');
   const margin = 40;
   const contentWidth = pageWidth - 2 * margin;
-
   const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : 'N/A';
   const fmtPct = (n) => n != null ? `${Number(n).toFixed(1)}%` : 'N/A';
 
-  // ── PAGE 1: COVER ──────────────────────────────────────────────────────
-  doc.setFillColor(primary.r, primary.g, primary.b);
-  doc.rect(0, 0, pageWidth, 110, 'F');
+  const mc = data.market_context || {};
+  const iv = data.tiered_comps?.implied_value_range || {};
+  const totalComps = (data.tiered_comps?.tiers || []).reduce((s, t) => s + (t.comps?.length || 0), 0);
 
-  doc.setTextColor(accent.r, accent.g, accent.b);
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.text('LISTING PRICING ANALYSIS', margin, 30);
+  // ── COVER ─────────────────────────────────────────────────────────────
+  drawCoverPage(doc, branding, 'Comparative Market Analysis', data.property_address, [
+    { label: 'Implied Value Range', value: iv.low && iv.high ? `${fmt(iv.low)} – ${fmt(iv.high)}` : 'See Report' },
+    { label: 'Comparable Sales', value: String(totalComps || 'N/A') },
+    { label: 'Confidence Level', value: data.confidence_level || 'Medium' },
+  ]);
 
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(22);
-  doc.setFont('helvetica', 'bold');
-  const addr = data.property_address || '';
-  doc.text(addr, margin, 55);
+  // ── SECTION DIVIDER: Market Context ──────────────────────────────────
+  doc.addPage();
+  drawSectionDivider(doc, branding, 1, 'Market Context', 'Current conditions · inventory · pricing trends');
 
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(200, 200, 200);
-  const meta = [data.property_type, data.location_class, data.analysis_date].filter(Boolean).join('  ·  ');
-  doc.text(meta, margin, 72);
+  // ── PAGE: MARKET STATS ────────────────────────────────────────────────
+  doc.addPage();
+  drawPageFrame(doc, branding, 'Section 01 · Market Context', 'Market Conditions Overview');
+  let y = 90;
 
-  if (branding.agent_name) {
+  if (mc.narrative) {
     doc.setFontSize(9);
-    doc.text(`Prepared by ${branding.agent_name}`, margin, 96);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(60, 60, 60);
+    const narLines = doc.splitTextToSize(mc.narrative, contentWidth);
+    doc.text(narLines.slice(0, 5), margin, y);
+    y += Math.min(narLines.length, 5) * 13 + 16;
   }
 
-  // KPI boxes
-  const v = data.valuation || {};
-  const kpis = [
-    { label: 'Recommended Range', value: `${fmt(v.recommended_range_low)} – ${fmt(v.recommended_range_high)}` },
-    { label: 'Strategic List Price', value: fmt(v.strategic_list_price) },
-    { label: 'Est. Days on Market', value: v.estimated_dom_low ? `${v.estimated_dom_low}–${v.estimated_dom_high} days` : 'N/A' },
-  ];
-  const kpiW = (contentWidth - 20) / 3;
-  kpis.forEach((kpi, i) => {
-    const kx = margin + i * (kpiW + 10);
-    const ky = 125;
-    doc.setFillColor(accent.r, accent.g, accent.b);
-    doc.rect(kx, ky, kpiW, 48, 'F');
-    doc.setTextColor(primary.r, primary.g, primary.b);
-    doc.setFontSize(7.5);
-    doc.setFont('helvetica', 'bold');
-    doc.text(kpi.label.toUpperCase(), kx + 7, ky + 12);
-    doc.setTextColor(50, 30, 10);
-    doc.setFontSize(11);
-    doc.text(kpi.value, kx + 7, ky + 30);
-  });
-
-  // ── PAGE 2: MARKET CONTEXT ─────────────────────────────────────────────
-  doc.addPage();
-  let y = margin;
-
-  const sectionHeader = (title) => {
-    doc.setFontSize(13);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(primary.r, primary.g, primary.b);
-    doc.text(title, margin, y);
-    y += 4;
-    doc.setDrawColor(accent.r, accent.g, accent.b);
-    doc.setLineWidth(1.5);
-    doc.line(margin, y, margin + 120, y);
-    y += 14;
-  };
-
-  sectionHeader('Market Context');
-
-  const mc = data.market_context || {};
-  const marketRows = [
-    ['Median Sale Price', fmt(mc.median_sale_price)],
-    ['YoY Appreciation', fmtPct(mc.yoy_appreciation)],
+  const stats = [
+    ['Median Sale Price', mc.median_sale_price ? fmt(mc.median_sale_price) : 'N/A'],
+    ['YoY Appreciation', mc.yoy_appreciation ? fmtPct(mc.yoy_appreciation) : 'N/A'],
     ['Avg Days on Market', mc.avg_days_on_market ? `${mc.avg_days_on_market} days` : 'N/A'],
     ['Sale-to-List Ratio', mc.sale_to_list_ratio ? fmtPct(mc.sale_to_list_ratio * 100) : 'N/A'],
     ['Months of Inventory', mc.months_inventory ? `${mc.months_inventory}` : 'N/A'],
     ['Market Characterization', mc.market_characterization || 'N/A'],
   ];
-  marketRows.forEach((row, i) => {
-    if (i % 2 === 0) { doc.setFillColor(247, 247, 247); doc.rect(margin, y - 8, contentWidth, 17, 'F'); }
-    doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(50, 50, 50);
-    doc.text(row[0], margin + 6, y + 1);
-    doc.text(row[1], margin + contentWidth - 6, y + 1, { align: 'right' });
-    y += 17;
-  });
 
-  // ── PAGE 3: TIERED COMPARABLES ────────────────────────────────────────
+  y = drawTable(doc, margin, y,
+    ['Market Indicator', 'Value'],
+    stats, [contentWidth - 130, 130],
+    { headerFill: branding.primary_color || '#1A3226', headerTextColor: '#FFFFFF', fontSize: 9, rowHeight: 26, branding });
+
+  // ── SECTION DIVIDER: Comparable Sales ────────────────────────────────
   doc.addPage();
-  y = margin;
-  sectionHeader('Comparable Sales Analysis');
+  drawSectionDivider(doc, branding, 2, 'Comparable Sales Analysis', 'Tiered comps · price-per-square-foot · implied value range');
+
+  // ── PAGE: TIERED COMPS ────────────────────────────────────────────────
+  doc.addPage();
+  drawPageFrame(doc, branding, 'Section 02 · Comparable Sales', 'Tiered Comparable Sales');
+  y = 90;
 
   if (data.tiered_comps?.tiers) {
     data.tiered_comps.tiers.forEach(tier => {
+      if (y + 60 > 725) { doc.addPage(); drawPageFrame(doc, branding, 'Section 02 · Comparable Sales', 'Tiered Comparable Sales (cont.)'); y = 90; }
+
+      // Tier banner
       const tColor = tier.tier_id === 'A' ? primary : tier.tier_id === 'B' ? accent : hexToRgb('#888888');
       doc.setFillColor(tColor.r, tColor.g, tColor.b);
-      doc.rect(margin, y, contentWidth, 18, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(9); doc.setFont('helvetica', 'bold');
+      doc.roundedRect(margin, y, contentWidth, 22, 3, 3, 'F');
+      doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
       const ppsf = tier.ppsf_range ? `  ·  $${tier.ppsf_range.low}–$${tier.ppsf_range.high}/SF` : '';
-      doc.text(`${tier.tier_label || 'Tier ' + tier.tier_id}${ppsf}`, margin + 6, y + 12);
-      y += 20;
+      doc.text(`${tier.tier_label || 'Tier ' + tier.tier_id}${ppsf}`, margin + 8, y + 15);
+      y += 26;
 
       if (tier.comps?.length) {
         const headers = ['Address', 'Date', 'Price', 'SF', '$/SF Raw', '$/SF Adj', 'Condition'];
-        const colWidths = [115, 48, 65, 42, 58, 58, 60];
+        const colWidths = [130, 52, 68, 42, 55, 55, 60];
         const rows = tier.comps.map(c => [
           c.address || '', c.sale_date || '',
           c.sale_price ? fmt(c.sale_price) : '',
@@ -803,235 +847,612 @@ function renderListingPricingPdf(doc, data, branding) {
           c.adjusted_ppsf ? `$${c.adjusted_ppsf}` : '',
           c.condition_vs_subject || '',
         ]);
-        y = drawTable(doc, margin, y, headers, rows, colWidths, {
-          headerFill: branding.primary_color || '#1A3226',
-          headerTextColor: '#FFFFFF',
-          fontSize: 7.5, rowHeight: 15,
-        });
-        y += 8;
+        y = drawTable(doc, margin, y, headers, rows, colWidths,
+          { headerFill: branding.primary_color || '#1A3226', headerTextColor: '#FFFFFF', fontSize: 7.5, rowHeight: 22, branding });
+        y += 10;
+      }
+    });
+  }
+
+  // Implied value range highlight
+  if (iv.low && iv.high) {
+    if (y + 32 > 725) { doc.addPage(); drawPageFrame(doc, branding, 'Section 02 · Comparable Sales', 'Comparable Sales (cont.)'); y = 90; }
+    doc.setFillColor(primary.r, primary.g, primary.b);
+    doc.roundedRect(margin, y, contentWidth, 32, 3, 3, 'F');
+    doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(accent.r, accent.g, accent.b);
+    doc.text(`Implied Value Range: ${fmt(iv.low)} – ${fmt(iv.high)}  ·  Midpoint: ${fmt(iv.midpoint)}`, margin + 10, y + 21);
+    y += 40;
+  }
+
+  if (data.tiered_comps?.thin_comp_flag) {
+    doc.setFontSize(8); doc.setTextColor(180, 50, 50);
+    doc.text('⚠ Thin comp set — valuation confidence is reduced.', margin, y);
+  }
+
+  // Agent footer on last page
+  addAgentFooter(doc, branding, pageWidth, doc.internal.pageSize.getHeight());
+}
+
+/**
+ * renderListingPricingPdf — Full Listing Pricing Analysis
+ */
+function renderListingPricingPdf(doc, data, branding) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const margin = 40;
+  const contentWidth = pageWidth - 2 * margin;
+  const primary = hexToRgb(branding.primary_color || '#1A3226');
+  const accent = hexToRgb(branding.accent_color || '#B8982F');
+  const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : 'N/A';
+  const fmtPct = (n) => n != null ? `${Number(n).toFixed(1)}%` : 'N/A';
+  const v = data.valuation || {};
+  const mc = data.market_context || {};
+
+  // ── COVER ─────────────────────────────────────────────────────────────
+  drawCoverPage(doc, branding, 'Listing Pricing Analysis', data.property_address, [
+    { label: 'Recommended Range', value: v.recommended_range_low ? `${fmt(v.recommended_range_low)} – ${fmt(v.recommended_range_high)}` : 'See Report' },
+    { label: 'Strategic List Price', value: fmt(v.strategic_list_price) },
+    { label: 'Est. Days on Market', value: v.estimated_dom_low ? `${v.estimated_dom_low}–${v.estimated_dom_high} days` : 'N/A' },
+  ]);
+
+  // ── SECTION 01: Executive Summary ────────────────────────────────────
+  doc.addPage();
+  drawSectionDivider(doc, branding, 1, 'Executive Summary', 'Market context · pricing rationale · key conclusions');
+
+  doc.addPage();
+  drawPageFrame(doc, branding, 'Section 01 · Executive Summary', 'Analysis Overview');
+  let y = 90;
+
+  if (data.executive_summary) {
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(50, 50, 50);
+    const sumLines = doc.splitTextToSize(data.executive_summary, contentWidth);
+    const visLines = sumLines.slice(0, 28);
+    doc.text(visLines, margin, y);
+    y += visLines.length * 13 + 16;
+  }
+
+  // Market stat grid
+  const statBoxes = [
+    { label: 'MEDIAN SALE PRICE', value: mc.median_sale_price ? fmt(mc.median_sale_price) : 'N/A' },
+    { label: 'YOY APPRECIATION', value: mc.yoy_appreciation ? fmtPct(mc.yoy_appreciation) : 'N/A' },
+    { label: 'AVG DAYS ON MARKET', value: mc.avg_days_on_market ? `${mc.avg_days_on_market}d` : 'N/A' },
+    { label: 'SALE-TO-LIST RATIO', value: mc.sale_to_list_ratio ? fmtPct(mc.sale_to_list_ratio * 100) : 'N/A' },
+  ];
+  const boxW = (contentWidth - 18) / 4;
+  if (y + 60 < 720) {
+    statBoxes.forEach((sb, i) => {
+      const bx = margin + i * (boxW + 6);
+      doc.setFillColor(primary.r, primary.g, primary.b);
+      doc.roundedRect(bx, y, boxW, 52, 3, 3, 'F');
+      doc.setFontSize(6.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(accent.r, accent.g, accent.b);
+      doc.text(sb.label, bx + boxW / 2, y + 14, { align: 'center', maxWidth: boxW - 8 });
+      doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
+      doc.text(sb.value, bx + boxW / 2, y + 36, { align: 'center', maxWidth: boxW - 8 });
+    });
+    y += 64;
+  }
+
+  // ── SECTION 02: Market Context ────────────────────────────────────────
+  doc.addPage();
+  drawSectionDivider(doc, branding, 2, 'Market Context', 'Current conditions · inventory dynamics · pricing environment');
+
+  doc.addPage();
+  drawPageFrame(doc, branding, 'Section 02 · Market Context', 'Market Conditions');
+  y = 90;
+
+  if (mc.narrative) {
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(50, 50, 50);
+    const narLines = doc.splitTextToSize(mc.narrative, contentWidth);
+    doc.text(narLines.slice(0, 6), margin, y);
+    y += Math.min(narLines.length, 6) * 13 + 14;
+  }
+
+  const mRows = [
+    ['Median Sale Price', fmt(mc.median_sale_price)],
+    ['YoY Appreciation', fmtPct(mc.yoy_appreciation)],
+    ['Avg Days on Market', mc.avg_days_on_market ? `${mc.avg_days_on_market} days` : 'N/A'],
+    ['Sale-to-List Ratio', mc.sale_to_list_ratio ? fmtPct(mc.sale_to_list_ratio * 100) : 'N/A'],
+    ['Months of Inventory', mc.months_inventory ? `${mc.months_inventory}` : 'N/A'],
+    ['Market Characterization', mc.market_characterization || 'N/A'],
+  ];
+  y = drawTable(doc, margin, y, ['Market Indicator', 'Value'], mRows, [contentWidth - 140, 140],
+    { headerFill: branding.primary_color || '#1A3226', headerTextColor: '#FFFFFF', fontSize: 9, rowHeight: 26, branding });
+
+  // Valuation narrative
+  if (v.narrative && y + 60 < 720) {
+    y += 20;
+    doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b);
+    doc.text('Valuation Summary', margin, y); y += 14;
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(50, 50, 50);
+    const vLines = doc.splitTextToSize(v.narrative, contentWidth);
+    doc.text(vLines.slice(0, 5), margin, y);
+  }
+
+  // ── SECTION 03: Comparable Sales ──────────────────────────────────────
+  doc.addPage();
+  drawSectionDivider(doc, branding, 3, 'Comparable Sales Analysis', 'Tiered comps · price-per-square-foot · implied value range');
+
+  doc.addPage();
+  drawPageFrame(doc, branding, 'Section 03 · Comparable Sales', 'Tiered Comparable Sales');
+  y = 90;
+
+  if (data.tiered_comps?.tiers) {
+    data.tiered_comps.tiers.forEach(tier => {
+      if (y + 60 > 720) { doc.addPage(); drawPageFrame(doc, branding, 'Section 03 · Comparable Sales', 'Tiered Comparable Sales (cont.)'); y = 90; }
+      const tColor = tier.tier_id === 'A' ? primary : tier.tier_id === 'B' ? accent : hexToRgb('#888888');
+      doc.setFillColor(tColor.r, tColor.g, tColor.b);
+      doc.roundedRect(margin, y, contentWidth, 22, 3, 3, 'F');
+      doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
+      const ppsf = tier.ppsf_range ? `  ·  $${tier.ppsf_range.low}–$${tier.ppsf_range.high}/SF` : '';
+      doc.text(`${tier.tier_label || 'Tier ' + tier.tier_id}${ppsf}`, margin + 8, y + 15);
+      y += 26;
+
+      if (tier.comps?.length) {
+        const headers = ['Address', 'Date', 'Price', 'SF', '$/SF Raw', '$/SF Adj', 'Condition'];
+        const colWidths = [130, 52, 68, 42, 52, 52, 56];
+        const rows = tier.comps.map(c => [
+          c.address || '', c.sale_date || '',
+          c.sale_price ? fmt(c.sale_price) : '',
+          c.square_feet ? c.square_feet.toLocaleString() : '',
+          c.raw_ppsf ? `$${c.raw_ppsf}` : '',
+          c.adjusted_ppsf ? `$${c.adjusted_ppsf}` : '',
+          c.condition_vs_subject || '',
+        ]);
+        y = drawTable(doc, margin, y, headers, rows, colWidths,
+          { headerFill: branding.primary_color || '#1A3226', headerTextColor: '#FFFFFF', fontSize: 7.5, rowHeight: 22, branding });
+        y += 10;
       }
     });
   }
 
   if (data.tiered_comps?.implied_value_range) {
     const ivr = data.tiered_comps.implied_value_range;
+    if (y + 36 > 720) { doc.addPage(); drawPageFrame(doc, branding, 'Section 03 · Comparable Sales', 'Implied Value Range'); y = 90; }
     doc.setFillColor(primary.r, primary.g, primary.b);
-    doc.rect(margin, y, contentWidth, 22, 'F');
-    doc.setTextColor(accent.r, accent.g, accent.b);
-    doc.setFontSize(10); doc.setFont('helvetica', 'bold');
-    doc.text(`Implied Value Range: ${fmt(ivr.low)} – ${fmt(ivr.high)}`, margin + 8, y + 15);
-    y += 30;
+    doc.roundedRect(margin, y, contentWidth, 32, 3, 3, 'F');
+    doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(accent.r, accent.g, accent.b);
+    doc.text(`Implied Value Range: ${fmt(ivr.low)} – ${fmt(ivr.high)}  ·  Midpoint: ${fmt(ivr.midpoint)}`, margin + 10, y + 21);
+    y += 40;
   }
 
-  // ── PAGE 4: VALUATION CONVERGENCE ────────────────────────────────────
-  doc.addPage();
-  y = margin;
-  sectionHeader('Valuation Convergence');
+  // ── SECTION 04: Pricing Scenarios ────────────────────────────────────
+  if (data.pricing_scenarios?.length) {
+    doc.addPage();
+    drawSectionDivider(doc, branding, 4, 'Pricing Scenarios', 'Strategic options · expected outcomes · agent recommendation');
 
-  const scenarioRows = (data.pricing_scenarios || []).map(s => [
-    s.label || '', fmt(s.price), s.expected_dom || '', s.rationale || ''
-  ]);
-  if (scenarioRows.length) {
-    y = drawTable(doc, margin, y, ['Scenario', 'Price', 'Est. DOM', 'Rationale'],
-      scenarioRows, [130, 70, 70, contentWidth - 270 - 6], {
-        headerFill: branding.primary_color || '#1A3226',
-        headerTextColor: '#FFFFFF',
-        fontSize: 8, rowHeight: 18,
-      });
-    y += 20;
+    doc.addPage();
+    drawPageFrame(doc, branding, 'Section 04 · Pricing Scenarios', 'Valuation & Pricing Scenarios');
+    y = 90;
+
+    const sRows = data.pricing_scenarios.map(s => [s.label || '', fmt(s.price), s.expected_dom || '', s.rationale || '']);
+    drawTable(doc, margin, y, ['Scenario', 'Price', 'Est. DOM', 'Rationale'],
+      sRows, [140, 72, 65, contentWidth - 285],
+      { headerFill: branding.primary_color || '#1A3226', headerTextColor: '#FFFFFF', fontSize: 8.5, rowHeight: 26, branding });
   }
 
-  // ── PAGE 5: AVM CONSUMER PERCEPTION ──────────────────────────────────
-  doc.addPage();
-  y = margin;
-  sectionHeader('AVM Consumer Perception Analysis');
-
+  // ── SECTION 05: AVM Consumer Perception ──────────────────────────────
   const avm = data.avm_analysis || {};
-  const platforms = avm.platforms || [];
+  doc.addPage();
+  drawSectionDivider(doc, branding, 5, 'Consumer AVM Perception', 'What the internet thinks your home is worth — and the full picture');
 
-  // AVM table
-  if (platforms.length) {
-    const avmRows = platforms.map(p => [
+  doc.addPage();
+  drawPageFrame(doc, branding, 'Section 05 · AVM Perception', 'Consumer AVM Perception Analysis');
+  y = 90;
+
+  // AVM subtitle
+  doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(accent.r, accent.g, accent.b);
+  doc.text('What the internet thinks your home is worth — and why the full picture is more nuanced', margin, y);
+  y += 18;
+
+  if (avm.platforms?.length) {
+    const avmRows = avm.platforms.map(p => [
       p.name || '',
       p.available ? fmt(p.estimate) : 'N/A',
-      p.available ? fmt(p.range_low) : '',
-      p.available ? fmt(p.range_high) : '',
-      p.trend || '',
+      p.available ? fmt(p.range_low) : '—',
+      p.available ? fmt(p.range_high) : '—',
+      p.trend || '—',
       p.date_retrieved || '',
     ]);
     y = drawTable(doc, margin, y,
-      ['Platform', 'Estimate', 'Range Low', 'Range High', 'Trend', 'Date Retrieved'],
-      avmRows, [85, 75, 75, 75, 55, 85], {
-        headerFill: branding.primary_color || '#1A3226',
-        headerTextColor: '#FFFFFF',
-        fontSize: 8, rowHeight: 17,
-      });
+      ['Platform', 'Estimate', 'Range Low', 'Range High', 'Trend', 'Retrieved'],
+      avmRows, [88, 75, 72, 72, 55, 90],
+      { headerFill: branding.primary_color || '#1A3226', headerTextColor: '#FFFFFF', fontSize: 8, rowHeight: 24, branding });
     y += 6;
   }
 
-  // Composite row
+  // Composite highlight row
   const comp = avm.composite || {};
-  if (comp.simple_average) {
+  if (comp.simple_average && y + 34 < 720) {
     doc.setFillColor(accent.r, accent.g, accent.b);
-    doc.rect(margin, y, contentWidth, 20, 'F');
-    doc.setTextColor(50, 30, 10);
-    doc.setFontSize(8.5); doc.setFont('helvetica', 'bold');
+    doc.roundedRect(margin, y, contentWidth, 28, 3, 3, 'F');
+    doc.setFontSize(8.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b);
     doc.text(
       `AVM Composite  ·  Avg: ${fmt(comp.simple_average)}  ·  Median: ${fmt(comp.median)}  ·  Spread: ${fmt(comp.spread)}`,
-      margin + 8, y + 13
-    );
-    y += 26;
-  }
-
-  // Gap callout bar
-  const ga = avm.gap_analysis || {};
-  if (ga.avm_composite && ga.professional_range_low) {
-    const dirLabel = ga.direction === 'overvalue' ? 'OVERVALUE' : ga.direction === 'undervalue' ? 'UNDERVALUE' : 'ALIGN';
-    const gapAbs = Math.abs(ga.gap_dollars || 0);
-    doc.setFillColor(primary.r, primary.g, primary.b);
-    doc.rect(margin, y, contentWidth, 28, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(9); doc.setFont('helvetica', 'bold');
-    doc.text(
-      `AVM Composite: ${fmt(ga.avm_composite)}  →  Professional Range: ${fmt(ga.professional_range_low)} – ${fmt(ga.professional_range_high)}`,
-      margin + 8, y + 11
-    );
-    doc.setFontSize(8.5); doc.setFont('helvetica', 'normal');
-    doc.setTextColor(accent.r, accent.g, accent.b);
-    doc.text(
-      `AVMs ${dirLabel} by approximately ${fmt(gapAbs)} (${fmtPct(Math.abs(ga.gap_pct || 0))})`,
-      margin + 8, y + 22
+      margin + 10, y + 18
     );
     y += 36;
   }
 
-  // Two-column box: blind spots + our position
-  const col1W = contentWidth * 0.60;
-  const col2W = contentWidth * 0.37;
-  const col2X = margin + col1W + contentWidth * 0.03;
-  const boxY = y;
-  const boxH = 130;
+  // Gap analysis bar
+  const ga = avm.gap_analysis || {};
+  if (ga.avm_composite && y + 44 < 720) {
+    const dirLabel = ga.direction === 'overvalue' ? 'AVMs OVERVALUE' : ga.direction === 'undervalue' ? 'AVMs UNDERVALUE' : 'AVMs ALIGNED';
+    doc.setFillColor(primary.r, primary.g, primary.b);
+    doc.roundedRect(margin, y, contentWidth, 40, 3, 3, 'F');
+    doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
+    doc.text(
+      `AVM Composite: ${fmt(ga.avm_composite)}  →  Professional Range: ${fmt(ga.professional_range_low)} – ${fmt(ga.professional_range_high)}`,
+      margin + 10, y + 14
+    );
+    doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(accent.r, accent.g, accent.b);
+    doc.text(
+      `${dirLabel} by approximately ${fmt(Math.abs(ga.gap_dollars || 0))} (${fmtPct(Math.abs(ga.gap_pct || 0))})`,
+      margin + 10, y + 30
+    );
+    y += 50;
+  }
 
-  // Left: Why AVMs Miss
-  doc.setFillColor(247, 247, 247);
-  doc.rect(margin, boxY, col1W, boxH, 'F');
-  doc.setFontSize(8.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b);
-  doc.text('Why AVMs Miss This Property', margin + 8, boxY + 14);
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(50, 50, 50);
-  let bly = boxY + 26;
-  (avm.blind_spots || []).forEach(spot => {
-    if (bly < boxY + boxH - 10) {
-      doc.setFillColor(accent.r, accent.g, accent.b);
-      doc.circle(margin + 12, bly - 2, 2, 'F');
-      const wrapped = doc.splitTextToSize(spot, col1W - 28);
-      doc.setTextColor(50, 50, 50);
-      doc.text(wrapped[0], margin + 18, bly);
-      bly += 14;
-    }
-  });
+  // Two-column: blind spots + agent strategy
+  if (y + 120 < 720) {
+    const col1W = contentWidth * 0.58;
+    const col2W = contentWidth * 0.37;
+    const col2X = margin + col1W + contentWidth * 0.05;
+    const boxH = Math.min(120, 720 - y - 10);
 
-  // Right: Our Position
-  doc.setFillColor(primary.r, primary.g, primary.b);
-  doc.rect(col2X, boxY, col2W, boxH, 'F');
-  doc.setFontSize(8.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(accent.r, accent.g, accent.b);
-  doc.text('Our Position', col2X + 8, boxY + 14);
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(220, 220, 220);
-  const stratText = avm.agent_response_strategy || '';
-  const stratWrapped = doc.splitTextToSize(stratText, col2W - 16);
-  doc.text(stratWrapped.slice(0, 9), col2X + 8, boxY + 27);
+    doc.setFillColor(247, 247, 244);
+    doc.roundedRect(margin, y, col1W, boxH, 3, 3, 'F');
+    doc.setDrawColor(primary.r, primary.g, primary.b);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(margin, y, col1W, boxH, 3, 3, 'S');
 
-  y = boxY + boxH + 20;
+    doc.setFontSize(8.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b);
+    doc.text('Why AVMs Miss This Property', margin + 10, y + 16);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(50, 50, 50);
+    let bly = y + 30;
+    (avm.blind_spots || []).forEach(spot => {
+      if (bly < y + boxH - 12) {
+        doc.setFillColor(accent.r, accent.g, accent.b);
+        doc.circle(margin + 14, bly - 2, 2, 'F');
+        const wrapped = doc.splitTextToSize(spot, col1W - 30);
+        doc.setTextColor(50, 50, 50);
+        doc.text(wrapped[0], margin + 20, bly);
+        bly += 15;
+      }
+    });
 
-  // ── PAGE 6: BUYER ARCHETYPES ──────────────────────────────────────────
+    doc.setFillColor(primary.r, primary.g, primary.b);
+    doc.roundedRect(col2X, y, col2W, boxH, 3, 3, 'F');
+    doc.setFontSize(8.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(accent.r, accent.g, accent.b);
+    doc.text('Our Position', col2X + 10, y + 16);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(220, 220, 220);
+    const stratWrapped = doc.splitTextToSize(avm.agent_response_strategy || '', col2W - 20);
+    doc.text(stratWrapped.slice(0, 8), col2X + 10, y + 30);
+    y += boxH + 16;
+  }
+
+  // ── SECTION 06: Buyer Archetypes ──────────────────────────────────────
   const archetypes = data.buyer_archetypes || [];
   if (archetypes.length) {
     doc.addPage();
-    y = margin;
-    sectionHeader('Buyer Archetypes');
+    drawSectionDivider(doc, branding, 6, 'Buyer Archetypes', 'Who will buy this home · language calibration · pool composition');
+
+    doc.addPage();
+    drawPageFrame(doc, branding, 'Section 06 · Buyer Archetypes', 'Buyer Archetype Profiles');
+    y = 90;
 
     archetypes.forEach((arch, idx) => {
-      if (y + 70 > pageHeight - 80) { doc.addPage(); y = margin; }
-      doc.setFillColor(idx % 2 === 0 ? 244 : 252, idx % 2 === 0 ? 244 : 252, idx % 2 === 0 ? 244 : 252);
-      doc.rect(margin, y, contentWidth, 62, 'F');
+      const cardH = 68;
+      if (y + cardH > 720) { doc.addPage(); drawPageFrame(doc, branding, 'Section 06 · Buyer Archetypes', 'Buyer Archetype Profiles (cont.)'); y = 90; }
+
+      doc.setFillColor(idx % 2 === 0 ? 247 : 252, idx % 2 === 0 ? 247 : 252, idx % 2 === 0 ? 244 : 252);
+      doc.roundedRect(margin, y, contentWidth, cardH, 3, 3, 'F');
       doc.setFillColor(primary.r, primary.g, primary.b);
-      doc.rect(margin, y, 4, 62, 'F');
+      doc.roundedRect(margin, y, 4, cardH, 2, 2, 'F');
 
       doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b);
-      doc.text(`${arch.archetype_name || ''}  (${arch.estimated_pool_pct || 0}% of buyer pool)`, margin + 10, y + 12);
+      doc.text(`${arch.archetype_name || ''}`, margin + 12, y + 14);
+      doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(accent.r, accent.g, accent.b);
+      doc.text(`${arch.estimated_pool_pct || 0}% of buyer pool`, margin + 12, y + 26);
 
       doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60);
-      const profileLines = doc.splitTextToSize(arch.profile || '', contentWidth - 20);
-      doc.text(profileLines.slice(0, 2), margin + 10, y + 23);
+      const profileLines = doc.splitTextToSize(arch.profile || '', contentWidth - 22);
+      doc.text(profileLines.slice(0, 2), margin + 12, y + 38);
 
       if (arch.language_use?.length) {
-        doc.setFontSize(7.5); doc.setFont('helvetica', 'bold');
-        doc.setTextColor(accent.r, accent.g, accent.b);
-        doc.text('USE: ', margin + 10, y + 42);
+        doc.setFontSize(7.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(accent.r, accent.g, accent.b);
+        doc.text('USE: ', margin + 12, y + 56);
         doc.setFont('helvetica', 'normal'); doc.setTextColor(50, 50, 50);
-        doc.text(arch.language_use.slice(0, 3).join('  ·  '), margin + 28, y + 42);
+        doc.text(arch.language_use.slice(0, 3).join('  ·  '), margin + 30, y + 56);
       }
       if (arch.language_avoid?.length) {
-        doc.setFontSize(7.5); doc.setFont('helvetica', 'bold');
-        doc.setTextColor(200, 50, 50);
-        doc.text('AVOID: ', margin + 10, y + 54);
+        doc.setFontSize(7.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(180, 50, 50);
+        doc.text('AVOID: ', margin + contentWidth / 2, y + 56);
         doc.setFont('helvetica', 'normal'); doc.setTextColor(50, 50, 50);
-        doc.text(arch.language_avoid.slice(0, 3).join('  ·  '), margin + 34, y + 54);
+        doc.text(arch.language_avoid.slice(0, 2).join('  ·  '), margin + contentWidth / 2 + 32, y + 56);
       }
-      y += 68;
+      y += cardH + 6;
     });
   }
 
-  // ── PAGE 7: MIGRATION & EMPLOYER MAP ─────────────────────────────────
+  // ── SECTION 07: Migration & Employer Targeting ────────────────────────
   const mig = data.migration_analysis || {};
   if (mig.feeder_markets?.length || mig.employer_targets?.length) {
     doc.addPage();
-    y = margin;
-    sectionHeader('Migration & Employer Targeting');
+    drawSectionDivider(doc, branding, 7, 'Migration & Employer Targeting', 'Feeder markets · relocation drivers · corporate demand');
+
+    doc.addPage();
+    drawPageFrame(doc, branding, 'Section 07 · Migration', 'Migration & Employer Targeting');
+    y = 90;
 
     if (mig.feeder_markets?.length) {
+      doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b);
+      doc.text('Top Feeder Markets', margin, y); y += 14;
       y = drawTable(doc, margin, y,
-        ['Feeder Market', 'Score', 'Motivation', 'Price Psychology'],
+        ['Feeder Market', 'Score', 'Primary Motivation', 'Price Psychology'],
         mig.feeder_markets.map(m => [m.market || '', String(m.migration_score || ''), m.primary_motivation || '', m.price_psychology || '']),
-        [150, 40, 160, 150], {
-          headerFill: branding.primary_color || '#1A3226',
-          headerTextColor: '#FFFFFF',
-          fontSize: 8, rowHeight: 16,
-        });
-      y += 16;
+        [145, 42, 170, 175],
+        { headerFill: branding.primary_color || '#1A3226', headerTextColor: '#FFFFFF', fontSize: 8, rowHeight: 22, branding });
+      y += 20;
     }
 
     if (mig.employer_targets?.length) {
-      doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b);
-      doc.text('Employer Targeting Matrix', margin, y); y += 12;
+      if (y + 60 > 720) { doc.addPage(); drawPageFrame(doc, branding, 'Section 07 · Migration', 'Employer Targeting Matrix'); y = 90; }
+      doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b);
+      doc.text('Employer Targeting Matrix', margin, y); y += 14;
       y = drawTable(doc, margin, y,
         ['Company', 'Relevance', 'Target Roles', 'Commute'],
         mig.employer_targets.map(e => [e.company || '', e.relevance || '', e.target_roles || '', e.commute_time || '']),
-        [150, 60, 180, 100], {
-          headerFill: branding.primary_color || '#1A3226',
-          headerTextColor: '#FFFFFF',
-          fontSize: 7.5, rowHeight: 15,
-        });
+        [150, 60, 190, 100],
+        { headerFill: branding.primary_color || '#1A3226', headerTextColor: '#FFFFFF', fontSize: 7.5, rowHeight: 22, branding });
     }
   }
 
-  // Agent footer on last page
-  addAgentFooter(doc, branding, pageWidth, pageHeight);
+  addAgentFooter(doc, branding, pageWidth, doc.internal.pageSize.getHeight());
 }
 
 function renderBuyerIntelligencePdf(doc, data, branding) {
-  // TODO: Build buyer_intelligence template
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const margin = 40;
+  const contentWidth = pageWidth - 2 * margin;
+  const primary = hexToRgb(branding.primary_color || '#1A3226');
+  const accent = hexToRgb(branding.accent_color || '#B8982F');
+  const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : 'N/A';
+
+  drawCoverPage(doc, branding, 'Buyer Intelligence Report', data.property_address, [
+    { label: 'Buyer Archetypes', value: String((data.buyer_archetypes || []).length) },
+    { label: 'Feeder Markets', value: String((data.migration_analysis?.feeder_markets || []).length) },
+    { label: 'Employer Targets', value: String((data.migration_analysis?.employer_targets || []).length) },
+  ]);
+
+  // Summary
+  doc.addPage();
+  drawPageFrame(doc, branding, 'Section 01 · Summary', 'Buyer Intelligence Overview');
+  let y = 90;
+  if (data.executive_summary) {
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(50, 50, 50);
+    const lines = doc.splitTextToSize(data.executive_summary, contentWidth);
+    doc.text(lines.slice(0, 20), margin, y);
+  }
+
+  // Archetypes
+  const archetypes = data.buyer_archetypes || [];
+  if (archetypes.length) {
+    doc.addPage();
+    drawSectionDivider(doc, branding, 2, 'Buyer Archetype Profiles', 'Who will buy this home · language calibration · pool composition');
+    doc.addPage();
+    drawPageFrame(doc, branding, 'Section 02 · Buyer Archetypes', 'Buyer Archetype Profiles');
+    y = 90;
+    archetypes.forEach((arch, idx) => {
+      const cardH = 68;
+      if (y + cardH > 720) { doc.addPage(); drawPageFrame(doc, branding, 'Section 02 · Buyer Archetypes', 'Buyer Archetype Profiles (cont.)'); y = 90; }
+      doc.setFillColor(idx % 2 === 0 ? 247 : 252, idx % 2 === 0 ? 247 : 252, 244);
+      doc.roundedRect(margin, y, contentWidth, cardH, 3, 3, 'F');
+      doc.setFillColor(primary.r, primary.g, primary.b);
+      doc.roundedRect(margin, y, 4, cardH, 2, 2, 'F');
+      doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b);
+      doc.text(`${arch.archetype_name || ''}  (${arch.estimated_pool_pct || 0}%)`, margin + 12, y + 14);
+      doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60);
+      const pLines = doc.splitTextToSize(arch.profile || '', contentWidth - 22);
+      doc.text(pLines.slice(0, 2), margin + 12, y + 28);
+      if (arch.language_use?.length) {
+        doc.setFontSize(7.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(accent.r, accent.g, accent.b);
+        doc.text('USE: ', margin + 12, y + 56);
+        doc.setFont('helvetica', 'normal'); doc.setTextColor(50, 50, 50);
+        doc.text(arch.language_use.slice(0, 3).join('  ·  '), margin + 30, y + 56);
+      }
+      y += cardH + 6;
+    });
+  }
+
+  // Migration
+  const mig = data.migration_analysis || {};
+  if (mig.feeder_markets?.length) {
+    doc.addPage();
+    drawPageFrame(doc, branding, 'Section 03 · Migration', 'Migration & Employer Targeting');
+    y = 90;
+    y = drawTable(doc, margin, y,
+      ['Feeder Market', 'Score', 'Primary Motivation', 'Price Psychology'],
+      mig.feeder_markets.map(m => [m.market || '', String(m.migration_score || ''), m.primary_motivation || '', m.price_psychology || '']),
+      [145, 42, 180, 165], { headerFill: branding.primary_color || '#1A3226', headerTextColor: '#FFFFFF', fontSize: 8, rowHeight: 22, branding });
+  }
+
+  addAgentFooter(doc, branding, pageWidth, doc.internal.pageSize.getHeight());
 }
 
 function renderClientPortfolioPdf(doc, data, branding) {
-  // TODO: Build client_portfolio template
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const margin = 40;
+  const contentWidth = pageWidth - 2 * margin;
+  const primary = hexToRgb(branding.primary_color || '#1A3226');
+  const accent = hexToRgb(branding.accent_color || '#B8982F');
+  const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : 'N/A';
+
+  const iv = data.tiered_comps?.implied_value_range || {};
+  drawCoverPage(doc, branding, 'Client Portfolio Review', data.property_address, [
+    { label: 'Est. Current Value', value: iv.midpoint ? fmt(iv.midpoint) : 'See Report' },
+    { label: 'Value Range', value: iv.low && iv.high ? `${fmt(iv.low)} – ${fmt(iv.high)}` : 'See Report' },
+    { label: 'Portfolio Options', value: String((data.portfolio_options || []).length || 'N/A') },
+  ]);
+
+  doc.addPage();
+  drawPageFrame(doc, branding, 'Section 01 · Overview', 'Portfolio Analysis Overview');
+  let y = 90;
+  if (data.executive_summary) {
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(50, 50, 50);
+    const lines = doc.splitTextToSize(data.executive_summary, contentWidth);
+    doc.text(lines.slice(0, 20), margin, y);
+    y += Math.min(lines.length, 20) * 13 + 16;
+  }
+
+  if (data.tiered_comps?.tiers) {
+    doc.addPage();
+    drawSectionDivider(doc, branding, 2, 'Comparable Sales Analysis', 'Market value context · pricing benchmarks');
+    doc.addPage();
+    drawPageFrame(doc, branding, 'Section 02 · Comparable Sales', 'Comparable Sales');
+    y = 90;
+    data.tiered_comps.tiers.forEach(tier => {
+      if (y + 60 > 720) { doc.addPage(); drawPageFrame(doc, branding, 'Section 02 · Comparable Sales', 'Comparable Sales (cont.)'); y = 90; }
+      const tColor = tier.tier_id === 'A' ? primary : tier.tier_id === 'B' ? accent : hexToRgb('#888888');
+      doc.setFillColor(tColor.r, tColor.g, tColor.b);
+      doc.roundedRect(margin, y, contentWidth, 22, 3, 3, 'F');
+      doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
+      doc.text(tier.tier_label || 'Tier ' + tier.tier_id, margin + 8, y + 15);
+      y += 26;
+      if (tier.comps?.length) {
+        const rows = tier.comps.map(c => [c.address || '', c.sale_date || '', c.sale_price ? fmt(c.sale_price) : '', c.adjusted_ppsf ? `$${c.adjusted_ppsf}` : '']);
+        y = drawTable(doc, margin, y, ['Address', 'Date', 'Price', 'Adj $/SF'], rows, [200, 70, 80, 82],
+          { headerFill: branding.primary_color || '#1A3226', headerTextColor: '#FFFFFF', fontSize: 8, rowHeight: 22, branding });
+        y += 8;
+      }
+    });
+  }
+
+  if (data.portfolio_options?.length) {
+    doc.addPage();
+    drawSectionDivider(doc, branding, 3, 'Portfolio Options', 'Strategic paths forward · financial implications');
+    doc.addPage();
+    drawPageFrame(doc, branding, 'Section 03 · Portfolio Options', 'Strategic Portfolio Options');
+    y = 90;
+    data.portfolio_options.forEach((opt, idx) => {
+      if (y + 80 > 720) { doc.addPage(); drawPageFrame(doc, branding, 'Section 03 · Portfolio Options', 'Portfolio Options (cont.)'); y = 90; }
+      doc.setFillColor(idx % 2 === 0 ? 247 : 252, idx % 2 === 0 ? 247 : 252, 244);
+      doc.roundedRect(margin, y, contentWidth, 75, 3, 3, 'F');
+      doc.setFillColor(accent.r, accent.g, accent.b);
+      doc.roundedRect(margin, y, 4, 75, 2, 2, 'F');
+      doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b);
+      doc.text(opt.label || opt.title || `Option ${idx + 1}`, margin + 12, y + 16);
+      doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(50, 50, 50);
+      const descLines = doc.splitTextToSize(opt.description || opt.narrative || '', contentWidth - 22);
+      doc.text(descLines.slice(0, 3), margin + 12, y + 30);
+      if (opt.estimated_net_proceeds) {
+        doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(accent.r, accent.g, accent.b);
+        doc.text(`Est. Net Proceeds: ${fmt(opt.estimated_net_proceeds)}`, margin + 12, y + 62);
+      }
+      y += 82;
+    });
+  }
+
+  addAgentFooter(doc, branding, pageWidth, doc.internal.pageSize.getHeight());
 }
 
 function renderInvestmentPdf(doc, data, branding) {
-  // TODO: Build investment_analysis template
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const margin = 40;
+  const contentWidth = pageWidth - 2 * margin;
+  const primary = hexToRgb(branding.primary_color || '#1A3226');
+  const accent = hexToRgb(branding.accent_color || '#B8982F');
+  const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : 'N/A';
+  const fmtPct = (n) => n != null ? `${Number(n).toFixed(1)}%` : 'N/A';
+
+  const v = data.valuation || {};
+  drawCoverPage(doc, branding, 'Investment Analysis', data.property_address, [
+    { label: 'Value Range', value: v.recommended_range_low ? `${fmt(v.recommended_range_low)} – ${fmt(v.recommended_range_high)}` : 'See Report' },
+    { label: 'Confidence Level', value: v.confidence_level || 'Medium' },
+    { label: 'Est. DOM', value: v.estimated_dom_low ? `${v.estimated_dom_low}–${v.estimated_dom_high}d` : 'N/A' },
+  ]);
+
+  doc.addPage();
+  drawPageFrame(doc, branding, 'Section 01 · Overview', 'Investment Analysis Overview');
+  let y = 90;
+
+  if (data.executive_summary) {
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(50, 50, 50);
+    const lines = doc.splitTextToSize(data.executive_summary, contentWidth);
+    doc.text(lines.slice(0, 20), margin, y);
+    y += Math.min(lines.length, 20) * 13 + 16;
+  }
+
+  const mc = data.market_context || {};
+  if (y + 60 < 720) {
+    const mRows = [
+      ['Median Sale Price', fmt(mc.median_sale_price)],
+      ['YoY Appreciation', fmtPct(mc.yoy_appreciation)],
+      ['Avg Days on Market', mc.avg_days_on_market ? `${mc.avg_days_on_market} days` : 'N/A'],
+      ['Months of Inventory', mc.months_inventory ? `${mc.months_inventory}` : 'N/A'],
+    ];
+    y = drawTable(doc, margin, y, ['Indicator', 'Value'], mRows, [contentWidth - 130, 130],
+      { headerFill: branding.primary_color || '#1A3226', headerTextColor: '#FFFFFF', fontSize: 9, rowHeight: 26, branding });
+  }
+
+  if (data.tiered_comps?.tiers) {
+    doc.addPage();
+    drawPageFrame(doc, branding, 'Section 02 · Comparable Sales', 'Comparable Sales Analysis');
+    y = 90;
+    data.tiered_comps.tiers.forEach(tier => {
+      if (y + 60 > 720) { doc.addPage(); drawPageFrame(doc, branding, 'Section 02 · Comparable Sales', 'Comparable Sales (cont.)'); y = 90; }
+      const tColor = tier.tier_id === 'A' ? primary : tier.tier_id === 'B' ? accent : hexToRgb('#888888');
+      doc.setFillColor(tColor.r, tColor.g, tColor.b);
+      doc.roundedRect(margin, y, contentWidth, 22, 3, 3, 'F');
+      doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
+      doc.text(tier.tier_label || 'Tier ' + tier.tier_id, margin + 8, y + 15);
+      y += 26;
+      if (tier.comps?.length) {
+        const rows = tier.comps.map(c => [c.address || '', c.sale_date || '', c.sale_price ? fmt(c.sale_price) : '', c.adjusted_ppsf ? `$${c.adjusted_ppsf}` : '', c.condition_vs_subject || '']);
+        y = drawTable(doc, margin, y, ['Address', 'Date', 'Price', 'Adj $/SF', 'Condition'], rows, [155, 55, 75, 65, 82],
+          { headerFill: branding.primary_color || '#1A3226', headerTextColor: '#FFFFFF', fontSize: 7.5, rowHeight: 22, branding });
+        y += 10;
+      }
+    });
+  }
+
+  addAgentFooter(doc, branding, pageWidth, doc.internal.pageSize.getHeight());
 }
 
 function renderRentalMarketPdf(doc, data, branding) {
-  // TODO: Build rental_analysis template
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const margin = 40;
+  const contentWidth = pageWidth - 2 * margin;
+  const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : 'N/A';
+
+  drawCoverPage(doc, branding, 'Rental Market Analysis', data.property_address, [
+    { label: 'Analysis Date', value: data.analysis_date || new Date().getFullYear().toString() },
+    { label: 'Property Type', value: data.property_type || 'N/A' },
+    { label: 'Location', value: data.location_class || 'N/A' },
+  ]);
+
+  doc.addPage();
+  drawPageFrame(doc, branding, 'Section 01 · Overview', 'Rental Market Analysis');
+  let y = 90;
+
+  if (data.executive_summary) {
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(50, 50, 50);
+    const lines = doc.splitTextToSize(data.executive_summary, contentWidth);
+    doc.text(lines.slice(0, 30), margin, y);
+    y += Math.min(lines.length, 30) * 13 + 16;
+  }
+
+  if (data.market_context?.narrative && y + 40 < 720) {
+    doc.setFontSize(10); doc.setFont('helvetica', 'bold');
+    const primary = hexToRgb(branding.primary_color || '#1A3226');
+    doc.setTextColor(primary.r, primary.g, primary.b);
+    doc.text('Market Context', margin, y); y += 14;
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(50, 50, 50);
+    const mcLines = doc.splitTextToSize(data.market_context.narrative, contentWidth);
+    doc.text(mcLines.slice(0, 8), margin, y);
+  }
+
+  addAgentFooter(doc, branding, pageWidth, doc.internal.pageSize.getHeight());
 }
 
 // ─── Helper: Email HTML Builder ────────────────────────────────────────────
