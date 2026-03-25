@@ -48,6 +48,23 @@ function getRequiredSections(assessmentType, analysis) {
   return sections;
 }
 
+// Extract structured JSON from AI response and separate from narrative text
+function extractJsonOutput(text) {
+  const START = '---BEGIN_JSON_OUTPUT---';
+  const END = '---END_JSON_OUTPUT---';
+  const startIdx = text.indexOf(START);
+  const endIdx = text.indexOf(END);
+  if (startIdx === -1 || endIdx === -1) return { cleanText: text, outputJson: null };
+  const jsonStr = text.slice(startIdx + START.length, endIdx).trim();
+  const cleanText = (text.slice(0, startIdx) + text.slice(endIdx + END.length)).trim();
+  try {
+    return { cleanText, outputJson: JSON.parse(jsonStr) };
+  } catch (e) {
+    console.warn('[extractJsonOutput] JSON parse failed:', e.message, '| snippet:', jsonStr.slice(0, 200));
+    return { cleanText: text, outputJson: null };
+  }
+}
+
 // Expanded analysis instructions (inlined to avoid import path issues in Deno)
 function getExpandedSystemPrompt(todayString, requiredSections) {
   const ANALYSIS_SYSTEM_PROMPT = `
@@ -181,38 +198,22 @@ Property descriptions: Target features and amenities only (SF, finishes, outdoor
 Focus on lifestyle fit without implying buyer demographic.
 Never steer toward/away from protected classes.
 `;
-  
-  // Filter prompt instructions based on required sections
+
   let filtered = ANALYSIS_SYSTEM_PROMPT;
-  
-  // Remove sections not in requiredSections
-  if (!requiredSections.has('migration_analysis')) {
-    filtered = filtered.replace(
-      /^FOR MIGRATION ANALYSIS.*?(?=^FOR |^────|\Z)/ms,
-      ''
-    );
+  if (!requiredSections || !requiredSections.has('migration_analysis')) {
+    filtered = filtered.replace(/FOR MIGRATION ANALYSIS \(Listing Pricing.*?(?=FOR ARCHETYPE|FOR TIERED|FOR CLIENT|FAIR HOUSING)/s, '');
   }
-  if (!requiredSections.has('buyer_archetype')) {
-    filtered = filtered.replace(
-      /^FOR ARCHETYPE GENERATION.*?(?=^FOR |^────|\Z)/ms,
-      ''
-    );
+  if (!requiredSections || !requiredSections.has('buyer_archetype')) {
+    filtered = filtered.replace(/FOR ARCHETYPE GENERATION \(All.*?(?=FOR TIERED|FOR CLIENT|FAIR HOUSING)/s, '');
   }
-  if (!requiredSections.has('portfolio_options')) {
-    filtered = filtered.replace(
-      /^FOR CLIENT PORTFOLIO ANALYSIS ONLY.*?(?=^FOR |^────|\Z)/ms,
-      ''
-    );
+  if (!requiredSections || !requiredSections.has('portfolio_options')) {
+    filtered = filtered.replace(/FOR CLIENT PORTFOLIO ANALYSIS ONLY.*?(?=FAIR HOUSING)/s, '');
   }
-  if (!requiredSections.has('tiered_comps')) {
-    filtered = filtered.replace(
-      /^FOR TIERED COMP ANALYSIS.*?(?=^FOR |^────|\Z)/ms,
-      ''
-    );
+  if (!requiredSections || !requiredSections.has('tiered_comps')) {
+    filtered = filtered.replace(/FOR TIERED COMP ANALYSIS \(Listing Pricing.*?(?=FOR CLIENT|FAIR HOUSING)/s, '');
   }
-  
-  return filtered;
-  return `You are PropPrompt™, an elite real estate AI analyst serving New England brokerages. Today's date is ${todayString}. All market analysis, pricing, and trends should reflect current conditions as of this date. Provide thorough, data-driven analysis with professional narrative quality. Use markdown formatting.
+
+  return `You are PropPrompt™, an elite real estate AI analyst serving New England brokerages. Today's date is ${todayString}. All market analysis, pricing, and trends reflect current conditions as of this date. Write your full narrative analysis in markdown. After completing all narrative sections, append the structured JSON block exactly as specified in the JSON OUTPUT section above.
 
 ${filtered}`;
 }
@@ -235,7 +236,7 @@ async function callClaudeOnce(apiKey, prompt, keySource, requiredSections) {
     },
     body: JSON.stringify({
       model,
-      max_tokens: 4096,
+      max_tokens: 8000,
       messages: [{ role: "user", content: prompt }],
       system: systemPrompt,
     }),
@@ -537,13 +538,19 @@ Deno.serve(async (req) => {
       result = await callClaude(apiKey, prompt, keySource);
     }
 
+    // Extract structured JSON from AI response
+    const { cleanText, outputJson } = extractJsonOutput(result.text);
+    console.log('[generateAnalysis] output_json populated:', !!outputJson);
+
     // Persist output
-    await base44.asServiceRole.entities.Analysis.update(analysisId, {
+    const saveData = {
       status: "complete",
-      output_text: result.text,
+      output_text: cleanText,
       completed_at: new Date().toISOString(),
       ai_model: result.model,
-    });
+    };
+    if (outputJson) saveData.output_json = outputJson;
+    await base44.asServiceRole.entities.Analysis.update(analysisId, saveData);
 
     // Deduct quota (best-effort)
     try {
@@ -552,7 +559,7 @@ Deno.serve(async (req) => {
       console.warn("[generateAnalysis] quota deduction failed:", e.message);
     }
 
-    return Response.json({ output: result.text, model: result.model, keySource });
+    return Response.json({ output: cleanText, outputJson: !!outputJson, model: result.model, keySource });
 
   } catch (error) {
     console.error("[generateAnalysis] error:", error);
