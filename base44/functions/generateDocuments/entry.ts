@@ -149,17 +149,17 @@ async function generatePdf(base44, analysis, branding) {
   // Dispatch to assessment-type-specific renderer
   if (analysis.output_json) {
     if (analysis.assessment_type === 'cma') {
-      renderCMAPdf(doc, analysis.output_json, branding);
+      await renderCMAPdf(doc, analysis.output_json, branding);
     } else if (analysis.assessment_type === 'listing_pricing') {
-      renderListingPricingPdf(doc, analysis.output_json, branding);
+      await renderListingPricingPdf(doc, analysis.output_json, branding);
     } else if (analysis.assessment_type === 'buyer_intelligence') {
-      renderBuyerIntelligencePdf(doc, analysis.output_json, branding);
+      await renderBuyerIntelligencePdf(doc, analysis.output_json, branding);
     } else if (analysis.assessment_type === 'client_portfolio') {
-      renderClientPortfolioPdf(doc, analysis.output_json, branding);
+      await renderClientPortfolioPdf(doc, analysis.output_json, branding);
     } else if (analysis.assessment_type === 'investment_analysis') {
-      renderInvestmentPdf(doc, analysis.output_json, branding);
+      await renderInvestmentPdf(doc, analysis.output_json, branding);
     } else if (analysis.assessment_type === 'rental_analysis') {
-      renderRentalMarketPdf(doc, analysis.output_json, branding);
+      await renderRentalMarketPdf(doc, analysis.output_json, branding);
     } else {
       renderFallbackTextPdf(doc, analysis, branding);
     }
@@ -423,7 +423,7 @@ function escapeHtml(str) {
  * drawPageFrame — draws the top accent bar, bottom accent bar, and footer bar
  * on every content page. Call at the start of each new page.
  */
-function drawPageFrame(doc, branding, breadcrumb, pageTitle) {
+async function drawPageFrame(doc, branding, breadcrumb, pageTitle) {
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const primary = hexToRgb(branding.primary_color || '#1A3226');
@@ -453,14 +453,33 @@ function drawPageFrame(doc, branding, breadcrumb, pageTitle) {
   doc.setTextColor(255, 255, 255);
   doc.text(footerParts.join(' · '), 40, 758);
 
-  // Monogram badge (right side)
-  const monogram = (branding.org_name || 'PP').split(' ').map(w => w[0]).join('').slice(0, 3).toUpperCase();
-  doc.setFillColor(accent.r, accent.g, accent.b);
-  doc.roundedRect(pageWidth - 60, 741, 32, 20, 3, 3, 'F');
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(primary.r, primary.g, primary.b);
-  doc.text(monogram, pageWidth - 44, 754, { align: 'center' });
+  // Logo or monogram badge (right side of footer)
+  if (branding.org_logo_url) {
+    try {
+      const logoRes = await fetch(branding.org_logo_url);
+      const logoBuffer = await logoRes.arrayBuffer();
+      const logoBase64 = btoa(String.fromCharCode(...new Uint8Array(logoBuffer)));
+      const ext = branding.org_logo_url.toLowerCase().includes('.png') ? 'PNG' : 'JPEG';
+      // Small logo in footer — 40pt wide max, 18pt tall, white-tinted via opacity isn't possible in jsPDF
+      // so render at natural size capped to fit the footer bar
+      doc.addImage(`data:image/${ext.toLowerCase()};base64,${logoBase64}`, ext, pageWidth - 68, 740, 40, 18, undefined, 'FAST');
+    } catch (e) {
+      // fall back to monogram
+      const monogram = (branding.org_name || 'PP').split(' ').map(w => w[0]).join('').slice(0, 3).toUpperCase();
+      doc.setFillColor(accent.r, accent.g, accent.b);
+      doc.roundedRect(pageWidth - 60, 741, 32, 20, 3, 3, 'F');
+      doc.setFontSize(8); doc.setFont('helvetica', 'bold');
+      doc.setTextColor(primary.r, primary.g, primary.b);
+      doc.text(monogram, pageWidth - 44, 754, { align: 'center' });
+    }
+  } else {
+    const monogram = (branding.org_name || 'PP').split(' ').map(w => w[0]).join('').slice(0, 3).toUpperCase();
+    doc.setFillColor(accent.r, accent.g, accent.b);
+    doc.roundedRect(pageWidth - 60, 741, 32, 20, 3, 3, 'F');
+    doc.setFontSize(8); doc.setFont('helvetica', 'bold');
+    doc.setTextColor(primary.r, primary.g, primary.b);
+    doc.text(monogram, pageWidth - 44, 754, { align: 'center' });
+  }
 
   // Section breadcrumb
   if (breadcrumb) {
@@ -489,7 +508,7 @@ function drawPageFrame(doc, branding, breadcrumb, pageTitle) {
 /**
  * drawCoverPage — draws the cover page for any assessment type
  */
-function drawCoverPage(doc, branding, reportType, address, kpis) {
+async function drawCoverPage(doc, branding, reportType, address, kpis) {
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const primary = hexToRgb(branding.primary_color || '#1A3226');
@@ -507,17 +526,33 @@ function drawCoverPage(doc, branding, reportType, address, kpis) {
   doc.rect(0, 789, pageWidth, 3, 'F');
 
   // Org name / logo zone
-  doc.setFontSize(28);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(255, 255, 255);
   const orgDisplay = branding.org_name || 'PropPrompt';
-  doc.text(orgDisplay, pageWidth / 2, 110, { align: 'center' });
+  let logoRendered = false;
+  if (branding.org_logo_url) {
+    try {
+      const logoRes = await fetch(branding.org_logo_url);
+      const logoBuffer = await logoRes.arrayBuffer();
+      const logoBase64 = btoa(String.fromCharCode(...new Uint8Array(logoBuffer)));
+      const ext = branding.org_logo_url.toLowerCase().includes('.png') ? 'PNG' : 'JPEG';
+      // Render logo tastefully — max 140pt wide, 50pt tall, centered
+      doc.addImage(`data:image/${ext.toLowerCase()};base64,${logoBase64}`, ext, pageWidth / 2 - 70, 88, 140, 50, undefined, 'FAST');
+      logoRendered = true;
+    } catch (e) {
+      // fall through to text
+    }
+  }
+  if (!logoRendered) {
+    doc.setFontSize(28);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    doc.text(orgDisplay, pageWidth / 2, 110, { align: 'center' });
+  }
 
   if (branding.org_tagline) {
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(accent.r, accent.g, accent.b);
-    doc.text(branding.org_tagline, pageWidth / 2, 130, { align: 'center' });
+    doc.text(branding.org_tagline, pageWidth / 2, logoRendered ? 150 : 130, { align: 'center' });
   }
 
   // Gold divider
@@ -762,7 +797,7 @@ function drawTable(doc, x, y, headers, rows, colWidths, options = {}) {
 /**
  * renderCMAPdf — Comparative Market Analysis
  */
-function renderCMAPdf(doc, data, branding) {
+async function renderCMAPdf(doc, data, branding) {
   const pageWidth = doc.internal.pageSize.getWidth();
   const primary = hexToRgb(branding.primary_color || '#1A3226');
   const accent = hexToRgb(branding.accent_color || '#B8982F');
@@ -776,7 +811,7 @@ function renderCMAPdf(doc, data, branding) {
   const totalComps = (data.tiered_comps?.tiers || []).reduce((s, t) => s + (t.comps?.length || 0), 0);
 
   // ── COVER ─────────────────────────────────────────────────────────────
-  drawCoverPage(doc, branding, 'Comparative Market Analysis', data.property_address, [
+  await drawCoverPage(doc, branding, 'Comparative Market Analysis', data.property_address, [
     { label: 'Implied Value Range', value: iv.low && iv.high ? `${fmt(iv.low)} – ${fmt(iv.high)}` : 'See Report' },
     { label: 'Comparable Sales', value: String(totalComps || 'N/A') },
     { label: 'Confidence Level', value: data.confidence_level || 'Medium' },
@@ -786,9 +821,9 @@ function renderCMAPdf(doc, data, branding) {
   doc.addPage();
   drawSectionDivider(doc, branding, 1, 'Market Context', 'Current conditions · inventory · pricing trends');
 
-  // ── PAGE: MARKET STATS ────────────────────────────────────────────────
+  // ── PAGE: MARKET STATS
   doc.addPage();
-  drawPageFrame(doc, branding, 'Section 01 · Market Context', 'Market Conditions Overview');
+  await drawPageFrame(doc, branding, 'Section 01 · Market Context', 'Market Conditions Overview');
   let y = 90;
 
   if (mc.narrative) {
@@ -818,9 +853,9 @@ function renderCMAPdf(doc, data, branding) {
   doc.addPage();
   drawSectionDivider(doc, branding, 2, 'Comparable Sales Analysis', 'Tiered comps · price-per-square-foot · implied value range');
 
-  // ── PAGE: TIERED COMPS ────────────────────────────────────────────────
+  // ── PAGE: TIERED COMPS
   doc.addPage();
-  drawPageFrame(doc, branding, 'Section 02 · Comparable Sales', 'Tiered Comparable Sales');
+  await drawPageFrame(doc, branding, 'Section 02 · Comparable Sales', 'Tiered Comparable Sales');
   y = 90;
 
   if (data.tiered_comps?.tiers) {
@@ -876,7 +911,7 @@ function renderCMAPdf(doc, data, branding) {
 /**
  * renderListingPricingPdf — Full Listing Pricing Analysis
  */
-function renderListingPricingPdf(doc, data, branding) {
+async function renderListingPricingPdf(doc, data, branding) {
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 40;
   const contentWidth = pageWidth - 2 * margin;
@@ -888,7 +923,7 @@ function renderListingPricingPdf(doc, data, branding) {
   const mc = data.market_context || {};
 
   // ── COVER ─────────────────────────────────────────────────────────────
-  drawCoverPage(doc, branding, 'Listing Pricing Analysis', data.property_address, [
+  await drawCoverPage(doc, branding, 'Listing Pricing Analysis', data.property_address, [
     { label: 'Recommended Range', value: v.recommended_range_low ? `${fmt(v.recommended_range_low)} – ${fmt(v.recommended_range_high)}` : 'See Report' },
     { label: 'Strategic List Price', value: fmt(v.strategic_list_price) },
     { label: 'Est. Days on Market', value: v.estimated_dom_low ? `${v.estimated_dom_low}–${v.estimated_dom_high} days` : 'N/A' },
@@ -1211,7 +1246,7 @@ function renderListingPricingPdf(doc, data, branding) {
   addAgentFooter(doc, branding, pageWidth, doc.internal.pageSize.getHeight());
 }
 
-function renderBuyerIntelligencePdf(doc, data, branding) {
+async function renderBuyerIntelligencePdf(doc, data, branding) {
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 40;
   const contentWidth = pageWidth - 2 * margin;
@@ -1219,7 +1254,7 @@ function renderBuyerIntelligencePdf(doc, data, branding) {
   const accent = hexToRgb(branding.accent_color || '#B8982F');
   const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : 'N/A';
 
-  drawCoverPage(doc, branding, 'Buyer Intelligence Report', data.property_address, [
+  await drawCoverPage(doc, branding, 'Buyer Intelligence Report', data.property_address, [
     { label: 'Buyer Archetypes', value: String((data.buyer_archetypes || []).length) },
     { label: 'Feeder Markets', value: String((data.migration_analysis?.feeder_markets || []).length) },
     { label: 'Employer Targets', value: String((data.migration_analysis?.employer_targets || []).length) },
@@ -1280,7 +1315,7 @@ function renderBuyerIntelligencePdf(doc, data, branding) {
   addAgentFooter(doc, branding, pageWidth, doc.internal.pageSize.getHeight());
 }
 
-function renderClientPortfolioPdf(doc, data, branding) {
+async function renderClientPortfolioPdf(doc, data, branding) {
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 40;
   const contentWidth = pageWidth - 2 * margin;
@@ -1289,7 +1324,7 @@ function renderClientPortfolioPdf(doc, data, branding) {
   const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : 'N/A';
 
   const iv = data.tiered_comps?.implied_value_range || {};
-  drawCoverPage(doc, branding, 'Client Portfolio Review', data.property_address, [
+  await drawCoverPage(doc, branding, 'Client Portfolio Review', data.property_address, [
     { label: 'Est. Current Value', value: iv.midpoint ? fmt(iv.midpoint) : 'See Report' },
     { label: 'Value Range', value: iv.low && iv.high ? `${fmt(iv.low)} – ${fmt(iv.high)}` : 'See Report' },
     { label: 'Portfolio Options', value: String((data.portfolio_options || []).length || 'N/A') },
@@ -1356,7 +1391,7 @@ function renderClientPortfolioPdf(doc, data, branding) {
   addAgentFooter(doc, branding, pageWidth, doc.internal.pageSize.getHeight());
 }
 
-function renderInvestmentPdf(doc, data, branding) {
+async function renderInvestmentPdf(doc, data, branding) {
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 40;
   const contentWidth = pageWidth - 2 * margin;
@@ -1366,7 +1401,7 @@ function renderInvestmentPdf(doc, data, branding) {
   const fmtPct = (n) => n != null ? `${Number(n).toFixed(1)}%` : 'N/A';
 
   const v = data.valuation || {};
-  drawCoverPage(doc, branding, 'Investment Analysis', data.property_address, [
+  await drawCoverPage(doc, branding, 'Investment Analysis', data.property_address, [
     { label: 'Value Range', value: v.recommended_range_low ? `${fmt(v.recommended_range_low)} – ${fmt(v.recommended_range_high)}` : 'See Report' },
     { label: 'Confidence Level', value: v.confidence_level || 'Medium' },
     { label: 'Est. DOM', value: v.estimated_dom_low ? `${v.estimated_dom_low}–${v.estimated_dom_high}d` : 'N/A' },
@@ -1419,13 +1454,13 @@ function renderInvestmentPdf(doc, data, branding) {
   addAgentFooter(doc, branding, pageWidth, doc.internal.pageSize.getHeight());
 }
 
-function renderRentalMarketPdf(doc, data, branding) {
+async function renderRentalMarketPdf(doc, data, branding) {
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 40;
   const contentWidth = pageWidth - 2 * margin;
   const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : 'N/A';
 
-  drawCoverPage(doc, branding, 'Rental Market Analysis', data.property_address, [
+  await drawCoverPage(doc, branding, 'Rental Market Analysis', data.property_address, [
     { label: 'Analysis Date', value: data.analysis_date || new Date().getFullYear().toString() },
     { label: 'Property Type', value: data.property_type || 'N/A' },
     { label: 'Location', value: data.location_class || 'N/A' },
