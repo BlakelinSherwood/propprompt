@@ -227,6 +227,67 @@ JSON OUTPUT SCHEMA — RETURN THIS STRUCTURE POPULATED WITH REAL DATA
 ANALYSIS INSTRUCTIONS
 ────────────────────────────────────────────────────────────────
 
+COVER PAGE DATA:
+- Property address (full street address, city, state, zip)
+- Property type (e.g., Single-Family Residence)
+- Report title: LISTING PRICING ANALYSIS
+- Date: current date formatted as Month DD, YYYY
+- Prepared by [AGENT_NAME]
+- CONFIDENTIAL
+DO NOT include the recommended price range, strategic list price, or estimated DOM on the cover page. These appear in Section 04 after the data foundation is established.
+
+SECTION ORDER (generate content in this sequence):
+
+SECTION 01 — Property & Market Context
+  01a. Property Snapshot: subject property details, condition, notable features
+  01b. Market Overview: current conditions narrative, KPI metrics, seasonal context
+  01c. Rate Environment: current rates, purchasing power impact, Fed outlook
+
+SECTION 02 — Valuation Analysis
+  02a. Comparable Sales: tiered comp table WITH narrative per tier
+  02b. Valuation Convergence: three independent methods, convergence statement
+  02c. Consumer AVM Perception: AVM table, gap analysis, why AVMs miss this property
+
+SECTION 03 — Buyer Demand Intelligence [PRO+ ONLY — omit for Starter tier]
+  03a. Buyer Archetype Profiles: full profiles with language calibration
+  03b. Migration & Feeder Markets: feeder table, employer targeting matrix
+
+SECTION 04 — Pricing Strategy & Recommendation
+  04a. Pricing Scenarios: 3 scenarios with full narrative each
+  04b. Recommended Strategy: THE strategic list price reveal
+  04c. Pre-Listing Preparation Timeline: 4-6 week checklist
+  04d. Risk Factors & Market Headwinds: 3-5 risks with analysis
+
+SECTION 05 — Seller Financial Summary
+  05a. Estimated Net Proceeds: 3 scenarios matching pricing scenarios
+  05b. Analysis Summary Table: 8-10 row key findings table
+
+AGENT APPENDIX (mark all pages AGENT USE ONLY — REMOVE BEFORE SHARING):
+  A1. Research Data Log (every data point, source, date)
+  A2. Confidence Assessment (category-level HIGH/MEDIUM/LOW ratings)
+  A3. Client Inquiry Note (if data gaps exist — draft email to client)
+  A4. Follow-Up Checklist (pre-meeting, during, post-meeting, next annual)
+
+SECTION LENGTH REQUIREMENTS:
+This report supports a 30-45 minute listing appointment. Every section must feel substantial and authoritative.
+
+- Executive Summary / Property Context: 3-4 paragraphs (8-12 sentences)
+- Market Overview: 3-4 paragraphs + KPI metrics block
+- Rate Environment: 2-3 paragraphs with specific rate data and purchasing power math
+- Comparable Sales: 2-3 narrative sentences PER TIER above each comp table, plus a 2-3 sentence synthesis paragraph after all tiers
+- Valuation Convergence: 2-3 sentences per method + convergence statement
+- AVM Perception: Full table + 4-6 bullet 'Why AVMs Miss' section + 3-4 sentence 'Our Position' coaching section. DO NOT TRUNCATE.
+- Buyer Archetypes [PRO+]: 3-5 sentence profile per archetype, minimum 3 USE items and 3 AVOID items each. DO NOT TRUNCATE.
+- Migration [PRO+]: 2-3 sentences per feeder market. Complete employer table rows.
+- Pricing Scenarios: 4-6 sentence narrative per scenario with strategy, expected buyer behavior, competition dynamics, and risk/reward.
+- Pre-Listing Timeline: Specific tasks grouped by week for 4-6 weeks
+- Risk Factors: 3-5 risks with 2-3 sentences each
+- Net Proceeds: Three scenarios with line-item math
+- Summary Table: 8-10 rows of key findings
+- Agent Appendix: Full data log, confidence matrix, inquiry note, checklist
+
+DO NOT truncate any section. If approaching token limits, prioritize completing all sections over adding length to any single section.
+
 COMP SOURCING RULES — STRICTLY ENFORCED
 
 TIER A comps MUST be from the SAME TOWN as the subject property. No exceptions.
@@ -237,8 +298,8 @@ TIER B comps MUST also be from the SAME TOWN. Expand radius within town only.
 TIER C may include ADJACENT TOWNS for market context ONLY. Every Tier C comp from a
 different town MUST include a town premium/discount adjustment:
   Ratio = subject_town_median_ppsf / comp_town_median_ppsf
-  Town-adjusted price = comp_sale_price × ratio
-  Label: "Town-adjusted from [CompTown] to [SubjectTown] using X.XXX ratio"
+  Town-adjusted price = comp_sale_price x ratio
+  Label: Town-adjusted from [CompTown] to [SubjectTown] using X.XXX ratio
 
 Tier C comps are REFERENCE ONLY. implied_value_range uses Tier A and B ONLY.
 Every comp JSON object must include: town, same_town_as_subject, town_adjustment_ratio,
@@ -247,14 +308,14 @@ town_adjusted_price, town_adjustment_note.
 AVM CONSUMER PERCEPTION ANALYSIS — REQUIRED (Listing Pricing & CMA)
 
 Search for AVM estimates for the subject property from:
-- Zillow (zillow.com) — "Zestimate"
-- Redfin (redfin.com) — "Redfin Estimate"
-- Realtor.com — "Home Value"
-- Homes.com — "Estimated Value"
+- Zillow (zillow.com) — Zestimate
+- Redfin (redfin.com) — Redfin Estimate
+- Realtor.com — Home Value
+- Homes.com — Estimated Value
 
 Record estimate, range low/high, trend, date. If unavailable: available=false with reason.
 Compute: simple average, median, spread of available estimates.
-Compare AVM composite to professional range: gap dollars, gap pct, direction (overvalue/undervalue/aligned ±3%).
+Compare AVM composite to professional range: gap dollars, gap pct, direction (overvalue/undervalue/aligned +/-3%).
 Identify 3-5 property-specific reasons AVMs miss THIS address.
 Never attack platforms. Acknowledge buyers have already seen these numbers.
 
@@ -270,13 +331,13 @@ BUYER ARCHETYPES:
 3. Profile: 3-4 sentences, lifestyle/financial framing only
 4. language_use: 3-5 phrases to USE in marketing copy
 5. language_avoid: 3-5 phrases to AVOID
-6. Condo required: Urban Downsizer, Young Professional First-Time, Pied-à-Terre Buyer, Investor/Rental Buyer
+6. Condo required: Urban Downsizer, Young Professional First-Time, Pied-a-Terre Buyer, Investor/Rental Buyer
 
 TIERED COMPS:
 1. 12-18 total comps. If <12, set thin_comp_flag=true.
 2. Comps >12 months old must be time-adjusted (local appreciation rate, max 5 yr cap)
 3. Condo: within-building sales as sub-tier of Tier A; set within_building=true
-4. implied_value_range from Tier A adjusted PPSF × subject SF
+4. implied_value_range from Tier A adjusted PPSF x subject SF
 
 FAIR HOUSING COMPLIANCE — ALL OUTPUTS
 NEVER reference protected classes: race, color, national origin, religion, sex, familial status,
@@ -320,6 +381,9 @@ async function callClaudeOnce(apiKey, prompt, keySource) {
     throw Object.assign(new Error(msg), { isOverloaded });
   }
   const data = await res.json();
+  if (data.stop_reason === 'max_tokens') {
+    console.warn('[callClaude] WARNING: Listing Pricing Analysis truncated at max_tokens');
+  }
   return { text: data.content?.[0]?.text || "", model };
 }
 
@@ -363,6 +427,9 @@ async function callOpenAI(apiKey, prompt) {
     throw new Error(err.error?.message || `OpenAI API error ${res.status}`);
   }
   const data = await res.json();
+  if (data.choices?.[0]?.finish_reason === 'length') {
+    console.warn('[callOpenAI] WARNING: Analysis truncated at max_tokens');
+  }
   return { text: data.choices?.[0]?.message?.content || "", model: "gpt-4o" };
 }
 
