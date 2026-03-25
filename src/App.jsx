@@ -40,6 +40,7 @@ import DataQuality from "./pages/admin/DataQuality";
 import AlertSettings from "./pages/AlertSettings";
 import AiSettings from "./pages/admin/AiSettings";
 import BrandingAdmin from "./pages/admin/BrandingAdmin";
+import FlipbookViewer from "./pages/FlipbookViewer";
 
 function Spinner() {
   return (
@@ -106,6 +107,7 @@ function AuthenticatedApp() {
         <Route path="/app/Territories" element={<ProtectedRoute element={<Territories />} />} />
       </Route>
       <Route path="/Landing" element={<Landing />} />
+      <Route path="/flipbook/:token" element={<FlipbookViewer />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );
