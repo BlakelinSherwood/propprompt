@@ -368,6 +368,15 @@
     },
     "net_proceeds_json": {
       "type": "object"
+    },
+    "low_comp_acknowledged": {
+      "type": "boolean",
+      "default": false,
+      "description": "True when agent checked the acknowledgment box and submitted with fewer than 3 comps."
+    },
+    "low_comp_count": {
+      "type": "integer",
+      "description": "The number of comps confirmed when low_comp_acknowledged is true."
     }
   },
   "required": [
