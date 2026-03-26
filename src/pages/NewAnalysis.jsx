@@ -12,15 +12,19 @@ import Step6Confirm from "../components/wizard/Step6Confirm";
 import StepClientFinancial from "../components/wizard/StepClientFinancial";
 import StepBuyerIntelligence from "../components/wizard/StepBuyerIntelligence";
 import StepReportEnhancements from "../components/wizard/StepReportEnhancements";
+import StepComparableSales from "../components/wizard/StepComparableSales";
+import StepPriorSaleHistory from "../components/wizard/StepPriorSaleHistory";
 
 function getStepLabels(assessmentType) {
   const base = ["Assessment", "Client Role", "Property"];
-  const afterProperty = [];
-  if (assessmentType === "listing_pricing") afterProperty.push("Buyer Context");
-  else if (assessmentType === "client_portfolio") afterProperty.push("Financial Context");
-  else if (["buyer_intelligence"].includes(assessmentType)) afterProperty.push("Buyer Context");
-  else if (["cma", "investment_analysis"].includes(assessmentType)) afterProperty.push("Enhancements");
-  return [...base, ...afterProperty, "Output", "Confirm"];
+  const hasComps = ["listing_pricing", "cma"].includes(assessmentType);
+  const compsSteps = hasComps ? ["Comparable Sales", "Prior Sale History"] : [];
+  const afterComps = [];
+  if (assessmentType === "listing_pricing") afterComps.push("Buyer Context");
+  else if (assessmentType === "client_portfolio") afterComps.push("Financial Context");
+  else if (["buyer_intelligence"].includes(assessmentType)) afterComps.push("Buyer Context");
+  else if (["cma", "investment_analysis"].includes(assessmentType)) afterComps.push("Enhancements");
+  return [...base, ...compsSteps, ...afterComps, "Output", "Confirm"];
 }
 
 function getMaxStep(assessmentType) {
@@ -35,13 +39,25 @@ const INITIAL_INTAKE = {
   address: "",
   property_type: "",
   location_class: "",
+  bedrooms: null,
+  bathrooms: null,
+  sqft: null,
   output_format: "narrative",
   on_behalf_of_email: "",
   drive_sync: true,
   selected_modules: [],
   // Comparable sales
   agent_comps: [],
+  raw_batchdata_comps: [],
+  raw_perplexity_enrichment: [],
   comps_source: "none",
+  comps_fetched_at: null,
+  comps_search_tier: null,
+  comps_search_radius: null,
+  large_property_flag: false,
+  comps_fetch_triggered: false,
+  comps_cache_key: null,
+  comps_researcher_note: null,
   // Prior sale history
   prior_sale_price: null,
   prior_sale_year: null,
@@ -168,6 +184,9 @@ export default function NewAnalysis() {
         intake_data: {
           address: intake.address,
           client_relationship: intake.client_relationship,
+          bedrooms: intake.bedrooms,
+          bathrooms: intake.bathrooms,
+          sqft: intake.sqft,
           drive_sync: intake.drive_sync,
           ...(intake.assessment_type === "client_portfolio" && {
             mortgage_balance: intake.mortgage_balance,
@@ -177,14 +196,23 @@ export default function NewAnalysis() {
             heloc_info: intake.heloc_info,
             client_interests: intake.client_interests,
           }),
-          ...(["listing_pricing", "buyer_intelligence"].includes(intake.assessment_type)) && {
+          ...(["listing_pricing", "buyer_intelligence"].includes(intake.assessment_type) && {
             buyer_pool_expectation: intake.buyer_pool_expectation,
             known_employer_draws: intake.known_employer_draws,
             key_selling_attributes: intake.key_selling_attributes,
-          },
+          }),
         },
         agent_comps: intake.agent_comps || [],
+        raw_batchdata_comps: intake.raw_batchdata_comps || [],
+        raw_perplexity_enrichment: intake.raw_perplexity_enrichment || [],
         comps_source: intake.comps_source || "none",
+        comps_fetched_at: intake.comps_fetched_at || null,
+        comps_search_tier: intake.comps_search_tier || null,
+        comps_search_radius: intake.comps_search_radius || null,
+        large_property_flag: intake.large_property_flag || false,
+        comps_fetch_triggered: intake.comps_fetch_triggered || false,
+        comps_cache_key: intake.comps_cache_key || null,
+        comps_researcher_note: intake.comps_researcher_note || null,
         prior_sale_price: intake.prior_sale_price ?? null,
         prior_sale_year: intake.prior_sale_year ?? null,
         seller_mortgage_payoff: intake.seller_mortgage_payoff ?? null,
@@ -209,6 +237,7 @@ export default function NewAnalysis() {
     }
   }
 
+  const hasCompsStep = ["listing_pricing", "cma"].includes(intake.assessment_type);
   const stepProps = { intake, update, user, userTier, onNext: next, onBack: back };
   const maxStep = getMaxStep(intake.assessment_type);
   const stepLabels = getStepLabels(intake.assessment_type);
@@ -224,6 +253,13 @@ export default function NewAnalysis() {
     if (step === 3) return <Step4PropertyDetails {...stepProps} />;
 
     let nextStep = 4;
+
+    if (hasCompsStep) {
+      if (step === nextStep) return <StepComparableSales {...stepProps} />;
+      nextStep++;
+      if (step === nextStep) return <StepPriorSaleHistory {...stepProps} />;
+      nextStep++;
+    }
 
     if (hasContextStep) {
       if (step === nextStep) {

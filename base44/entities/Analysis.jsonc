@@ -1,0 +1,338 @@
+{
+  "name": "Analysis",
+  "type": "object",
+  "description": "One record per AI analysis run. Contains all intake data and output references.",
+  "properties": {
+    "org_id": {
+      "type": "string",
+      "description": "Organization this analysis belongs to"
+    },
+    "run_by_email": {
+      "type": "string",
+      "description": "Email of the user who triggered the analysis"
+    },
+    "on_behalf_of_email": {
+      "type": "string",
+      "description": "If run by an assistant on behalf of an agent, the agent's email. Null if self-run."
+    },
+    "assessment_type": {
+      "type": "string",
+      "enum": [
+        "listing_pricing",
+        "cma",
+        "buyer_intelligence",
+        "investment_analysis",
+        "rental_analysis",
+        "client_portfolio",
+        "price_reduction_review",
+        "custom"
+      ],
+      "description": "Type of analysis run"
+    },
+    "property_type": {
+      "type": "string",
+      "enum": [
+        "single_family",
+        "condo",
+        "multi_family",
+        "land"
+      ],
+      "description": "Property type for this analysis"
+    },
+    "location_class": {
+      "type": "string",
+      "enum": [
+        "urban_core",
+        "inner_suburb",
+        "outer_suburb",
+        "coastal",
+        "rural"
+      ],
+      "description": "Location class (drives framework selection)"
+    },
+    "ai_platform": {
+      "type": "string",
+      "enum": [
+        "claude",
+        "chatgpt",
+        "gemini",
+        "perplexity",
+        "grok"
+      ],
+      "description": "AI platform used for this analysis"
+    },
+    "ai_model": {
+      "type": "string",
+      "description": "Specific model version used"
+    },
+    "output_format": {
+      "type": "string",
+      "enum": [
+        "narrative",
+        "structured",
+        "bullets"
+      ],
+      "description": "Output format requested"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "in_progress",
+        "complete",
+        "listed",
+        "sold",
+        "archived",
+        "anomaly_flagged"
+      ],
+      "default": "draft",
+      "description": "Lifecycle status"
+    },
+    "is_private": {
+      "type": "boolean",
+      "default": false
+    },
+    "intake_data": {
+      "type": "object"
+    },
+    "followup_answers": {
+      "type": "object"
+    },
+    "prompt_assembled": {
+      "type": "string"
+    },
+    "output_text": {
+      "type": "string"
+    },
+    "output_json": {
+      "type": "object"
+    },
+    "output_pdf_url": {
+      "type": "string"
+    },
+    "output_pptx_url": {
+      "type": "string"
+    },
+    "drive_file_id": {
+      "type": "string"
+    },
+    "drive_url": {
+      "type": "string"
+    },
+    "drive_sync_status": {
+      "type": "string",
+      "enum": [
+        "not_synced",
+        "synced",
+        "failed",
+        "pending"
+      ],
+      "default": "not_synced"
+    },
+    "last_exported_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "last_export_format": {
+      "type": "string"
+    },
+    "tokens_used": {
+      "type": "integer"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "crm_push_status": {
+      "type": "string",
+      "enum": [
+        "not_pushed",
+        "pushed",
+        "failed"
+      ],
+      "default": "not_pushed"
+    },
+    "compliance_flagged": {
+      "type": "boolean",
+      "default": false
+    },
+    "compliance_flag_reason": {
+      "type": "string"
+    },
+    "selected_modules": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "include_migration": {
+      "type": "boolean",
+      "default": false
+    },
+    "include_archetypes": {
+      "type": "boolean",
+      "default": false
+    },
+    "total_credits_used": {
+      "type": "number"
+    },
+    "listed_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "list_price": {
+      "type": "number"
+    },
+    "sale_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "sale_price": {
+      "type": "number"
+    },
+    "dom_alert_threshold": {
+      "type": "integer"
+    },
+    "price_reduction_alert_sent": {
+      "type": "boolean",
+      "default": false
+    },
+    "ensemble_mode_used": {
+      "type": "boolean",
+      "default": false
+    },
+    "sections_completed": {
+      "type": "integer",
+      "default": 0
+    },
+    "sections_total": {
+      "type": "integer",
+      "default": 1
+    },
+    "assembly_status": {
+      "type": "string",
+      "default": "pending"
+    },
+    "ensemble_section_outputs": {
+      "type": "object"
+    },
+    "fallback_triggered": {
+      "type": "boolean",
+      "default": false
+    },
+    "generation_time_ms": {
+      "type": "integer"
+    },
+    "prior_sale_price": {
+      "type": "number",
+      "description": "Last known sale price for this property in dollars."
+    },
+    "prior_sale_year": {
+      "type": "number",
+      "description": "4-digit year of the prior sale."
+    },
+    "agent_comps": {
+      "type": "array",
+      "description": "Agent-confirmed comp set after review. The ONLY comp data that ever reaches the AI.",
+      "items": {
+        "type": "object"
+      }
+    },
+    "raw_batchdata_comps": {
+      "type": "array",
+      "description": "Full unfiltered BatchData response before agent review. Stored for audit trail. Never passed directly to AI.",
+      "items": {
+        "type": "object"
+      }
+    },
+    "raw_perplexity_enrichment": {
+      "type": "array",
+      "description": "Raw Perplexity cross-reference responses keyed by address. Stored for audit trail.",
+      "items": {
+        "type": "object"
+      }
+    },
+    "comps_source": {
+      "type": "string",
+      "enum": [
+        "api_verified",
+        "agent_manual",
+        "mixed",
+        "none"
+      ],
+      "default": "none",
+      "description": "How comps were sourced."
+    },
+    "comps_fetched_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of the BatchData + Perplexity fetch, for staleness checks."
+    },
+    "comps_search_tier": {
+      "type": "string",
+      "description": "Tier level that produced the final comp set: 1|2|3|4|multi_tier|agent_deep_search"
+    },
+    "comps_search_radius": {
+      "type": "number",
+      "description": "Radius in miles used for the successful fetch."
+    },
+    "large_property_flag": {
+      "type": "boolean",
+      "default": false,
+      "description": "True when subject_sqft >= 4000. Disables bedroom/bathroom constraints."
+    },
+    "comps_researcher_note": {
+      "type": "string",
+      "description": "Note from Perplexity deep search agent explaining why comp volume was limited."
+    },
+    "comps_fetch_triggered": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether the agent has clicked Find Comparable Sales at least once."
+    },
+    "comps_cache_key": {
+      "type": "string",
+      "description": "Hash of search parameters (address+beds+baths+sqft+type). Used to detect stale cache."
+    },
+    "valuation_anomaly": {
+      "type": "object",
+      "description": "Stored result from validateValuation when an anomaly is detected."
+    },
+    "override_acknowledged": {
+      "type": "boolean",
+      "default": false
+    },
+    "override_acknowledged_by": {
+      "type": "string"
+    },
+    "override_acknowledged_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "seller_mortgage_payoff": {
+      "type": "number"
+    },
+    "seller_mortgage_known": {
+      "type": "boolean",
+      "default": false
+    },
+    "seller_commission_rate": {
+      "type": "number"
+    },
+    "seller_closing_cost_rate": {
+      "type": "number"
+    },
+    "seller_other_costs": {
+      "type": "number"
+    },
+    "net_proceeds_json": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "run_by_email",
+    "assessment_type",
+    "property_type",
+    "ai_platform"
+  ]
+}
