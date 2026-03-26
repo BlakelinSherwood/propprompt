@@ -20,7 +20,6 @@ const LABELS = {
 const ENSEMBLE_TIERS = ['pro', 'team', 'broker', 'platform_owner', 'admin'];
 
 const ROWS = [
-  { key: "ai_platform", label: "AI Platform" },
   { key: "assessment_type", label: "Assessment" },
   { key: "client_relationship", label: "Client Role" },
   { key: "address", label: "Property Address", raw: true },
@@ -145,7 +144,18 @@ export default function Step6Confirm({ intake, update, user, orgMembers, submitt
         </div>
       )}
 
-      {/* API Mode Indicator */}
+      {/* AI Engine Indicator */}
+      <div className="rounded-xl border border-[#1A3226]/10 bg-[#FAF8F4] p-4 mb-5 flex items-center gap-3">
+        <Zap className="w-4 h-4 text-[#B8982F] flex-shrink-0" />
+        <p className="text-xs text-[#1A3226]/70">
+          <span className="font-medium text-[#1A3226]">
+            {ENSEMBLE_TIERS.includes(user?.role) ? 'Ensemble AI (Multi-Provider)' : 'Claude Sonnet (Anthropic)'}
+          </span>
+          {' '}— assigned automatically based on your subscription tier.
+        </p>
+      </div>
+
+      {/* API Security Notice */}
       <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 mb-8 flex items-start gap-3">
         <Zap className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
         <div>

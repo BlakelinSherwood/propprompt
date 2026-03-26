@@ -78,15 +78,20 @@ export default function NewAnalysis() {
       // Resolve subscription tier
       try {
         const subs = await base44.entities.TerritorySubscription.filter({ user_id: user.id, status: 'active' });
+        let resolvedTier = 'starter';
         if (subs.length > 0) {
           const tiers = subs.map(s => s.tier);
-          const tier = tiers.includes('team') ? 'team' : tiers.includes('pro') ? 'pro' : 'starter';
-          setUserTier(tier);
-        } else {
-          setUserTier(user.role === 'platform_owner' ? 'team' : 'starter');
+          resolvedTier = tiers.includes('team') ? 'team' : tiers.includes('pro') ? 'pro' : 'starter';
+        } else if (user.role === 'platform_owner' || user.role === 'admin') {
+          resolvedTier = 'team';
         }
+        setUserTier(resolvedTier);
+        // Auto-assign platform — no user choice
+        const isPro = ['pro', 'team', 'broker'].includes(resolvedTier) || ['platform_owner', 'admin'].includes(user.role);
+        update({ ai_platform: isPro ? 'ensemble' : 'claude' });
       } catch (e) {
         setUserTier('starter');
+        update({ ai_platform: 'claude' });
       }
     }
     load();
