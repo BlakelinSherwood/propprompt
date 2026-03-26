@@ -953,6 +953,48 @@ async function addDisclaimerPage(doc, branding) {
   }
 }
 
+async function renderAvmSection(doc, data, branding, margin, contentWidth, primary, accent, fmt) {
+  const ap = data.avm_perception ?? null;
+  const al = data.avm_analysis || {};
+  const platforms = ap?.platforms || al.platforms || null;
+  if (!platforms?.length) return; // STATE 1: section absent
+  doc.addPage();
+  await drawPageFrame(doc, branding, 'Section 02 · Valuation Analysis', 'Consumer AVM Perception');
+  let y = 90;
+  doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(accent.r, accent.g, accent.b);
+  doc.text('What the internet thinks your home is worth — and why the full picture is more nuanced', margin, y); y += 18;
+  let hasNull = false;
+  const colW = [88, 90, 80, 80, 50]; const totalW = colW.reduce((a,b)=>a+b,0); const rh = 24;
+  doc.setFillColor(primary.r, primary.g, primary.b); doc.rect(margin, y, totalW, rh+4, 'F');
+  doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(255,255,255);
+  let cx = margin+8; ['Platform','Estimate','Range Low','Range High','Trend'].forEach((h,i)=>{doc.text(h,cx,y+rh/2+5); cx+=colW[i];}); y+=rh+4;
+  platforms.forEach((p,ri)=>{
+    const raw=p.estimate; const hasEst=raw!=null&&raw!=='null'&&raw!=='';
+    if(!hasEst) hasNull=true;
+    const disp=hasEst?(typeof raw==='number'?fmt(raw):raw):null;
+    const row=[p.name||p.platform||'',disp,hasEst?(p.range_low?(typeof p.range_low==='number'?fmt(p.range_low):p.range_low):'—'):'—',hasEst?(p.range_high?(typeof p.range_high==='number'?fmt(p.range_high):p.range_high):'—'):'—',p.trend||'—'];
+    ri%2!==0?doc.setFillColor(244,241,234):doc.setFillColor(255,255,255);
+    doc.rect(margin,y,totalW,rh,'F'); doc.setDrawColor(224,221,214); doc.setLineWidth(0.5); doc.line(margin,y+rh,margin+totalW,y+rh);
+    cx=margin+8; row.forEach((cell,ci)=>{
+      if(ci===1&&cell===null){doc.setFontSize(7.5);doc.setFont('helvetica','italic');doc.setTextColor(150,150,150);doc.text('No estimate available',cx,y+rh/2+3);}
+      else{doc.setFontSize(8);doc.setFont('helvetica','normal');doc.setTextColor(26,26,26);doc.text(String(cell||'—'),cx,y+rh/2+3);}
+      cx+=colW[ci];
+    }); y+=rh;
+  }); y+=6;
+  if(hasNull&&y+22<710){doc.setFontSize(7.5);doc.setFont('helvetica','italic');doc.setTextColor(120,120,120);const fn=doc.splitTextToSize('* This property may be too recent or have insufficient transaction history for this platform to generate an estimate.',contentWidth);doc.text(fn,margin,y);y+=fn.length*11+8;}
+  const gapDir=ap?.gap_direction||al.gap_analysis?.direction||null;
+  const alignN=ap?.alignment_narrative||null;
+  if(gapDir&&y+44<710){
+    const lbl=gapDir==='professional_higher'?'PROFESSIONAL ESTIMATE HIGHER':gapDir==='avm_higher'?'AVMs HIGHER':'AVMs ALIGNED WITH PROFESSIONAL RANGE';
+    doc.setFillColor(primary.r,primary.g,primary.b);doc.roundedRect(margin,y,contentWidth,alignN?52:40,3,3,'F');
+    doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(255,255,255);
+    const cl=ap?.composite_average?`AVM Composite: ${ap.composite_average}  →  `:'';
+    doc.text(`${cl}${lbl}${ap?.gap_percent?' ('+ap.gap_percent+')':''}`,margin+10,y+16);
+    if(alignN){doc.setFontSize(8.5);doc.setFont('helvetica','normal');doc.setTextColor(accent.r,accent.g,accent.b);doc.text(doc.splitTextToSize(alignN,contentWidth-20)[0],margin+10,y+34);}
+    y+=alignN?60:48;
+  }
+}
+
 /**
  * renderCMAPdf — Comparative Market Analysis
  */
@@ -1035,6 +1077,9 @@ async function renderCMAPdf(doc, data, branding) {
     doc.text(`Implied Value Range: ${fmt(iv.low)} – ${fmt(iv.high)}  ·  Midpoint: ${fmt(iv.midpoint)}`, margin + 10, y + 24);
   }
   if (data.tiered_comps?.thin_comp_flag) { doc.setFontSize(8); doc.setTextColor(180, 50, 50); doc.text('⚠ Thin comp set — valuation confidence is reduced.', margin, y + 50); }
+
+  // AVM Consumer Perception (Pro+ only)
+  await renderAvmSection(doc, data, branding, margin, contentWidth, primary, accent, fmt);
 
   // ── CLOSING SUMMARY ───────────────────────────────────────────────────
   await addClosingSummaryPage(doc, branding, 'CMA Summary', [
@@ -1276,49 +1321,8 @@ async function renderListingPricingPdf(doc, data, branding) {
     y += Math.min(vLines.length, 8) * 13 + 14;
   }
 
-  // AVM Consumer Perception
-  const avm = data.avm_analysis || {};
-  if (avm.platforms?.length) {
-    doc.addPage();
-    await drawPageFrame(doc, branding, 'Section 02 · Valuation Analysis', 'Consumer AVM Perception');
-    y = 90;
-    doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(accent.r, accent.g, accent.b);
-    doc.text('What the internet thinks your home is worth — and why the full picture is more nuanced', margin, y);
-    y += 18;
-    const avmRows = avm.platforms.map(p => [
-      p.name || '',
-      p.available ? fmt(p.estimate) : 'N/A',
-      p.available ? fmt(p.range_low) : '—',
-      p.available ? fmt(p.range_high) : '—',
-      p.trend || '—',
-    ]);
-    y = drawTable(doc, margin, y, ['Platform', 'Estimate', 'Range Low', 'Range High', 'Trend'],
-      avmRows, [88, 80, 80, 80, 60],
-      { headerFill: branding.primary_color || '#1A3226', headerTextColor: '#FFFFFF', fontSize: 8, rowHeight: 24, branding });
-    y += 6;
-    const ga = avm.gap_analysis || {};
-    if (ga.avm_composite && y + 44 < 710) {
-      const dirLabel = ga.direction === 'overvalue' ? 'AVMs OVERVALUE' : ga.direction === 'undervalue' ? 'AVMs UNDERVALUE' : 'AVMs ALIGNED';
-      doc.setFillColor(primary.r, primary.g, primary.b);
-      doc.roundedRect(margin, y, contentWidth, 40, 3, 3, 'F');
-      doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
-      doc.text(`AVM Composite: ${fmt(ga.avm_composite)}  →  Professional Range: ${fmt(ga.professional_range_low)} – ${fmt(ga.professional_range_high)}`, margin + 10, y + 14);
-      doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(accent.r, accent.g, accent.b);
-      doc.text(`${dirLabel} by approximately ${fmt(Math.abs(ga.gap_dollars || 0))} (${fmtPct(Math.abs(ga.gap_pct || 0))})`, margin + 10, y + 30);
-      y += 50;
-    }
-    if (avm.blind_spots?.length && y + 80 < 710) {
-      doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b);
-      doc.text('Why AVMs Miss This Property', margin, y); y += 14;
-      doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(50, 50, 50);
-      avm.blind_spots.slice(0, 5).forEach(spot => {
-        doc.setFillColor(accent.r, accent.g, accent.b);
-        doc.circle(margin + 6, y - 2, 2, 'F');
-        doc.text(spot, margin + 14, y);
-        y += 14;
-      });
-    }
-  }
+  // AVM Consumer Perception — three states
+  await renderAvmSection(doc, data, branding, margin, contentWidth, primary, accent, fmt);
 
   // ── SECTION 03: Buyer Demand Intelligence (PRO+ only) ─────────────────────
   if (isPro) {

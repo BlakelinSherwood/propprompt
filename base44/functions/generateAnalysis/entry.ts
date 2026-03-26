@@ -664,6 +664,29 @@ async function callPerplexity(apiKey, prompt) {
   };
 }
 
+// ── Perplexity AVM lookup (sonar model, NOT sonar-pro) ──────────────────────
+async function callPerplexityAVM(apiKey, address) {
+  const systemPrompt = 'You are a real estate data researcher. Your only job is to look up current automated valuation estimates from major real estate platforms. Return ONLY valid JSON. No explanation, no preamble, no markdown.';
+  const userPrompt = `Search for current automated valuation estimates for this property:\nAddress: ${address}\n\nFind the current estimated value for each platform:\n1. Zillow (Zestimate)\n2. Redfin Estimate\n3. Realtor.com Estimate\n4. Homes.com Estimate\n\nReturn ONLY this JSON. No other text:\n{\n  "zillow": {"estimate": "$XXX,XXX or null", "range_low": "$XXX,XXX or null", "range_high": "$XXX,XXX or null", "trend": "rising/stable/falling or null", "as_of": "Month YYYY or null"},\n  "redfin": {"estimate": "$XXX,XXX or null", "range_low": "$XXX,XXX or null", "range_high": "$XXX,XXX or null", "trend": "rising/stable/falling or null", "as_of": "Month YYYY or null"},\n  "realtor_com": {"estimate": "$XXX,XXX or null", "range_low": "$XXX,XXX or null", "range_high": "$XXX,XXX or null", "trend": "rising/stable/falling or null", "as_of": "Month YYYY or null"},\n  "homes_com": {"estimate": "$XXX,XXX or null", "range_low": "$XXX,XXX or null", "range_high": "$XXX,XXX or null", "trend": "rising/stable/falling or null", "as_of": "Month YYYY or null"}\n}\n\nIf a platform has no estimate for this property, set all its fields to null.\nDo not interpolate, estimate, or guess. Only return values found via search.`;
+  const res = await fetch('https://api.perplexity.ai/chat/completions', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: 'sonar', messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }] }),
+  });
+  if (!res.ok) throw new Error(`Perplexity AVM error ${res.status}`);
+  const data = await res.json();
+  const text = (data.choices?.[0]?.message?.content || '').trim();
+  console.log('[callPerplexityAVM] raw response length:', text.length, '| first 200:', text.slice(0, 200));
+  try {
+    let clean = text;
+    if (clean.startsWith('```')) clean = clean.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+    return JSON.parse(clean);
+  } catch (e) {
+    console.warn('[callPerplexityAVM] JSON parse failed:', e.message);
+    return null;
+  }
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -714,6 +737,11 @@ Deno.serve(async (req) => {
     // Inject prior sale history if present
     if (analysis.prior_sale_price || analysis.prior_sale_year) {
       prompt += `\n\nPRIOR SALE HISTORY:\n  Last known sale price: ${analysis.prior_sale_price ? '$' + analysis.prior_sale_price.toLocaleString() : 'unknown'}\n  Year of last sale: ${analysis.prior_sale_year || 'unknown'}\nUse this to cross-check valuation and flag anomalies.`;
+    }
+
+    // Starter tier: AVM lookup not available — instruct AI to set avm_perception to null
+    if (['listing_pricing', 'cma'].includes(analysis.assessment_type)) {
+      prompt += `\n\nAVM PERCEPTION DATA: null (Starter tier — live search not available)\nSet avm_perception to null in the output JSON. Do not attempt to look up, estimate, or generate AVM platform values.`;
     }
 
     // Mark as in_progress
@@ -778,6 +806,24 @@ Deno.serve(async (req) => {
         sections_total: pipelinePrompts.length,
       });
 
+      // Start AVM lookup in parallel with pipeline step 1 (listing_pricing + cma only)
+      const isAvmType = ['listing_pricing', 'cma'].includes(analysis.assessment_type);
+      let avmDataPromise = null;
+      if (isAvmType) {
+        try {
+          const perpAvmKey = await getKey('perplexity');
+          if (perpAvmKey) {
+            const avmAddress = analysis.intake_data?.address || '';
+            console.log('[generateAnalysis] Starting parallel Perplexity AVM lookup (sonar) for:', avmAddress);
+            avmDataPromise = callPerplexityAVM(perpAvmKey, avmAddress);
+          } else {
+            console.warn('[generateAnalysis] No Perplexity key — AVM lookup skipped');
+          }
+        } catch (avmInitErr) {
+          console.warn('[generateAnalysis] Could not start AVM lookup:', avmInitErr.message);
+        }
+      }
+
       for (const promptRecord of pipelinePrompts) {
         const section = promptRecord.prompt_section;
         console.log(`[pipeline] step ${promptRecord.ensemble_order}: ${section} via ${promptRecord.ai_platform}`);
@@ -796,6 +842,23 @@ Deno.serve(async (req) => {
           .replace(/\[PERPLEXITY_DATA\]/g, extras.perplexity_data ? JSON.stringify(extras.perplexity_data, null, 2) : '(not yet available)')
           .replace(/\[GEMINI_DATA\]/g, extras.gemini_data ? JSON.stringify(extras.gemini_data, null, 2) : '(not yet available)')
           .replace(/\[REGISTRY_DATA\]/g, extras.registry_data ? JSON.stringify(extras.registry_data, null, 2) : '(not yet available)');
+
+        // For report_assembly step: await AVM data (was started in parallel) and inject
+        if (section === 'report_assembly' && isAvmType) {
+          let avmResult = null;
+          if (avmDataPromise) {
+            try {
+              avmResult = await avmDataPromise;
+              console.log('[generateAnalysis] AVM data received for synthesis. Platforms:', avmResult ? Object.keys(avmResult).join(',') : 'none');
+            } catch (avmWaitErr) {
+              console.warn('[generateAnalysis] AVM lookup failed:', avmWaitErr.message);
+            }
+          }
+          const avmInjectBlock = avmResult
+            ? `\n\nAVM PERCEPTION DATA (from live Perplexity search — use ONLY these values, do NOT invent or guess):\n${JSON.stringify(avmResult, null, 2)}\n\nBuild the avm_perception object in the output JSON from this data. Structure:\n{\n  "platforms": [{"name": "Zillow", "estimate": "$X or null", "range_low": "$X or null", "range_high": "$X or null", "trend": "rising/stable/falling or null", "as_of": "Month YYYY or null"}, ...],\n  "composite_average": "average of all non-null estimates as currency string, or null",\n  "avm_vs_professional_gap": "gap between composite and implied_value_range midpoint as currency string (positive = professional higher), or null",\n  "gap_direction": "professional_higher | avm_higher | aligned (aligned if < 3%)",\n  "gap_percent": "e.g. 4.2%",\n  "alignment_narrative": "one sentence explaining gap in plain English for the agent"\n}`
+            : `\n\nAVM PERCEPTION DATA: null (Perplexity lookup unavailable or returned no data)\nSet avm_perception to null in the output JSON.`;
+          stepPrompt += avmInjectBlock;
+        }
 
         try {
           const stepKey = await getKey(promptRecord.ai_platform);
