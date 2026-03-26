@@ -171,6 +171,24 @@ export default function DriveConnectedApp() {
         </div>
       </div>
 
+      {!driveStatus?.connected && (
+        <div className="px-4 pb-4 border-t border-[#1A3226]/5 pt-3 space-y-2">
+          <p className="text-xs font-semibold text-[#1A3226]/60 uppercase tracking-wider mb-1">What happens when you connect</p>
+          {[
+            'Click "Connect" — a Google sign-in popup will open.',
+            'Sign in with the Google account where you want reports saved.',
+            'Grant permission for PropPrompt to create files in your Drive.',
+            'A "PropPrompt Reports" folder will be created automatically.',
+            'After any analysis, click Export → PDF to sync it to that folder.',
+          ].map((step, i) => (
+            <div key={i} className="flex gap-2.5 items-start">
+              <span className="w-4 h-4 rounded-full bg-[#1A3226]/10 text-[#1A3226] text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{i + 1}</span>
+              <p className="text-xs text-[#1A3226]/60">{step}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
       {driveStatus?.connected && (
         <div className="px-4 pb-4 border-t border-[#1A3226]/5 pt-3 space-y-3">
           <p className="text-xs text-[#1A3226]/50 font-medium uppercase tracking-wider mb-2">Folder Settings</p>
