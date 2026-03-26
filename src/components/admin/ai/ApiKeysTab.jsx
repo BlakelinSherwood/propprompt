@@ -3,7 +3,8 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Eye, EyeOff, Loader2, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
+import { Eye, EyeOff, Loader2, CheckCircle2, XCircle, AlertCircle, Database } from "lucide-react";
+import { toast } from "sonner";
 
 const PROVIDERS = [
   {
@@ -273,6 +274,74 @@ function ProviderCard({ provider, config, onUpdate }) {
   );
 }
 
+function BatchDataCard({ config, onUpdate }) {
+  const [keyInput, setKeyInput] = useState("");
+  const [showKey, setShowKey] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const hasKey = !!config.batchdata_api_key;
+  const maskedKey = hasKey ? `••••••••${String(config.batchdata_api_key).slice(-4)}` : "";
+
+  async function saveKey() {
+    if (!keyInput.trim()) return;
+    setSaving(true);
+    await base44.functions.invoke('updatePlatformConfig', { data: { batchdata_api_key: keyInput.trim() } });
+    setKeyInput("");
+    toast.success("BatchData API key saved.");
+    await onUpdate();
+    setSaving(false);
+  }
+
+  return (
+    <div className="border border-[#1A3226]/10 rounded-xl p-5 space-y-4 bg-white">
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center">
+            <span className="text-xs font-bold text-gray-500">BD</span>
+          </div>
+          <div>
+            <div className="font-bold text-[#1A3226] text-lg">BatchData <span className="font-normal text-[#1A3226]/60 text-base">· Comparable Sales</span></div>
+            <div className="text-xs text-[#1A3226]/50 mt-0.5">Automated comp lookups for listing pricing and CMA reports</div>
+          </div>
+        </div>
+        {hasKey
+          ? <span className="px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700">Connected</span>
+          : <span className="px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-500">Not configured</span>}
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-xs font-medium text-[#1A3226]/70 uppercase tracking-wide">BatchData API Key</label>
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Input
+              type={showKey ? "text" : "password"}
+              placeholder={hasKey ? maskedKey : "Enter your BatchData API key"}
+              value={keyInput}
+              onChange={e => setKeyInput(e.target.value)}
+              className="pr-9 text-sm"
+            />
+            <button className="absolute right-2 top-1/2 -translate-y-1/2 text-[#1A3226]/40 hover:text-[#1A3226]" onClick={() => setShowKey(v => !v)}>
+              {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+          <Button onClick={saveKey} disabled={!keyInput.trim() || saving} size="sm" className="bg-[#1A3226] text-white hover:bg-[#1A3226]/90">
+            {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save Key"}
+          </Button>
+        </div>
+        <p className="text-xs text-[#1A3226]/50">
+          Used to automatically find comparable sales for listing pricing and CMA reports.
+          Get your key at{" "}
+          <a href="https://www.batchdata.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-[#1A3226]">batchdata.com</a>.
+        </p>
+      </div>
+
+      <div className="flex items-center justify-between pt-2 border-t border-[#1A3226]/5">
+        <span className="text-xs text-[#1A3226]/40">Stored encrypted · Never shared with agents</span>
+      </div>
+    </div>
+  );
+}
+
 export default function ApiKeysTab() {
   const [config, setConfig] = useState(null);
 
@@ -299,6 +368,11 @@ export default function ApiKeysTab() {
         {PROVIDERS.map(p => (
           <ProviderCard key={p.id} provider={p} config={config} onUpdate={load} />
         ))}
+      </div>
+
+      <div className="mt-2">
+        <p className="text-xs font-semibold text-[#1A3226]/40 uppercase tracking-widest mb-3">Data Integrations</p>
+        <BatchDataCard config={config} onUpdate={load} />
       </div>
     </div>
   );

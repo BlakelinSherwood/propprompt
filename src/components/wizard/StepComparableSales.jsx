@@ -1,6 +1,7 @@
-import { useState } from "react";
-import { Plus, X, AlertTriangle, Info } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Plus, X, AlertTriangle, Info, Search, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { base44 } from "@/api/base44Client";
 import WizardShell from "./WizardShell";
 
 const CONDITIONS = ["Superior", "Similar", "Inferior"];
@@ -23,6 +24,35 @@ export default function StepComparableSales({ intake, update, onNext, onBack }) 
       : []
   );
   const [showWarningConfirm, setShowWarningConfirm] = useState(false);
+  const [batchDataConfigured, setBatchDataConfigured] = useState(null); // null=loading, true, false
+  const [fetchingComps, setFetchingComps] = useState(false);
+  const [fetchError, setFetchError] = useState(null);
+
+  useEffect(() => {
+    base44.functions.invoke('fetchCompsFromBatchData', { checkOnly: true })
+      .then(res => setBatchDataConfigured(res.data?.configured === true))
+      .catch(() => setBatchDataConfigured(false));
+  }, []);
+
+  async function handleFetchComps() {
+    if (!intake.address) return;
+    setFetchingComps(true);
+    setFetchError(null);
+    const res = await base44.functions.invoke('fetchCompsFromBatchData', { address: intake.address });
+    const data = res.data;
+    if (data?.success && data.comps?.length > 0) {
+      setComps(prev => {
+        const existing = new Set(prev.map(c => c.address?.toLowerCase()));
+        const newComps = data.comps.filter(c => !existing.has(c.address?.toLowerCase()));
+        return [...prev, ...newComps].slice(0, 10);
+      });
+    } else if (data?.error) {
+      setFetchError(data.message || 'No comps found for this address.');
+    } else {
+      setFetchError('No comparable sales found for this address.');
+    }
+    setFetchingComps(false);
+  }
 
   function addComp() {
     if (comps.length >= 10) return;
@@ -194,6 +224,37 @@ export default function StepComparableSales({ intake, update, onNext, onBack }) 
           >
             <Plus className="w-4 h-4" /> Add Another Comp
           </Button>
+        )}
+
+        {/* BatchData auto-fetch */}
+        {batchDataConfigured === true && intake.address && (
+          <div className="rounded-xl border border-[#1A3226]/10 bg-[#FAF8F4] px-4 py-3 space-y-2">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <p className="text-xs text-[#1A3226]/70 font-medium">Auto-find comparable sales via BatchData</p>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleFetchComps}
+                disabled={fetchingComps}
+                className="gap-1.5 text-xs border-[#1A3226]/20 text-[#1A3226]"
+              >
+                <Search className="w-3.5 h-3.5" />
+                {fetchingComps ? 'Finding comps…' : '🔍 Find Comparable Sales'}
+              </Button>
+            </div>
+            {fetchError && <p className="text-xs text-red-600">{fetchError}</p>}
+          </div>
+        )}
+        {batchDataConfigured === false && (
+          <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 flex items-center justify-between gap-3">
+            <p className="text-xs text-gray-500">BatchData API key not configured.</p>
+            <a
+              href="/admin/ai-settings?tab=keys"
+              className="text-xs text-[#1A3226] underline flex items-center gap-1 whitespace-nowrap"
+            >
+              Configure in Admin Settings <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
         )}
 
         {/* Info callout */}

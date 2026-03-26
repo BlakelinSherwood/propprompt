@@ -1,0 +1,167 @@
+{
+  "name": "PlatformConfig",
+  "type": "object",
+  "description": "Platform-wide configuration for AI models, API keys, and feature availability.",
+  "properties": {
+    "platform_version": {
+      "type": "string",
+      "default": "4.0",
+      "description": "Current PropPrompt platform version (e.g. 4.0)"
+    },
+    "sc_managed_keys_enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether Sherwood & Company platform-managed API keys are enabled globally"
+    },
+    "anthropic_api_key": {
+      "type": "string",
+      "description": "Encrypted Claude API key for platform use"
+    },
+    "openai_api_key": {
+      "type": "string",
+      "description": "Encrypted OpenAI API key for platform use"
+    },
+    "google_api_key": {
+      "type": "string",
+      "description": "Encrypted Google API key for platform use"
+    },
+    "perplexity_api_key": {
+      "type": "string",
+      "description": "Encrypted Perplexity API key for platform use"
+    },
+    "grok_api_key": {
+      "type": "string",
+      "description": "Encrypted Grok API key for platform use"
+    },
+    "groq_api_key": {
+      "type": "string",
+      "description": "Encrypted Groq (Llama) API key for platform use"
+    },
+    "batchdata_api_key": {
+      "type": "string",
+      "description": "Encrypted BatchData API key used for automated comparable sales lookups. Never exposed in client-facing responses or logs."
+    },
+    "claude_enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether Claude is globally available"
+    },
+    "chatgpt_enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether ChatGPT is globally available"
+    },
+    "gemini_enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether Gemini is globally available"
+    },
+    "perplexity_enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether Perplexity is globally available"
+    },
+    "grok_enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether Grok is globally available"
+    },
+    "groq_enabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether Groq/Llama is globally available (Phase 2)"
+    },
+    "anthropic_model": {
+      "type": "string",
+      "default": "claude-opus-4-5",
+      "description": "Default Claude model"
+    },
+    "openai_model": {
+      "type": "string",
+      "default": "gpt-4o",
+      "description": "Default OpenAI model"
+    },
+    "gemini_model": {
+      "type": "string",
+      "default": "gemini-2.0-flash",
+      "description": "Default Gemini model"
+    },
+    "perplexity_model": {
+      "type": "string",
+      "default": "sonar-pro",
+      "description": "Default Perplexity model"
+    },
+    "grok_model": {
+      "type": "string",
+      "default": "grok-3",
+      "description": "Default Grok model"
+    },
+    "groq_model": {
+      "type": "string",
+      "default": "llama-3.3-70b-versatile",
+      "description": "Default Groq/Llama model"
+    },
+    "ensemble_mode_enabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether Ensemble AI mode is active"
+    },
+    "ensemble_primary_provider": {
+      "type": "string",
+      "default": "claude",
+      "description": "Primary provider for ensemble analyses"
+    },
+    "ensemble_fallback_provider": {
+      "type": "string",
+      "default": "chatgpt",
+      "description": "Fallback provider for ensemble analyses"
+    },
+    "ensemble_section_assignments": {
+      "type": "object",
+      "description": "Per-section AI provider and model assignments for ensemble mode"
+    },
+    "anthropic_last_ping": {
+      "type": "string"
+    },
+    "openai_last_ping": {
+      "type": "string"
+    },
+    "gemini_last_ping": {
+      "type": "string"
+    },
+    "perplexity_last_ping": {
+      "type": "string"
+    },
+    "grok_last_ping": {
+      "type": "string"
+    },
+    "groq_last_ping": {
+      "type": "string"
+    },
+    "anthropic_last_ping_at": {
+      "type": "string",
+      "format": "date"
+    },
+    "openai_last_ping_at": {
+      "type": "string",
+      "format": "date"
+    },
+    "gemini_last_ping_at": {
+      "type": "string",
+      "format": "date"
+    },
+    "perplexity_last_ping_at": {
+      "type": "string",
+      "format": "date"
+    },
+    "grok_last_ping_at": {
+      "type": "string",
+      "format": "date"
+    },
+    "groq_last_ping_at": {
+      "type": "string",
+      "format": "date"
+    }
+  },
+  "required": []
+}
