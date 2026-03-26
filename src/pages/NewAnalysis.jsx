@@ -86,9 +86,8 @@ export default function NewAnalysis() {
           resolvedTier = 'team';
         }
         setUserTier(resolvedTier);
-        // Auto-assign platform — no user choice
-        const isPro = ['pro', 'team', 'broker'].includes(resolvedTier) || ['platform_owner', 'admin'].includes(user.role);
-        update({ ai_platform: isPro ? 'ensemble' : 'claude' });
+        // Always store 'claude' — tier-based routing in generateAnalysis handles ensemble automatically
+        update({ ai_platform: 'claude' });
       } catch (e) {
         setUserTier('starter');
         update({ ai_platform: 'claude' });
