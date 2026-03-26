@@ -744,7 +744,7 @@ Deno.serve(async (req) => {
 
     // Starter tier: AVM lookup not available — instruct AI to set avm_perception to null
     if (['listing_pricing', 'cma'].includes(analysis.assessment_type)) {
-      prompt += `\n\nAVM PERCEPTION DATA: null (Starter tier — live search not available)\nSet avm_perception to null in the output JSON. Do not attempt to look up, estimate, or generate AVM platform values.`;
+      prompt += `\n\nAVM PERCEPTION DATA: null (Starter tier — live search not available)\nSet avm_perception to null in the output JSON. Do NOT attempt to search, estimate, look up, or generate any AVM platform values. The key must exist in the JSON and its value must be null — not an object, not an empty array.`;
     }
 
     // Mark as in_progress

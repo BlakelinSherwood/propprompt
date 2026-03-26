@@ -100,6 +100,7 @@ function substituteTokens(template, analysis, territory, extras = {}) {
     .replace(/\[PERPLEXITY_DATA\]/g, extras.perplexity_data ? JSON.stringify(extras.perplexity_data, null, 2) : "(not available)")
     .replace(/\[GEMINI_DATA\]/g, extras.gemini_data ? JSON.stringify(extras.gemini_data, null, 2) : "(not available)")
     .replace(/\[REGISTRY_DATA\]/g, extras.registry_data ? JSON.stringify(extras.registry_data, null, 2) : "(not available)")
+    .replace(/\[PERPLEXITY_AVM_DATA\]/g, extras.perplexity_avm_data ? JSON.stringify(extras.perplexity_avm_data, null, 2) : "null")
     .replace(/\[INTAKE_JSON\]/g, JSON.stringify(d, null, 2));
 }
 
