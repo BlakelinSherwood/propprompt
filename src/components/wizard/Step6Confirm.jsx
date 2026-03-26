@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Zap, User, ChevronDown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -69,14 +69,29 @@ function QuotaMeter({ user }) {
   );
 }
 
+const PROGRESS_MESSAGES = [
+  'Searching for comparable sales...',
+  'Analyzing market data...',
+  'Building your report...'
+];
+
 export default function Step6Confirm({ intake, update, user, orgMembers, submitting, onBack, onSubmit }) {
   const isAssistantOrLead = user?.role === "assistant" || user?.role === "team_lead";
   const [fetchingComps, setFetchingComps] = useState(false);
   const [progressMsg, setProgressMsg] = useState('');
+  const msgIndexRef = useRef(0);
+  const msgIntervalRef = useRef(null);
 
   const handleLaunchWithComps = async () => {
     setFetchingComps(true);
-    setProgressMsg('Searching for comparable sales...');
+    msgIndexRef.current = 0;
+    setProgressMsg(PROGRESS_MESSAGES[0]);
+
+    // Rotate progress messages every 3 seconds
+    msgIntervalRef.current = setInterval(() => {
+      msgIndexRef.current = (msgIndexRef.current + 1) % PROGRESS_MESSAGES.length;
+      setProgressMsg(PROGRESS_MESSAGES[msgIndexRef.current]);
+    }, 3000);
 
     try {
       // Trigger comp fetch in background
@@ -93,7 +108,6 @@ export default function Step6Confirm({ intake, update, user, orgMembers, submitt
       }).then(r => r.json());
 
       if (compRes.success) {
-        setProgressMsg('Analyzing market data...');
         update({
           agent_comps: compRes.comps || [],
           comps_source: compRes.comps?.length >= 3 ? 'api_verified' : (compRes.comps?.length > 0 ? 'mixed' : 'none'),
@@ -107,13 +121,11 @@ export default function Step6Confirm({ intake, update, user, orgMembers, submitt
       }
     } catch (err) {
       console.warn('[Step6Confirm] Comp fetch failed, continuing anyway:', err);
-    }
-
-    setProgressMsg('Building your report...');
-    setTimeout(() => {
+    } finally {
+      if (msgIntervalRef.current) clearInterval(msgIntervalRef.current);
       setFetchingComps(false);
       onSubmit();
-    }, 500);
+    }
   };
 
   return (

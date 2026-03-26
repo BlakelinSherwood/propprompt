@@ -12,21 +12,15 @@ import Step6Confirm from "../components/wizard/Step6Confirm";
 import StepClientFinancial from "../components/wizard/StepClientFinancial";
 import StepBuyerIntelligence from "../components/wizard/StepBuyerIntelligence";
 import StepReportEnhancements from "../components/wizard/StepReportEnhancements";
-import StepComparableSales from "../components/wizard/StepComparableSales";
-import StepPriorSaleHistory from "../components/wizard/StepPriorSaleHistory";
-import StepSellerFinancial from "../components/wizard/StepSellerFinancial";
 
 function getStepLabels(assessmentType) {
   const base = ["Assessment", "Client Role", "Property"];
-  const hasCompsStep = ["listing_pricing", "cma"].includes(assessmentType);
-  const compsSteps = hasCompsStep ? ["Comparable Sales", "Prior Sale History"] : [];
-  const sellerFinancialStep = assessmentType === "listing_pricing" ? ["Seller Financials"] : [];
   const afterProperty = [];
   if (assessmentType === "listing_pricing") afterProperty.push("Buyer Context");
   else if (assessmentType === "client_portfolio") afterProperty.push("Financial Context");
   else if (["buyer_intelligence"].includes(assessmentType)) afterProperty.push("Buyer Context");
   else if (["cma", "investment_analysis"].includes(assessmentType)) afterProperty.push("Enhancements");
-  return [...base, ...compsSteps, ...sellerFinancialStep, ...afterProperty, "Output", "Confirm"];
+  return [...base, ...afterProperty, "Output", "Confirm"];
 }
 
 function getMaxStep(assessmentType) {
@@ -227,8 +221,6 @@ export default function NewAnalysis() {
   const stepProps = { intake, update, user, userTier, onNext: next, onBack: back };
   const maxStep = getMaxStep(intake.assessment_type);
   const stepLabels = getStepLabels(intake.assessment_type);
-  const hasCompsStep = ["listing_pricing", "cma"].includes(intake.assessment_type);
-  const hasSellerFinancialStep = intake.assessment_type === "listing_pricing";
   const hasFinancialStep = intake.assessment_type === "client_portfolio";
   const hasBuyerStep = ["listing_pricing", "buyer_intelligence"].includes(intake.assessment_type);
   const hasEnhancementStep = ["cma", "investment_analysis"].includes(intake.assessment_type);
@@ -241,18 +233,6 @@ export default function NewAnalysis() {
     if (step === 3) return <Step4PropertyDetails {...stepProps} />;
 
     let nextStep = 4;
-
-    if (hasCompsStep) {
-      if (step === nextStep) return <StepComparableSales {...stepProps} />;
-      nextStep++;
-      if (step === nextStep) return <StepPriorSaleHistory {...stepProps} />;
-      nextStep++;
-    }
-
-    if (hasSellerFinancialStep) {
-      if (step === nextStep) return <StepSellerFinancial {...stepProps} />;
-      nextStep++;
-    }
 
     if (hasContextStep) {
       if (step === nextStep) {
