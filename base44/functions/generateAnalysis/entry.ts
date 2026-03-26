@@ -729,8 +729,10 @@ Deno.serve(async (req) => {
     // Inject agent comps block
     const agentComps = analysis.agent_comps;
     if (Array.isArray(agentComps) && agentComps.length > 0) {
-      const radiusNote = analysis.comps_search_radius != null ? analysis.comps_search_radius + ' miles' : 'varies';
-      prompt += `\n\nVERIFIED COMPARABLE SALES\nSource: ${analysis.comps_source || 'agent_provided'} | Fetched: ${analysis.comps_fetched_at || 'unknown'}\nCount: ${agentComps.length} | Search radius used: ${radiusNote}\n\nThese comps were retrieved from BatchData public records and cross-referenced against Compass, Zillow, Redfin, and Realtor.com. They were reviewed and confirmed by the agent.\nUse ONLY these comps. Do not add, substitute, or invent any others.\n\n${JSON.stringify(agentComps, null, 2)}`;
+      const compsSource = analysis.comps_source || 'agent_provided';
+      const compsRadius = analysis.comps_search_radius ? `${analysis.comps_search_radius} miles` : 'unknown';
+      const compsFetchedAt = analysis.comps_fetched_at ? new Date(analysis.comps_fetched_at).toLocaleDateString() : 'unknown';
+      prompt += `\n\nVERIFIED COMPARABLE SALES\nSource: ${compsSource} | Fetched: ${compsFetchedAt}\nCount: ${agentComps.length} | Search radius used: ${compsRadius}\n\nThese comps were retrieved from BatchData public records and cross-referenced against Compass, Zillow, Redfin, and Realtor.com. They were reviewed and confirmed by the agent.\nUse ONLY these comps. Do not add, substitute, or invent any others.\n\n${JSON.stringify(agentComps, null, 2)}`;
     } else {
       prompt += `\n\nCOMPARABLE SALES: None confirmed by agent.\nSet data_quality_flag to 'red', comps to [], and implied_value_range to null per data integrity rules.`;
     }

@@ -233,23 +233,50 @@
     },
     "agent_comps": {
       "type": "array",
-      "description": "Agent-confirmed comp set after review. The ONLY comp data that ever reaches the AI.",
+      "description": "Agent-confirmed comp set after review. The ONLY comp data passed to AI.",
       "items": {
-        "type": "object"
-      }
-    },
-    "raw_batchdata_comps": {
-      "type": "array",
-      "description": "Full unfiltered BatchData response before agent review. Stored for audit trail. Never passed directly to AI.",
-      "items": {
-        "type": "object"
-      }
-    },
-    "raw_perplexity_enrichment": {
-      "type": "array",
-      "description": "Raw Perplexity cross-reference responses keyed by address. Stored for audit trail.",
-      "items": {
-        "type": "object"
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "sale_price": {
+            "type": "number"
+          },
+          "sale_date": {
+            "type": "string"
+          },
+          "sqft": {
+            "type": "number"
+          },
+          "bedrooms": {
+            "type": "number"
+          },
+          "bathrooms": {
+            "type": "number"
+          },
+          "price_per_sqft": {
+            "type": "number"
+          },
+          "source": {
+            "type": "string"
+          },
+          "perplexity_confirmed": {
+            "type": "boolean"
+          },
+          "perplexity_variance": {
+            "type": "number"
+          },
+          "condition_vs_subject": {
+            "type": "string"
+          },
+          "agent_excluded": {
+            "type": "boolean"
+          },
+          "agent_notes": {
+            "type": "string"
+          }
+        }
       }
     },
     "comps_source": {
@@ -263,6 +290,20 @@
       "default": "none",
       "description": "How comps were sourced."
     },
+    "raw_batchdata_comps": {
+      "type": "array",
+      "description": "Full unfiltered BatchData response before agent review. Stored for audit trail. Never passed directly to AI.",
+      "items": {
+        "type": "object"
+      }
+    },
+    "raw_perplexity_enrichment": {
+      "type": "array",
+      "description": "Perplexity cross-reference data keyed by address. Stored for audit trail. Never passed directly to AI.",
+      "items": {
+        "type": "object"
+      }
+    },
     "comps_fetched_at": {
       "type": "string",
       "format": "date-time",
@@ -270,11 +311,11 @@
     },
     "comps_search_tier": {
       "type": "string",
-      "description": "Tier level that produced the final comp set: 1|2|3|4|multi_tier|agent_deep_search"
+      "description": "The tier level that produced the final comp set. Values: 1-4, multi_tier, agent_deep_search."
     },
     "comps_search_radius": {
       "type": "number",
-      "description": "Radius in miles used for the successful fetch."
+      "description": "The radius in miles used for the successful fetch."
     },
     "large_property_flag": {
       "type": "boolean",
@@ -283,7 +324,7 @@
     },
     "comps_researcher_note": {
       "type": "string",
-      "description": "Note from Perplexity deep search agent explaining why comp volume was limited."
+      "description": "Note from Perplexity deep search agent explaining why volume was limited. Shown as info banner in review UI."
     },
     "comps_fetch_triggered": {
       "type": "boolean",
@@ -292,7 +333,7 @@
     },
     "comps_cache_key": {
       "type": "string",
-      "description": "Hash of search parameters (address+beds+baths+sqft+type). Used to detect stale cache."
+      "description": "Hash of search parameters for cache invalidation."
     },
     "valuation_anomaly": {
       "type": "object",
