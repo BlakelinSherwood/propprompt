@@ -139,8 +139,23 @@ Deno.serve(async (req) => {
     const brandingRes = await base44.functions.invoke('resolveBranding', { analysisId });
     const branding = brandingRes?.data?.branding;
     if (!branding) throw new Error('Failed to resolve branding');
+    
+    // STEP 4: Inject all branding variables NOW (before template rendering)
+    const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    branding.report_date = today;
+    branding.generated_date = today;
+    
+    // Ensure all branding tokens have values (11 required tokens)
+    branding.agent_name = branding.agent_name || '';
+    branding.agent_title = branding.agent_title || '';
+    branding.agent_phone = branding.agent_phone || '';
+    branding.agent_email = branding.agent_email || '';
+    branding.org_name = branding.org_name || 'PropPrompt';
+    branding.org_logo_url = branding.org_logo_url || '';
+    branding.agent_headshot_url = branding.agent_headshot_url || '';
+    
     console.log('[PropPrompt PDF] Branding resolved:', { analysis_id: analysisId, agent_name: branding.agent_name, org_name: branding.org_name, primary_color: branding.primary_color, accent_color: branding.accent_color, has_logo: !!branding.org_logo_url, has_headshot: !!branding.agent_headshot_url, resolution_source: branding.resolution_source });
-    if (branding.resolution_source === 'platform_fallback') console.warn('[PropPrompt PDF] WARNING: resolution_source is platform_fallback — agent may have custom branding that is not resolving.');
+    if (branding.resolution_source === 'platform_fallback' && (branding.agent_name || branding.agent_email)) console.warn('[PropPrompt PDF] WARNING: resolution_source is platform_fallback but agent has custom branding configured — cascade may be broken.');
 
     // 2. Load analysis for content
     const analyses = await base44.asServiceRole.entities.Analysis.filter({ id: analysisId });
