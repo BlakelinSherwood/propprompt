@@ -161,6 +161,10 @@
     "groq_last_ping_at": {
       "type": "string",
       "format": "date"
+    },
+    "generation_perf_snapshot": {
+      "type": "object",
+      "description": "Rolling 7-day performance metrics per tier with last_computed timestamp"
     }
   },
   "required": []

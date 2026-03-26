@@ -1,0 +1,71 @@
+{
+  "name": "GenerationTimingLog",
+  "type": "object",
+  "description": "Records AI content generation time per analysis for performance monitoring.",
+  "properties": {
+    "analysis_id": {
+      "type": "string",
+      "description": "Reference to the Analysis record"
+    },
+    "report_type": {
+      "type": "string",
+      "description": "Type of report: listing_pricing, cma, buyer_intelligence, etc."
+    },
+    "subscription_tier": {
+      "type": "string",
+      "enum": [
+        "starter",
+        "pro",
+        "team",
+        "broker"
+      ],
+      "description": "User tier at time of generation"
+    },
+    "generation_start": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when first AI model call was initiated"
+    },
+    "generation_end": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when final JSON was returned (excludes PDF/upload)"
+    },
+    "duration_ms": {
+      "type": "integer",
+      "description": "Duration in milliseconds (generation_end - generation_start)"
+    },
+    "duration_seconds": {
+      "type": "number",
+      "description": "Duration in seconds (rounded to 1 decimal)"
+    },
+    "threshold_exceeded": {
+      "type": "boolean",
+      "default": false,
+      "description": "True if duration exceeded tier threshold (30/45/45/60 seconds)"
+    },
+    "alert_sent": {
+      "type": "boolean",
+      "default": false,
+      "description": "True once alert triggered for this record"
+    },
+    "model_pipeline": {
+      "type": "string",
+      "description": "Label describing pipeline used (e.g. claude+gpt4o, ensemble-5model)"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Auto-generated timestamp"
+    }
+  },
+  "required": [
+    "analysis_id",
+    "report_type",
+    "subscription_tier",
+    "generation_start",
+    "generation_end",
+    "duration_ms",
+    "duration_seconds"
+  ]
+}

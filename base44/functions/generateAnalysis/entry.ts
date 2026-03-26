@@ -906,7 +906,26 @@ Deno.serve(async (req) => {
         || sectionOutputs['narrative_layer']
         || Object.values(sectionOutputs).join('\n\n---\n\n');
 
-      const generationTime = Date.now() - startTime;
+      const generationEnd = Date.now();
+      const generationTime = generationEnd - startTime;
+      const durationSeconds = Math.round(generationTime / 10) / 100;
+      const tierThresholds = { starter: 30, pro: 45, team: 45, broker: 60 };
+      const tierThreshold = tierThresholds[tier] ?? 60;
+      try {
+        await base44.asServiceRole.entities.GenerationTimingLog.create({
+          analysis_id: analysisId,
+          report_type: analysis.assessment_type || 'unknown',
+          subscription_tier: tier,
+          generation_start: new Date(startTime).toISOString(),
+          generation_end: new Date(generationEnd).toISOString(),
+          duration_ms: generationTime,
+          duration_seconds: durationSeconds,
+          threshold_exceeded: durationSeconds > tierThreshold,
+          alert_sent: false,
+          model_pipeline: 'ensemble-5model',
+        });
+      } catch (timingErr) { console.warn('[generateAnalysis] ProTimingLog failed:', timingErr.message); }
+      console.log('[PropPrompt Timing]', { analysis_id: analysisId, tier, report_type: analysis.assessment_type, duration_s: durationSeconds, threshold_s: tierThreshold, exceeded: durationSeconds > tierThreshold });
 
       await base44.asServiceRole.entities.Analysis.update(analysisId, {
         status: 'complete',
@@ -944,6 +963,7 @@ Deno.serve(async (req) => {
     }
 
     // ── STARTER / FALLBACK: Single-model path ────────────────────────────────
+    const starterGenStart = Date.now();
     let result;
     const platform = analysis.ai_platform;
     if (platform === "claude") {
@@ -984,6 +1004,28 @@ Deno.serve(async (req) => {
     } catch (logError) {
       console.warn('[generateAnalysis] AITokenLog (starter) failed silently:', logError.message);
     }
+
+    // Record timing for Starter path
+    const starterGenEnd = Date.now();
+    const starterDurationMs = starterGenEnd - starterGenStart;
+    const starterDurationSec = Math.round(starterDurationMs / 10) / 100;
+    const starterThresholds = { starter: 30, pro: 45, team: 45, broker: 60 };
+    const starterThreshold = starterThresholds[tier] ?? 60;
+    try {
+      await base44.asServiceRole.entities.GenerationTimingLog.create({
+        analysis_id: analysisId,
+        report_type: analysis.assessment_type || 'unknown',
+        subscription_tier: tier,
+        generation_start: new Date(starterGenStart).toISOString(),
+        generation_end: new Date(starterGenEnd).toISOString(),
+        duration_ms: starterDurationMs,
+        duration_seconds: starterDurationSec,
+        threshold_exceeded: starterDurationSec > starterThreshold,
+        alert_sent: false,
+        model_pipeline: 'claude+gpt4o',
+      });
+    } catch (timingErr) { console.warn('[generateAnalysis] StarterTimingLog failed:', timingErr.message); }
+    console.log('[PropPrompt Timing]', { analysis_id: analysisId, tier, report_type: analysis.assessment_type, duration_s: starterDurationSec, threshold_s: starterThreshold, exceeded: starterDurationSec > starterThreshold });
 
     // Extract structured JSON from AI response
     const { cleanText, outputJson } = extractJsonOutput(result.text);

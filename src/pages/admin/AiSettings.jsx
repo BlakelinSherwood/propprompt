@@ -10,6 +10,7 @@ import UsageStatsTab from "../../components/admin/ai/UsageStatsTab";
 import ModelReferenceTab from "../../components/admin/ai/ModelReferenceTab";
 import QualityAuditTab from "../../components/admin/ai/QualityAuditTab";
 import ModelRoutingConfig from "../../components/admin/ai/ModelRoutingConfig";
+import GenerationPerformanceTab from "../../components/admin/ai/GenerationPerformanceTab";
 
 export default function AiSettings() {
   const [loading, setLoading] = useState(true);
@@ -55,6 +56,7 @@ export default function AiSettings() {
           <TabsTrigger value="routing">Model Routing</TabsTrigger>
           <TabsTrigger value="usage">Usage Stats</TabsTrigger>
           <TabsTrigger value="reference">Model Reference</TabsTrigger>
+          <TabsTrigger value="performance">Generation Performance</TabsTrigger>
         </TabsList>
 
         <TabsContent value="keys" className="mt-6">
@@ -79,6 +81,10 @@ export default function AiSettings() {
 
         <TabsContent value="reference" className="mt-6">
           <ModelReferenceTab />
+        </TabsContent>
+
+        <TabsContent value="performance" className="mt-6">
+          <GenerationPerformanceTab />
         </TabsContent>
       </Tabs>
     </div>
