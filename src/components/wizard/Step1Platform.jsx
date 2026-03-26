@@ -34,7 +34,6 @@ const PLATFORMS = [
     name: "Grok (xAI)",
     description: "Real-time information, edgy analysis",
     icon: "⚡",
-    comingSoon: true,
   },
 ];
 
