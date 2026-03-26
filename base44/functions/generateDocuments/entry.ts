@@ -1416,7 +1416,7 @@ async function renderListingPricingPdf(doc, data, branding, netProceedsJson = nu
   await drawPageFrame(doc, branding, 'Section 05 · Seller Financial Summary', 'Estimated Net Proceeds');
   y = 90;
 
-  if (!netProceedsJson) {
+  if (!netProceedsJson || !netProceedsJson.scenarios || netProceedsJson.scenarios.length === 0) {
     // Skipped — show explanatory text
     doc.setFillColor(244, 241, 234);
     doc.roundedRect(margin, y, contentWidth, 44, 3, 3, 'F');

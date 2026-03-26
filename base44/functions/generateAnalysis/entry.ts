@@ -926,7 +926,7 @@ Deno.serve(async (req) => {
       }
 
       // Calculate net proceeds server-side (listing_pricing only, best-effort)
-      if (analysis.assessment_type === 'listing_pricing') {
+      if (analysis.assessment_type === 'listing_pricing' && outputJson) {
         try {
           await base44.functions.invoke('calculateNetProceeds', { analysisId });
         } catch (e) {
@@ -1025,7 +1025,7 @@ Deno.serve(async (req) => {
     }
 
     // Calculate net proceeds server-side (listing_pricing only, best-effort)
-    if (analysis.assessment_type === 'listing_pricing') {
+    if (analysis.assessment_type === 'listing_pricing' && outputJson) {
       try {
         await base44.functions.invoke('calculateNetProceeds', { analysisId });
       } catch (e) {
