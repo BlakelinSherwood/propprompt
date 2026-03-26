@@ -4,7 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { useNavigate } from "react-router-dom";
 import { AlertTriangle } from "lucide-react";
 import { Plug, Palette } from "lucide-react";
-import AiApiKeyManager from "../components/AiApiKeyManager";
+
 import CrmConnectedApps from "../components/CrmConnectedApps";
 import DriveConnectedApp from "../components/DriveConnectedApp";
 import AgentBrandingSettings from "../components/AgentBrandingSettings";
@@ -68,14 +68,6 @@ export default function AccountSettings() {
             <DriveConnectedApp />
           </div>
 
-          {/* AI API Keys */}
-          <div>
-            <h2 className="text-sm font-semibold text-[#1A3226] mb-1">AI API Keys</h2>
-            <p className="text-xs text-[#1A3226]/40 mb-3">
-              Add your own API keys to use ChatGPT for analyses.
-            </p>
-            <AiApiKeyManager />
-          </div>
 
           {/* CRM Integrations */}
           <div>
