@@ -135,10 +135,12 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 1. Resolve branding
+    // 1. Resolve branding — MUST happen before any PDF rendering
     const brandingRes = await base44.functions.invoke('resolveBranding', { analysisId });
     const branding = brandingRes?.data?.branding;
     if (!branding) throw new Error('Failed to resolve branding');
+    console.log('[PropPrompt PDF] Branding resolved:', { analysis_id: analysisId, agent_name: branding.agent_name, org_name: branding.org_name, primary_color: branding.primary_color, accent_color: branding.accent_color, has_logo: !!branding.org_logo_url, has_headshot: !!branding.agent_headshot_url, resolution_source: branding.resolution_source });
+    if (branding.resolution_source === 'platform_fallback') console.warn('[PropPrompt PDF] WARNING: resolution_source is platform_fallback — agent may have custom branding that is not resolving.');
 
     // 2. Load analysis for content
     const analyses = await base44.asServiceRole.entities.Analysis.filter({ id: analysisId });
@@ -431,25 +433,7 @@ function addAgentFooter(doc, branding, pageWidth, pageHeight) {
   doc.text(splitDisclaimer, 40, footerY + 34);
 }
 
-function chunkText(text, maxLen) {
-  const chunks = [];
-  let start = 0;
-  while (start < text.length) {
-    chunks.push(text.slice(start, start + maxLen));
-    start += maxLen;
-  }
-  return chunks.length ? chunks : [''];
-}
-
-function escapeHtml(str) {
-  if (!str) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+// chunkText and escapeHtml removed — not used by jsPDF renderer
 
 // ─── PDF Template Renderers ────────────────────────────────────────────────────
 
@@ -1985,9 +1969,5 @@ async function renderRentalMarketPdf(doc, data, branding) {
   await addDisclaimerPage(doc, branding);
 }
 
-// ─── Helper: Email HTML Builder ────────────────────────────────────────────
-
-function buildEmailHtml(analysis, branding) {
-  const primary = branding.primary_color || '#333333';
-  const accent = branding.accent_color || '#666666';
-}
+// ─── Helper: Email HTML Builder (stub — email format not yet implemented) ────
+function buildEmailHtml(analysis, branding) { return ''; }

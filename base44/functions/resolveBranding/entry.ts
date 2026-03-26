@@ -84,10 +84,17 @@ export async function resolveBrandingForAnalysis(base44Client, analysisId) {
 
   // 6. Merge: brokerage → team → agent
   // For team, only override if the team has explicitly set the field (non-null, non-empty)
+  // Determine resolution source for audit logging
+  const hasAgentBranding = !!(agentBranding.display_name || agentBranding.title || agentBranding.direct_phone || agentBranding.direct_email || agentBranding.headshot_url);
+  const hasOrgBranding = !!(brokerageBrandingConfig.primary_color || brokerageBranding.primary_color || teamBrandingConfig.primary_color);
+  const resolutionSource = hasAgentBranding ? 'agent' : hasOrgBranding ? 'org' : 'platform_fallback';
+
+  const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
   const merged = {
     // Org identity layer
     org_name: teamBranding.org_name || brokerageBranding.org_name || org?.name || '',
-    org_logo_url: teamBranding.logo_url || brokerageBranding.logo_url || null,
+    org_logo_url: teamBrandingConfig.org_logo_url || brokerageBrandingConfig.org_logo_url || teamBranding.logo_url || brokerageBranding.logo_url || null,
     org_tagline: teamBranding.tagline || brokerageBranding.tagline || '',
     org_address: teamBranding.address || brokerageBranding.address || '',
     org_phone: teamBranding.phone || brokerageBranding.phone || '',
@@ -97,8 +104,7 @@ export async function resolveBrandingForAnalysis(base44Client, analysisId) {
     primary_color: teamBrandingConfig.primary_color || brokerageBrandingConfig.primary_color || teamBranding.primary_color || brokerageBranding.primary_color || DEFAULTS.primary_color,
     accent_color: teamBrandingConfig.accent_color || brokerageBrandingConfig.accent_color || teamBranding.accent_color || brokerageBranding.accent_color || DEFAULTS.accent_color,
     background_color: teamBrandingConfig.background_color || brokerageBrandingConfig.background_color || teamBranding.background_color || brokerageBranding.background_color || DEFAULTS.background_color,
-    org_logo_url: teamBrandingConfig.org_logo_url || brokerageBrandingConfig.org_logo_url || null,
-    agent_headshot_url: teamBrandingConfig.agent_headshot_url || brokerageBrandingConfig.agent_headshot_url || agentBranding.headshot_url || null,
+    agent_headshot_url: agentBranding.headshot_url || teamBrandingConfig.agent_headshot_url || brokerageBrandingConfig.agent_headshot_url || null,
 
     // Agent personal layer
     agent_name: agentBranding.display_name || agentUser.full_name || agentEmail || '',
@@ -107,8 +113,14 @@ export async function resolveBrandingForAnalysis(base44Client, analysisId) {
     agent_email: agentBranding.direct_email || agentEmail || '',
     agent_license: agentBranding.license_number || '',
     agent_tagline: agentBranding.personal_tagline || '',
-    agent_headshot_url: agentBranding.headshot_url || null,
     signature_style: agentBranding.signature_style || 'name_title_contact',
+
+    // Date tokens — resolved here so any template always has them
+    report_date: today,
+    generated_date: today,
+
+    // Audit field
+    resolution_source: resolutionSource,
   };
 
   return merged;
