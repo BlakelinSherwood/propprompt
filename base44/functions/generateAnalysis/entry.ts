@@ -411,7 +411,7 @@ Start with { and end with }. No markdown. No text outside the JSON.`;
 }
 
 const ANTHROPIC_MODELS = {
-  default: "claude-opus-4-5",
+  default: "claude-3-5-sonnet-20241022",  // Faster model for single-call path
   agent:   "claude-3-5-sonnet-20241022",
 };
 
@@ -428,7 +428,7 @@ async function callClaudeOnce(apiKey, prompt, keySource) {
     },
     body: JSON.stringify({
       model,
-      max_tokens: 16000,
+      max_tokens: 8000,
       messages: [{ role: "user", content: prompt }],
       system: systemPrompt,
     }),
