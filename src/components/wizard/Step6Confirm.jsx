@@ -17,6 +17,8 @@ const LABELS = {
   output_format: { narrative: "Narrative", structured: "Structured", bullets: "Bullets" },
 };
 
+const ENSEMBLE_TIERS = ['pro', 'team', 'broker', 'platform_owner', 'admin'];
+
 const ROWS = [
   { key: "ai_platform", label: "AI Platform" },
   { key: "assessment_type", label: "Assessment" },
@@ -85,6 +87,10 @@ export default function Step6Confirm({ intake, update, user, orgMembers, submitt
            let displayValue = row.raw
              ? intake[row.key]
              : LABELS[row.key]?.[intake[row.key]];
+           // For Pro+ users, override AI Platform to show Ensemble branding
+           if (row.key === 'ai_platform' && ENSEMBLE_TIERS.includes(user?.role)) {
+             displayValue = 'Ensemble AI (Multi-Provider)';
+           }
           return (
             <div
               key={row.key}
