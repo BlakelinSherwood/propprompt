@@ -57,15 +57,20 @@ export default function Billing() {
 
     async function load() {
       if (!user) { setLoading(false); return; }
-      const memberships = await base44.entities.OrgMembership.filter({ user_email: user.email, status: "active" });
-      if (memberships.length > 0) {
-        const orgId = memberships[0].org_id;
-        const orgs = await base44.entities.Organization.filter({ id: orgId });
-        if (orgs.length > 0) setOrg(orgs[0]);
-        const quotas = await base44.entities.SeatQuota.filter({ org_id: orgId });
-        if (quotas.length > 0) setQuota(quotas[0]);
+      try {
+        const memberships = await base44.entities.OrgMembership.filter({ user_email: user.email, status: "active" });
+        if (memberships.length > 0) {
+          const orgId = memberships[0].org_id;
+          const orgs = await base44.entities.Organization.filter({ id: orgId });
+          if (orgs.length > 0) setOrg(orgs[0]);
+          const quotas = await base44.entities.SeatQuota.filter({ org_id: orgId });
+          if (quotas.length > 0) setQuota(quotas[0]);
+        }
+      } catch (e) {
+        console.warn("Billing load error:", e);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }
     load();
   }, [user]);
