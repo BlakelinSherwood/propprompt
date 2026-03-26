@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Eye, EyeOff, Loader2, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
 
@@ -118,7 +117,6 @@ function ProviderCard({ provider, config, onUpdate }) {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
-  const [selectedModel, setSelectedModel] = useState(config[provider.modelField] || provider.models[0].value);
 
   const hasKey = !!config[provider.keyField];
   const isEnabled = config[provider.enabledField] !== false;
@@ -148,11 +146,6 @@ function ProviderCard({ provider, config, onUpdate }) {
       [provider.pingField]: null,
     });
     setSaving(false);
-  }
-
-  async function saveModel(val) {
-    setSelectedModel(val);
-    await updateCfg({ [provider.modelField]: val });
   }
 
   async function toggleEnabled(val) {
@@ -232,21 +225,6 @@ function ProviderCard({ provider, config, onUpdate }) {
             </Button>
           )}
         </div>
-      </div>
-
-      {/* Model Row */}
-      <div className="space-y-2">
-        <label className="text-xs font-medium text-[#1A3226]/70 uppercase tracking-wide">Model</label>
-        <Select value={selectedModel} onValueChange={saveModel} disabled={!hasKey}>
-          <SelectTrigger className="text-sm">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {provider.models.map(m => (
-              <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
 
       {/* Test Connection Row */}
