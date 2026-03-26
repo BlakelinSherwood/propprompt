@@ -14,14 +14,16 @@ import StepBuyerIntelligence from "../components/wizard/StepBuyerIntelligence";
 import StepReportEnhancements from "../components/wizard/StepReportEnhancements";
 import StepComparableSales from "../components/wizard/StepComparableSales";
 import StepPriorSaleHistory from "../components/wizard/StepPriorSaleHistory";
+import StepSellerFinancial from "../components/wizard/StepSellerFinancial";
 
 function getStepLabels(assessmentType) {
   const base = ["Assessment", "Client Role", "Property"];
   const hasComps = ["listing_pricing", "cma"].includes(assessmentType);
   const compsSteps = hasComps ? ["Comparable Sales", "Prior Sale History"] : [];
   const afterProperty = [];
-  if (assessmentType === "client_portfolio") afterProperty.push("Financial Context");
-  else if (["listing_pricing", "buyer_intelligence"].includes(assessmentType)) afterProperty.push("Buyer Context");
+  if (assessmentType === "listing_pricing") afterProperty.push("Seller Financials", "Buyer Context");
+  else if (assessmentType === "client_portfolio") afterProperty.push("Financial Context");
+  else if (["buyer_intelligence"].includes(assessmentType)) afterProperty.push("Buyer Context");
   else if (["cma", "investment_analysis"].includes(assessmentType)) afterProperty.push("Enhancements");
   return [...base, ...compsSteps, ...afterProperty, "Output", "Confirm"];
 }
@@ -190,6 +192,11 @@ export default function NewAnalysis() {
         comps_source: intake.comps_source || "none",
         prior_sale_price: intake.prior_sale_price ?? null,
         prior_sale_year: intake.prior_sale_year ?? null,
+        seller_mortgage_payoff: intake.seller_mortgage_payoff ?? null,
+        seller_mortgage_known: intake.seller_mortgage_known ?? false,
+        seller_commission_rate: intake.seller_commission_rate ?? null,
+        seller_closing_cost_rate: intake.seller_closing_cost_rate ?? null,
+        seller_other_costs: intake.seller_other_costs ?? null,
         drive_sync_status: intake.drive_sync ? "pending" : "not_synced",
         include_migration: intake.include_migration || false,
         include_archetypes: intake.include_archetypes || false,
@@ -215,6 +222,7 @@ export default function NewAnalysis() {
   const hasBuyerStep = ["listing_pricing", "buyer_intelligence"].includes(intake.assessment_type);
   const hasEnhancementStep = ["cma", "investment_analysis"].includes(intake.assessment_type);
   const hasContextStep = hasFinancialStep || hasBuyerStep || hasEnhancementStep;
+  // listing_pricing gets its own seller financial step (separate from buyer context step)
 
   // Map step number to component based on assessment type
   function getStepComponent() {
@@ -228,6 +236,12 @@ export default function NewAnalysis() {
       if (step === nextStep) return <StepComparableSales {...stepProps} />;
       nextStep++;
       if (step === nextStep) return <StepPriorSaleHistory {...stepProps} />;
+      nextStep++;
+    }
+
+    // Seller Financial step — listing_pricing only
+    if (intake.assessment_type === 'listing_pricing') {
+      if (step === nextStep) return <StepSellerFinancial {...stepProps} />;
       nextStep++;
     }
 

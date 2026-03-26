@@ -922,6 +922,15 @@ Deno.serve(async (req) => {
         console.warn('[generateAnalysis] quota deduction failed:', e.message);
       }
 
+      // Calculate net proceeds server-side (listing_pricing only, best-effort)
+      if (analysis.assessment_type === 'listing_pricing') {
+        try {
+          await base44.functions.invoke('calculateNetProceeds', { analysisId });
+        } catch (e) {
+          console.warn('[generateAnalysis] calculateNetProceeds (pipeline) failed:', e.message);
+        }
+      }
+
       return Response.json({
         output: finalOutput,
         model: `pipeline-${tier}`,
@@ -1010,6 +1019,15 @@ Deno.serve(async (req) => {
       await base44.functions.invoke("deductAnalysisQuota", { analysisId, orgId: analysis.org_id });
     } catch (e) {
       console.warn("[generateAnalysis] quota deduction failed:", e.message);
+    }
+
+    // Calculate net proceeds server-side (listing_pricing only, best-effort)
+    if (analysis.assessment_type === 'listing_pricing') {
+      try {
+        await base44.functions.invoke('calculateNetProceeds', { analysisId });
+      } catch (e) {
+        console.warn('[generateAnalysis] calculateNetProceeds failed:', e.message);
+      }
     }
 
     return Response.json({ output: cleanText, outputJson: !!outputJson, model: result.model, keySource });

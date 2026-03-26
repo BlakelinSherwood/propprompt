@@ -250,7 +250,7 @@ async function generatePdf(base44, analysis, branding) {
     if (analysis.assessment_type === 'cma') {
       await renderCMAPdf(doc, analysis.output_json, branding);
     } else if (analysis.assessment_type === 'listing_pricing') {
-      await renderListingPricingPdf(doc, analysis.output_json, branding);
+      await renderListingPricingPdf(doc, analysis.output_json, branding, analysis.net_proceeds_json);
     } else if (analysis.assessment_type === 'buyer_intelligence') {
       await renderBuyerIntelligencePdf(doc, analysis.output_json, branding);
     } else if (analysis.assessment_type === 'client_portfolio') {
@@ -1103,7 +1103,7 @@ async function renderCMAPdf(doc, data, branding) {
  *   03 Buyer [PRO+] → 04 Pricing Strategy → 05 Financial Summary →
  *   Closing Summary → Disclaimer → Appendix
  */
-async function renderListingPricingPdf(doc, data, branding) {
+async function renderListingPricingPdf(doc, data, branding, netProceedsJson = null) {
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 40;
@@ -1432,18 +1432,40 @@ async function renderListingPricingPdf(doc, data, branding) {
   await drawPageFrame(doc, branding, 'Section 05 · Seller Financial Summary', 'Estimated Net Proceeds');
   y = 90;
 
-  const netProceeds = data.net_proceeds || data.seller_financial_summary?.net_proceeds || [];
-  if (netProceeds.length) {
-    const npRows = netProceeds.map(np => [
-      np.scenario || np.label || '',
-      np.sale_price ? fmt(np.sale_price) : '',
-      np.net_proceeds ? fmt(np.net_proceeds) : '',
-      np.notes || '',
+  if (!netProceedsJson) {
+    // Skipped — show explanatory text
+    doc.setFillColor(244, 241, 234);
+    doc.roundedRect(margin, y, contentWidth, 44, 3, 3, 'F');
+    doc.setFontSize(9); doc.setFont('helvetica', 'italic'); doc.setTextColor(100, 100, 100);
+    doc.text('Seller net proceeds not calculated. Financial data was not provided during report setup.', margin + 12, y + 28, { maxWidth: contentWidth - 24 });
+    y += 52;
+  } else {
+    const npScenarios = netProceedsJson.scenarios || [];
+    const hasEstimate = npScenarios.some(s => s.estimated);
+    const colW2 = [contentWidth - 390, 80, 80, 80, 80, 90];
+    const npHeaders = ['Scenario', 'Sale Price', 'Commission', 'Closing', 'Mortgage', 'Net Proceeds'];
+    const npRows = npScenarios.map(s => [
+      s.label || '',
+      s.sale_price || '',
+      s.commission || '',
+      s.closing_costs || '',
+      s.mortgage_payoff || '',
+      s.estimated ? (s.net_proceeds + ' *') : (s.net_proceeds || ''),
     ]);
-    y = drawTable(doc, margin, y, ['Scenario', 'Sale Price', 'Est. Net Proceeds', 'Notes'],
-      npRows, [140, 100, 120, contentWidth - 368],
-      { headerFill: branding.primary_color || '#1A3226', headerTextColor: '#FFFFFF', fontSize: 9, rowHeight: 28, branding });
-    y += 16;
+    y = drawTable(doc, margin, y, npHeaders, npRows, colW2,
+      { headerFill: branding.primary_color || '#1A3226', headerTextColor: '#FFFFFF', fontSize: 8.5, rowHeight: 28, branding });
+    y += 10;
+    if (hasEstimate && y + 22 < 710) {
+      doc.setFontSize(7.5); doc.setFont('helvetica', 'italic'); doc.setTextColor(120, 120, 120);
+      doc.text('* Based on estimated mortgage payoff — verify with lender before sharing with seller.', margin, y);
+      y += 14;
+    }
+    if (netProceedsJson.notes && y + 18 < 710) {
+      doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(80, 80, 80);
+      doc.text(netProceedsJson.notes, margin, y + 6);
+      y += 20;
+    }
+    y += 6;
   }
 
   const summaryRows = data.summary_rows || data.analysis_summary || [];
