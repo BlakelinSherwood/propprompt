@@ -172,7 +172,7 @@ export default function Landing() {
             {[
               { step: "01", icon: MapPin, title: "Find Your Territory", desc: "Browse the live map, pick your town or build a population pool across multiple small towns. See exactly what's available." },
               { step: "02", icon: Lock, title: "Claim It Exclusively", desc: "One subscriber per seat. No sharing. Once you hold Portsmouth NH, no other brokerage in Portsmouth gets PropPrompt." },
-              { step: "03", icon: Zap, title: "Run AI Analysis", desc: "CMAs, market reports, buyer presentations — all branded to you. Export to PDF, sync to Drive, or push to your CRM." },
+              { step: "03", icon: Zap, title: "Run AI Analysis", desc: "Listing pricing, CMAs, buyer intelligence, portfolio reviews — all branded to you. Export to PDF, sync to Drive, or push to your CRM." },
             ].map(s => (
               <div key={s.step} className="text-center relative z-10">
                 <div className="w-14 h-14 rounded-2xl bg-[#B8982F]/15 border border-[#B8982F]/30 flex items-center justify-center mx-auto mb-5">
@@ -261,7 +261,7 @@ export default function Landing() {
                 { icon: Brain, title: 'Pricing Strategy', model: 'Claude (Anthropic)', desc: 'Deep reasoning for defensible price positioning and comp analysis.' },
                 { icon: Zap, title: 'Market Context', model: 'Perplexity AI', desc: 'Real-time web research on current inventory, absorption, and buyer demand.' },
                 { icon: MapPin, title: 'Neighbourhood Intelligence', model: 'Gemini (Google)', desc: 'Location-aware analysis of schools, walkability, and community factors.' },
-                { icon: TrendingUp, title: 'Buyer Archetypes & Listing Copy', model: 'ChatGPT + Grok', desc: 'Psychographic profiling and persuasive listing narrative written to convert.' },
+                { icon: TrendingUp, title: 'Buyer Archetypes & Listing Copy', model: 'Claude (Anthropic)', desc: 'Psychographic profiling and persuasive listing narrative written to convert.' },
               ].map(item => (
                 <div key={item.title} className="flex items-start gap-4">
                   <div className="w-10 h-10 rounded-xl bg-[#B8982F]/10 flex items-center justify-center flex-shrink-0">
@@ -320,7 +320,7 @@ export default function Landing() {
           <div className="grid sm:grid-cols-3 gap-5 mb-8">
             {[
               "Claiming Your Territory",
-              "Running Your First CMA",
+              "Running Your First Listing Pricing Analysis",
               "Exporting Client Reports",
             ].map(title => (
               <div key={title} className="rounded-2xl bg-white/5 border border-white/10 overflow-hidden">
