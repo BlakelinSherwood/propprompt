@@ -129,7 +129,7 @@ function TaskRow({ task, selectedTier, onChange, isDirty }) {
         <select
           value={currentValue}
           disabled={locked}
-          onChange={e => onChange(task.id, e.target.value)}
+          onChange={e => onChange(task.task_id, e.target.value)}
           className="w-full text-xs border border-[#1A3226]/15 rounded-lg px-2.5 py-1.5 bg-white text-[#1A3226] focus:outline-none focus:ring-1 focus:ring-[#1A3226]/30"
         >
           {MODEL_GROUPS.map(group => (
@@ -158,10 +158,10 @@ function TaskRow({ task, selectedTier, onChange, isDirty }) {
 
 export default function EnsembleTab() {
   const [tasks, setTasks] = useState(null);
-  const [localTasks, setLocalTasks] = useState({});  // id → { provider, model }
-  const [assemblyModel, setAssemblyModel] = useState("anthropic::claude-sonnet-4-20250514");
-  const [assemblyDirty, setAssemblyDirty] = useState(false);
-  const [dirtyIds, setDirtyIds] = useState(new Set());
+  // tierAssignments: { tier → { task_id → { provider, model } } }
+  const [tierAssignments, setTierAssignments] = useState({});
+  const [localAssignments, setLocalAssignments] = useState({});
+  const [dirtyTaskIds, setDirtyTaskIds] = useState(new Set());
   const [ensembleOn, setEnsembleOn] = useState(true);
   const [selectedTier, setSelectedTier] = useState("broker");
   const [changeNote, setChangeNote] = useState("");
@@ -176,77 +176,69 @@ export default function EnsembleTab() {
     load();
   }, []);
 
+  // Reset dirty state when switching tiers
+  useEffect(() => {
+    setDirtyTaskIds(new Set());
+    // Sync localAssignments to saved state for this tier
+    setLocalAssignments(tierAssignments);
+  }, [selectedTier]); // eslint-disable-line react-hooks/exhaustive-deps
+
   async function load() {
     try {
-      const records = await base44.entities.EnsembleConfig.list();
-      // Sort by fixed order
+      const [records, cfgRes] = await Promise.all([
+        base44.entities.EnsembleConfig.list(),
+        base44.functions.invoke('getPlatformConfig', {}),
+      ]);
       records.sort((a, b) => TASK_ORDER.indexOf(a.task_id) - TASK_ORDER.indexOf(b.task_id));
       setTasks(records);
-      // Build local state
-      const local = {};
-      records.forEach(r => { local[r.id] = { provider: r.provider, model: r.model }; });
-      setLocalTasks(local);
-      setDirtyIds(new Set());
+      const saved = cfgRes.data?.config?.ensemble_section_assignments || {};
+      setTierAssignments(saved);
+      setLocalAssignments(saved);
+      setDirtyTaskIds(new Set());
     } catch (e) {
       console.error('[EnsembleTab] load error:', e);
       setTasks([]);
     }
   }
 
-  function handleChange(id, combinedValue) {
+  function handleChange(taskId, combinedValue) {
     const [provider, model] = combinedValue.split("::");
-    setLocalTasks(prev => ({ ...prev, [id]: { provider, model } }));
-    setDirtyIds(prev => new Set([...prev, id]));
+    setLocalAssignments(prev => ({
+      ...prev,
+      [selectedTier]: {
+        ...(prev[selectedTier] || {}),
+        [taskId]: { provider, model },
+      },
+    }));
+    setDirtyTaskIds(prev => new Set([...prev, taskId]));
   }
 
   async function saveAll() {
-    if (dirtyIds.size === 0) return;
+    if (dirtyTaskIds.size === 0) return;
     setSaving(true);
     try {
-      const savePromises = [...dirtyIds].map(id => {
-        const { provider, model } = localTasks[id];
-        const changeData = {
-          provider,
-          model,
-          updated_by: user?.email || "",
-          change_note: changeNote || undefined,
-        };
-        return base44.entities.EnsembleConfig.update(id, changeData);
+      await base44.functions.invoke('updatePlatformConfig', {
+        data: { ensemble_section_assignments: localAssignments },
       });
-      await Promise.all(savePromises);
-      // Record history entry locally
-      if (dirtyIds.size > 0) {
-        const changedTasks = tasks.filter(t => dirtyIds.has(t.id)).map(t => t.task_name);
-        setHistory(prev => [{
-          timestamp: new Date(),
-          note: changeNote,
-          tasks: changedTasks,
-          by: user?.full_name || user?.email || "Platform Owner",
-        }, ...prev].slice(0, 10));
-      }
-      setChangeNote("");
+      const changedNames = tasks.filter(t => dirtyTaskIds.has(t.task_id)).map(t => t.task_name);
+      setHistory(prev => [{
+        timestamp: new Date(),
+        note: changeNote,
+        tasks: changedNames,
+        tier: selectedTier,
+        by: user?.full_name || user?.email || 'Platform Owner',
+      }, ...prev].slice(0, 10));
+      setTierAssignments(localAssignments);
+      setChangeNote('');
+      setDirtyTaskIds(new Set());
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
-      load();
     } catch (e) {
       console.error('[EnsembleTab] save error:', e);
     } finally {
       setSaving(false);
     }
   }
-
-  if (!tasks) return (
-    <div className="flex items-center justify-center h-40 text-[#1A3226]/40">
-      <Loader2 className="w-5 h-5 animate-spin" />
-    </div>
-  );
-
-  // Merge tasks with local overrides for display
-  const displayTasks = tasks.map(t => ({
-    ...t,
-    provider: localTasks[t.id]?.provider ?? t.provider,
-    model: localTasks[t.id]?.model ?? t.model,
-  }));
 
   return (
     <div className="space-y-5">
@@ -310,12 +302,12 @@ export default function EnsembleTab() {
               task={task}
               selectedTier={selectedTier}
               onChange={handleChange}
-              isDirty={dirtyIds.has(task.id)}
+              isDirty={dirtyTaskIds.has(task.task_id)}
             />
           ))
         )}
 
-        {/* Final Assembly — editable row */}
+        {/* Final Assembly row */}
         <div className="grid grid-cols-[1fr_280px_32px] gap-4 items-start px-5 py-4 bg-[#1A3226]/[0.02] border-t border-[#1A3226]/8">
           <div>
             <span className="text-[13px] font-medium text-[#1A3226]">Final Assembly</span>
@@ -324,8 +316,8 @@ export default function EnsembleTab() {
           <div>
             <label className="text-[10px] uppercase tracking-wider text-[#1A3226]/40 font-medium block mb-1">Provider · Model</label>
             <select
-              value={assemblyModel}
-              onChange={e => { setAssemblyModel(e.target.value); setAssemblyDirty(true); }}
+              value={localAssignments[selectedTier]?.['final_assembly'] ? `${localAssignments[selectedTier]['final_assembly'].provider}::${localAssignments[selectedTier]['final_assembly'].model}` : 'anthropic::claude-sonnet-4-20250514'}
+              onChange={e => handleChange('final_assembly', e.target.value)}
               className="w-full text-xs border border-[#1A3226]/15 rounded-lg px-2.5 py-1.5 bg-white text-[#1A3226] focus:outline-none focus:ring-1 focus:ring-[#1A3226]/30"
             >
               {MODEL_GROUPS.map(group => (
@@ -336,10 +328,10 @@ export default function EnsembleTab() {
                 </optgroup>
               ))}
             </select>
-            <ModelBadge value={assemblyModel} />
+            <ModelBadge value={localAssignments[selectedTier]?.['final_assembly'] ? `${localAssignments[selectedTier]['final_assembly'].provider}::${localAssignments[selectedTier]['final_assembly'].model}` : 'anthropic::claude-sonnet-4-20250514'} />
           </div>
           <div className="flex items-start justify-center pt-7">
-            {assemblyDirty && (
+            {dirtyTaskIds.has('final_assembly') && (
               <span title="Unsaved change" style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#B8982F", display: "inline-block" }} />
             )}
           </div>
@@ -347,7 +339,7 @@ export default function EnsembleTab() {
       </div>
 
       {/* Action Bar */}
-      {dirtyIds.size > 0 && (
+      {dirtyTaskIds.size > 0 && (
         <div className="bg-white border border-[#B8982F]/30 rounded-xl p-4 shadow-sm">
           <div className="flex items-start gap-3">
             <div className="flex-1 space-y-2">
@@ -356,7 +348,7 @@ export default function EnsembleTab() {
                   style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#B8982F", display: "inline-block" }}
                 />
                 <span className="text-sm font-medium text-[#1A3226]">
-                  {dirtyIds.size} unsaved change{dirtyIds.size > 1 ? "s" : ""}
+                  {dirtyTaskIds.size} unsaved change{dirtyTaskIds.size > 1 ? 's' : ''} on <span className="capitalize font-semibold">{selectedTier}</span> tier
                 </span>
               </div>
               <Textarea
@@ -379,7 +371,7 @@ export default function EnsembleTab() {
                 variant="ghost"
                 size="sm"
                 className="text-[#1A3226]/50 text-xs"
-                onClick={() => { setDirtyIds(new Set()); load(); }}
+                onClick={() => { setDirtyTaskIds(new Set()); setLocalAssignments(tierAssignments); }}
               >
                 Discard
               </Button>
@@ -419,7 +411,7 @@ export default function EnsembleTab() {
                       <span className="text-xs text-[#1A3226]/35">{entry.timestamp.toLocaleTimeString()}</span>
                     </div>
                     <p className="text-xs text-[#1A3226]/50 mt-0.5">
-                      Updated: {entry.tasks.join(", ")}
+                     <span className="capitalize font-medium">{entry.tier}</span> tier — Updated: {entry.tasks.join(", ")}
                     </p>
                     {entry.note && (
                       <p className="text-xs italic text-[#1A3226]/40 mt-0.5">"{entry.note}"</p>
