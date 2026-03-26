@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Eye, EyeOff, Loader2, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "@/components/ui/use-toast";
 
 const PROVIDERS = [
   {
@@ -278,7 +278,6 @@ function BatchDataCard({ config, onUpdate }) {
   const [keyInput, setKeyInput] = useState("");
   const [showKey, setShowKey] = useState(false);
   const [saving, setSaving] = useState(false);
-  const { toast } = useToast();
 
   const hasKey = !!config.batchdata_api_key;
   const maskedKey = hasKey ? `••••••••${String(config.batchdata_api_key).slice(-4)}` : "";
