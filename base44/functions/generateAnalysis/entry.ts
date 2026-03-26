@@ -5,6 +5,42 @@
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 
+function runValidation({ reportJSON, prior_sale_price, prior_sale_year }) {
+  if (prior_sale_price == null || prior_sale_year == null) {
+    return { valid: true, reason: 'no_prior_sale_data' };
+  }
+  const currentYear = new Date().getFullYear();
+  const yearsElapsed = currentYear - Number(prior_sale_year);
+  let appreciationRate = 0.04;
+  const rawRate = reportJSON?.market_context?.yoy_appreciation_rate
+    ?? reportJSON?.market_context?.yoy_appreciation;
+  if (rawRate != null && !isNaN(Number(rawRate))) {
+    appreciationRate = Number(rawRate);
+    if (appreciationRate > 1) appreciationRate = appreciationRate / 100;
+  }
+  const projectedValue = Number(prior_sale_price) * Math.pow(1 + appreciationRate, yearsElapsed);
+  let aiMidpoint = reportJSON?.tiered_comps?.implied_value_range?.midpoint
+    ?? reportJSON?.implied_value_range?.midpoint
+    ?? null;
+  if (aiMidpoint == null) return { valid: true, reason: 'no_ai_midpoint' };
+  if (typeof aiMidpoint === 'string') aiMidpoint = Number(aiMidpoint.replace(/[^0-9.]/g, ''));
+  aiMidpoint = Number(aiMidpoint);
+  if (isNaN(aiMidpoint) || aiMidpoint === 0) return { valid: true, reason: 'no_ai_midpoint' };
+  const varianceDecimal = (projectedValue - aiMidpoint) / projectedValue;
+  if (varianceDecimal > 0.20) {
+    return {
+      valid: false,
+      reason: 'valuation_anomaly',
+      variance_percent: Math.round(varianceDecimal * 100),
+      prior_sale_price: Number(prior_sale_price),
+      prior_sale_year: Number(prior_sale_year),
+      projected_current_value: Math.round(projectedValue),
+      ai_midpoint: aiMidpoint,
+    };
+  }
+  return { valid: true };
+}
+
 // Inline section matrix (must match assemblePrompt)
 function getRequiredSections(assessmentType, analysis) {
   const matrix = {
@@ -877,6 +913,24 @@ Deno.serve(async (req) => {
     // Extract structured JSON from AI response
     const { cleanText, outputJson } = extractJsonOutput(result.text);
     console.log('[generateAnalysis] output_json populated:', !!outputJson, '| response length:', result.text.length);
+
+    // ── VALUATION SANITY CHECK ──────────────────────────────────────────────
+    if (outputJson) {
+      const validationResult = runValidation({
+        reportJSON: outputJson,
+        prior_sale_price: analysis.prior_sale_price ?? null,
+        prior_sale_year: analysis.prior_sale_year ?? null,
+      });
+      console.log('[generateAnalysis] validation result:', JSON.stringify(validationResult));
+      if (!validationResult.valid) {
+        await base44.asServiceRole.entities.Analysis.update(analysisId, {
+          status: 'anomaly_flagged',
+          valuation_anomaly: validationResult,
+          output_json: outputJson,
+        });
+        return Response.json({ anomaly: validationResult, model: result.model });
+      }
+    }
 
     // Persist output
     const saveData = {

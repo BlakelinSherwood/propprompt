@@ -4,6 +4,7 @@ import { base44 } from "@/api/base44Client";
 import ReactMarkdown from "react-markdown";
 import { Button } from "@/components/ui/button";
 import { Copy, Download, Mail, CheckCircle, AlertCircle, Loader2, ArrowLeft, Cloud, Database, Presentation, Send, Link, ExternalLink } from "lucide-react";
+import ValuationAnomalyModal from "../components/ValuationAnomalyModal";
 import StreamProgressBar from "../components/StreamProgressBar";
 
 const DISCLAIMER = `**DISCLAIMER:** This AI-generated analysis is provided for informational purposes only and does not constitute legal, financial, or professional real estate advice. All valuations and recommendations should be verified by a licensed real estate professional. PropPrompt™ analyses are tools to augment, not replace, professional judgment. © 2026 Sherwood & Company, Brokered by Compass.`;
@@ -43,6 +44,7 @@ export default function AnalysisRun() {
   const [flipbookLink, setFlipbookLink] = useState(null); // existing active link
   const [flipbookGenerating, setFlipbookGenerating] = useState(false);
   const [flipbookCopied, setFlipbookCopied] = useState(false);
+  const [anomalyData, setAnomalyData] = useState(null);
   const outputRef = useRef(null);
   const hasStarted = useRef(false);
 
@@ -105,6 +107,13 @@ export default function AnalysisRun() {
 
       // Call generateAnalysis via SDK (proper auth handled automatically)
       const res = await base44.functions.invoke("generateAnalysis", { analysisId, orgId });
+
+      // Handle valuation anomaly block
+      if (res.data?.anomaly) {
+        setAnomalyData(res.data.anomaly);
+        setStatus("complete");
+        return;
+      }
 
       if (!res.data?.output) {
         const errMsg = res.data?.error || "Analysis generation failed";
@@ -264,6 +273,18 @@ export default function AnalysisRun() {
     }
   };
 
+  function handleReviewComps() {
+    setAnomalyData(null);
+    // Navigate back to the wizard on the Comparable Sales step (step 4)
+    navigate(`/NewAnalysis?review=${analysisId}`);
+  }
+
+  function handleOverrideConfirmed() {
+    setAnomalyData(null);
+    // Reload analysis to get updated status then trigger PDF
+    window.location.reload();
+  }
+
   if (!analysisId) {
     return (
       <div className="flex items-center justify-center min-h-64 text-[#1A3226]/50">
@@ -274,6 +295,14 @@ export default function AnalysisRun() {
 
   return (
     <div className="max-w-4xl mx-auto">
+      {anomalyData && (
+        <ValuationAnomalyModal
+          anomalyData={anomalyData}
+          analysisId={analysisId}
+          onReviewComps={handleReviewComps}
+          onOverrideConfirmed={handleOverrideConfirmed}
+        />
+      )}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
         <div className="flex items-center gap-3">
