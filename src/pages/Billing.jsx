@@ -56,8 +56,8 @@ export default function Billing() {
     if (params.get("canceled")) setMessage({ type: "info", text: "Checkout canceled — no charge was made." });
 
     async function load() {
-      if (!user) return;
-      const memberships = await base44.entities.OrgMembership.filter({ user_email: me.email, status: "active" });
+      if (!user) { setLoading(false); return; }
+      const memberships = await base44.entities.OrgMembership.filter({ user_email: user.email, status: "active" });
       if (memberships.length > 0) {
         const orgId = memberships[0].org_id;
         const orgs = await base44.entities.Organization.filter({ id: orgId });
