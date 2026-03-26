@@ -3,8 +3,8 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Eye, EyeOff, Loader2, CheckCircle2, XCircle, AlertCircle, Database } from "lucide-react";
-import { toast } from "sonner";
+import { Eye, EyeOff, Loader2, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
 
 const PROVIDERS = [
   {
@@ -278,6 +278,7 @@ function BatchDataCard({ config, onUpdate }) {
   const [keyInput, setKeyInput] = useState("");
   const [showKey, setShowKey] = useState(false);
   const [saving, setSaving] = useState(false);
+  const { toast } = useToast();
 
   const hasKey = !!config.batchdata_api_key;
   const maskedKey = hasKey ? `••••••••${String(config.batchdata_api_key).slice(-4)}` : "";
@@ -287,7 +288,7 @@ function BatchDataCard({ config, onUpdate }) {
     setSaving(true);
     await base44.functions.invoke('updatePlatformConfig', { data: { batchdata_api_key: keyInput.trim() } });
     setKeyInput("");
-    toast.success("BatchData API key saved.");
+    toast({ title: "BatchData API key saved.", description: "Connected successfully." });
     await onUpdate();
     setSaving(false);
   }
