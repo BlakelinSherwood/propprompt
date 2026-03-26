@@ -726,15 +726,22 @@ Deno.serve(async (req) => {
     const promptRes = await base44.functions.invoke("assemblePrompt", { analysisId });
     let prompt = promptRes.data?.prompt || `Analyze this property for a PropPrompt™ listing pricing analysis: ${JSON.stringify(analysis.intake_data)}`;
 
-    // Inject agent comps block
-    const agentComps = analysis.agent_comps;
-    if (Array.isArray(agentComps) && agentComps.length > 0) {
-      const compsSource = analysis.comps_source || 'agent_provided';
-      const compsRadius = analysis.comps_search_radius ? `${analysis.comps_search_radius} miles` : 'unknown';
-      const compsFetchedAt = analysis.comps_fetched_at ? new Date(analysis.comps_fetched_at).toLocaleDateString() : 'unknown';
-      prompt += `\n\nVERIFIED COMPARABLE SALES\nSource: ${compsSource} | Fetched: ${compsFetchedAt}\nCount: ${agentComps.length} | Search radius used: ${compsRadius}\n\nThese comps were retrieved from BatchData public records and cross-referenced against Compass, Zillow, Redfin, and Realtor.com. They were reviewed and confirmed by the agent.\nUse ONLY these comps. Do not add, substitute, or invent any others.\n\n${JSON.stringify(agentComps, null, 2)}`;
+    // Inject data quality flag based on comp count
+    const agentComps = analysis.agent_comps || [];
+    let dataQualityBlock = '';
+    if (agentComps.length >= 3) {
+      dataQualityBlock = `\n\nDATA QUALITY: green\nCOMPARABLE SALES SOURCE: BatchData public records (verified)\nCOMP COUNT: ${agentComps.length}\nSet data_quality_flag to 'green' in the output JSON.`;
+    } else if (agentComps.length > 0) {
+      dataQualityBlock = `\n\nDATA QUALITY: yellow\nCOMPARABLE SALES SOURCE: BatchData + Perplexity deep search\nCOMP COUNT: ${agentComps.length}\nNote: Limited comp availability. Set confidence_level to 'low' in the output JSON. Note this limitation briefly in the valuation narrative.\nSet data_quality_flag to 'yellow'.`;
     } else {
-      prompt += `\n\nCOMPARABLE SALES: None confirmed by agent.\nSet data_quality_flag to 'red', comps to [], and implied_value_range to null per data integrity rules.`;
+      dataQualityBlock = `\n\nDATA QUALITY: red\nCOMPARABLE SALES: None found after exhaustive search.\nSet data_quality_flag to 'red' in the output JSON.\nDo NOT generate a valuation range. DO generate market context, buyer archetypes, migration data, and a narrative explaining that comp data was unavailable for this property type in this market at this time.\nThe report must still be useful and complete in every other way.`;
+    }
+    prompt += dataQualityBlock;
+
+    // Inject comp details if available
+    if (agentComps.length > 0) {
+      const compsRadius = analysis.comps_search_radius ? `${analysis.comps_search_radius} miles` : 'unknown';
+      prompt += `\n\nCOMPARABLE SALES DETAILS (Use ONLY these — do not invent or substitute):\nSearch radius: ${compsRadius}\n${JSON.stringify(agentComps, null, 2)}`;
     }
 
     // Inject prior sale history if present

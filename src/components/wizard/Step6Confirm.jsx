@@ -1,4 +1,5 @@
-import { Zap, User, ChevronDown } from "lucide-react";
+import { useState } from 'react';
+import { Zap, User, ChevronDown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -70,6 +71,50 @@ function QuotaMeter({ user }) {
 
 export default function Step6Confirm({ intake, update, user, orgMembers, submitting, onBack, onSubmit }) {
   const isAssistantOrLead = user?.role === "assistant" || user?.role === "team_lead";
+  const [fetchingComps, setFetchingComps] = useState(false);
+  const [progressMsg, setProgressMsg] = useState('');
+
+  const handleLaunchWithComps = async () => {
+    setFetchingComps(true);
+    setProgressMsg('Searching for comparable sales...');
+
+    try {
+      // Trigger comp fetch in background
+      const compRes = await fetch('/api/fetchCompsFromBatchData', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          address: intake.address,
+          bedrooms: intake.bedrooms ? Number(intake.bedrooms) : null,
+          bathrooms: intake.bathrooms ? Number(intake.bathrooms) : null,
+          sqft: intake.sqft ? Number(intake.sqft) : null,
+          propertyType: intake.property_type,
+        }),
+      }).then(r => r.json());
+
+      if (compRes.success) {
+        setProgressMsg('Analyzing market data...');
+        update({
+          agent_comps: compRes.comps || [],
+          comps_source: compRes.comps?.length >= 3 ? 'api_verified' : (compRes.comps?.length > 0 ? 'mixed' : 'none'),
+          raw_batchdata_comps: compRes.comps || [],
+          comps_search_tier: compRes.search_tier,
+          comps_search_radius: compRes.search_radius,
+          large_property_flag: compRes.large_property_flag || false,
+          comps_researcher_note: compRes.researcher_note,
+          comps_fetch_triggered: true,
+        });
+      }
+    } catch (err) {
+      console.warn('[Step6Confirm] Comp fetch failed, continuing anyway:', err);
+    }
+
+    setProgressMsg('Building your report...');
+    setTimeout(() => {
+      setFetchingComps(false);
+      onSubmit();
+    }, 500);
+  };
 
   return (
     <div className="p-6 lg:p-8">
@@ -166,24 +211,32 @@ export default function Step6Confirm({ intake, update, user, orgMembers, submitt
         </div>
       </div>
 
+      {/* Progress Indicator During Comp Fetch */}
+      {fetchingComps && (
+       <div className="rounded-xl border border-[#B8982F]/20 bg-[#B8982F]/5 p-4 mb-5 flex items-center gap-3">
+         <Loader2 className="w-4 h-4 text-[#B8982F] animate-spin flex-shrink-0" />
+         <p className="text-sm text-[#1A3226]/70">{progressMsg}</p>
+       </div>
+      )}
+
       {/* Actions */}
       <div className="flex items-center justify-between gap-3">
-        <Button
-          variant="ghost"
-          onClick={onBack}
-          disabled={submitting}
-          className="text-[#1A3226]/60 hover:text-[#1A3226] hover:bg-[#1A3226]/5"
-        >
-          ← Back
-        </Button>
-        <Button
-          onClick={onSubmit}
-          disabled={submitting}
-          className="bg-[#1A3226] hover:bg-[#1A3226]/90 text-white gap-2 px-8"
-        >
-          <Zap className="w-4 h-4" />
-          {submitting ? "Launching..." : "Launch Analysis"}
-        </Button>
+       <Button
+         variant="ghost"
+         onClick={onBack}
+         disabled={submitting || fetchingComps}
+         className="text-[#1A3226]/60 hover:text-[#1A3226] hover:bg-[#1A3226]/5"
+       >
+         ← Back
+       </Button>
+       <Button
+         onClick={fetchingComps ? undefined : handleLaunchWithComps}
+         disabled={submitting || fetchingComps}
+         className="bg-[#1A3226] hover:bg-[#1A3226]/90 text-white gap-2 px-8"
+       >
+         <Zap className="w-4 h-4" />
+         {submitting || fetchingComps ? "Launching..." : "Launch Analysis"}
+       </Button>
       </div>
     </div>
   );
