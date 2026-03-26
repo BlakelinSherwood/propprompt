@@ -14,7 +14,6 @@ Deno.serve(async (req) => {
     const street = parts[0] || '';
     const cityState = parts[1] || '';
     const zip = parts[2] || '';
-    
     const [city, state] = cityState.split(/\s+/).slice(0, 2);
 
     // Get BatchData API key from PlatformConfig
@@ -23,141 +22,160 @@ Deno.serve(async (req) => {
     if (!config?.batchdata_api_key) {
       return Response.json({ success: false, message: 'BatchData API key not configured' }, { status: 402 });
     }
-
     const batchDataKey = config.batchdata_api_key;
 
-    // Map property type for BatchData
-    const typeMap = {
-      'single_family': 'SFR',
-      'condo': 'CONDO',
-      'multi_family': 'MF2TO4',
-      'land': 'SFR' // fallback
-    };
-    const batchDataType = typeMap[propertyType] || 'SFR';
+    // Large property flag (sqft >= 4000)
+    const isLargeProperty = sqft && sqft >= 4000;
 
-    // Large property flag: omit bedroom constraints for sqft >= 4000
-    const isLargeProperty = sqft >= 4000;
+    // Tiered waterfall radii
+    const radiiTiers = isLargeProperty
+      ? [
+          { radii: [0.5, 1.0, 2.0], soldWithinMonths: 12, tierNum: 1 },
+          { radii: [0.5, 1.0, 2.0, 3.0], soldWithinMonths: 18, tierNum: 2 },
+          { radii: [1.0, 2.0, 3.0, 5.0], soldWithinMonths: 24, tierNum: 3 },
+        ]
+      : [
+          { radii: [0.5, 1.0, 2.0], soldWithinMonths: 12, tierNum: 1 },
+          { radii: [0.5, 1.0, 2.0], soldWithinMonths: 18, tierNum: 2 },
+          { radii: [0.5, 1.0, 2.0, 3.0], soldWithinMonths: 18, tierNum: 3 },
+          { radii: [1.0, 2.0, 3.0], soldWithinMonths: 24, tierNum: 4 },
+        ];
 
-    // Tiered waterfall: expand radius and relax constraints progressively
-    const tiers = [
-      {
-        radius: 0.5,
-        maxResults: 10,
-        radiusLabel: '0.5 mi',
-        bedOffset: 1,
-        sqftPercent: 0.20,
-      },
-      {
-        radius: 1.0,
-        maxResults: 12,
-        radiusLabel: '1.0 mi',
-        bedOffset: 2,
-        sqftPercent: 0.30,
-      },
-      {
-        radius: 2.0,
-        maxResults: 15,
-        radiusLabel: '2.0 mi',
-        bedOffset: 3,
-        sqftPercent: 0.40,
-      },
-      {
-        radius: 3.0,
-        maxResults: 20,
-        radiusLabel: '3.0 mi',
-        bedOffset: 4,
-        sqftPercent: 0.50,
-      },
-    ];
+    const compAddress = { street, city, state, zip };
+
+    // Helper: Filter raw BatchData results by property type and sold date
+    function filterResults(properties, soldWithinMonths) {
+      const cutoffDate = new Date();
+      cutoffDate.setMonth(cutoffDate.getMonth() - soldWithinMonths);
+
+      return properties.filter(p => {
+        // Check property type
+        const listingType = p.listing?.propertyType || '';
+        const isSF = ['single family', 'other residential', 'sfr'].some(t => 
+          listingType.toLowerCase().includes(t)
+        );
+        if (!isSF) return false;
+
+        // Check sold date from listing or deed history
+        const soldDate = p.listing?.soldDate
+          ? new Date(p.listing.soldDate)
+          : p.deedHistory && p.deedHistory.length > 0
+            ? new Date(p.deedHistory[p.deedHistory.length - 1].recordingDate)
+            : null;
+
+        if (!soldDate || soldDate < cutoffDate) return false;
+
+        // Check has sold price
+        const hasSoldPrice = !!p.listing?.soldPrice || 
+                            (p.deedHistory && p.deedHistory.length > 0 && !!p.deedHistory[p.deedHistory.length - 1].salePrice);
+        return hasSoldPrice;
+      });
+    }
+
+    // Helper: Normalize property to comp schema
+    function normalizeProp(p, tierNum, distanceMiles) {
+      const lastDeed = p.deedHistory && p.deedHistory.length > 0 ? p.deedHistory[p.deedHistory.length - 1] : {};
+      const listing = p.listing || {};
+
+      const soldPrice = listing.soldPrice || lastDeed.salePrice || null;
+      const sqftValue = listing.totalBuildingAreaSquareFeet || listing.livingArea || null;
+
+      const address = [
+        p.address?.houseNumber,
+        p.address?.street,
+        p.address?.city,
+        p.address?.state,
+        p.address?.zip
+      ].filter(Boolean).join(' ');
+
+      return {
+        address,
+        sale_price: soldPrice,
+        sale_date: listing.soldDate || lastDeed.recordingDate || null,
+        sqft: sqftValue,
+        bedrooms: listing.bedroomCount || null,
+        bathrooms: listing.bathroomCount || null,
+        price_per_sqft: (soldPrice && sqftValue)
+          ? Math.round(soldPrice / sqftValue)
+          : null,
+        lot_sqft: listing.lotSizeSquareFeet || null,
+        year_built: listing.yearBuilt || null,
+        days_on_market: listing.daysOnMarket || null,
+        listing_url: listing.listingUrl || null,
+        batchdata_id: p._id,
+        source: 'batchdata',
+        search_tier: tierNum,
+        search_radius: distanceMiles,
+        perplexity_confirmed: false,
+        perplexity_variance: null,
+        agent_excluded: false,
+        agent_notes: ''
+      };
+    }
 
     let allComps = [];
-    let successTier = null;
+    let successTierNum = null;
+    let successRadiusMiles = null;
 
-    for (const tier of tiers) {
-      console.log(`[fetchCompsFromBatchData] Trying tier with radius ${tier.radius}mi`);
+    // Run tiered waterfall
+    for (const tierConfig of radiiTiers) {
+      console.log(`[fetchCompsFromBatchData] Tier ${tierConfig.tierNum}: trying radii ${tierConfig.radii.join(', ')} mi, sold within ${tierConfig.soldWithinMonths} months`);
 
-      const searchCriteria = {
-        compAddress: {
-          street,
-          city,
-          state,
-          zip,
-        },
-        propertyType: batchDataType,
-        radiusMiles: tier.radius,
-        maxResults: tier.maxResults,
-        soldWithinMonths: 12,
-      };
+      for (const distanceMiles of tierConfig.radii) {
+        try {
+          // CORRECT FLAT REQUEST BODY STRUCTURE
+          const requestBody = {
+            searchCriteria: {
+              compAddress
+            },
+            options: {
+              useDistance: true,
+              distanceMiles: distanceMiles,
+              take: 25
+            }
+          };
 
-      // Add bedroom constraints unless large property
-      if (!isLargeProperty && bedrooms) {
-        searchCriteria.bedroomsRange = {
-          min: Math.max(0, bedrooms - tier.bedOffset),
-          max: bedrooms + tier.bedOffset,
-        };
-      }
+          const response = await fetch('https://api.batchdata.com/api/v1/property/search', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${batchDataKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody),
+          });
 
-      // Add sqft constraints if sqft provided
-      if (sqft) {
-        searchCriteria.sqftRange = {
-          min: Math.round(sqft * (1 - tier.sqftPercent)),
-          max: Math.round(sqft * (1 + tier.sqftPercent)),
-        };
-      }
+          if (response.status === 403) {
+            console.error('[fetchCompsFromBatchData] 403 Forbidden — check BatchData token permissions (property-search, property-lookup-all-attributes)');
+            return Response.json({ success: false, message: 'BatchData API authentication failed — token may not have property-search permission' }, { status: 403 });
+          }
 
-      try {
-        const response = await fetch('https://api.batchdata.com/api/v1/property/search', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${batchDataKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            requests: [{ searchCriteria }],
-          }),
-        });
+          if (!response.ok) {
+            console.warn(`[fetchCompsFromBatchData] Tier ${tierConfig.tierNum} radius ${distanceMiles}mi failed with status ${response.status}`);
+            continue;
+          }
 
-        if (response.status === 403) {
-          console.error('[fetchCompsFromBatchData] 403 Forbidden — check BatchData token permissions (property-search, property-lookup-all-attributes)');
-          return Response.json({ success: false, message: 'BatchData API authentication failed — token may not have property-search permission' }, { status: 403 });
-        }
+          const data = await response.json();
+          const rawProperties = data.properties || [];
+          console.log(`[fetchCompsFromBatchData] Tier ${tierConfig.tierNum} radius ${distanceMiles}mi: ${rawProperties.length} raw results`);
 
-        if (!response.ok) {
-          console.warn(`[fetchCompsFromBatchData] Tier ${tier.radiusLabel} failed with status ${response.status}`);
+          // Filter by property type and sold date
+          const filtered = filterResults(rawProperties, tierConfig.soldWithinMonths);
+          console.log(`[fetchCompsFromBatchData] After filtering: ${filtered.length} recently-sold SFR comps`);
+
+          if (filtered.length >= 3) {
+            // Success — normalize and return
+            allComps = filtered.map(p => normalizeProp(p, tierConfig.tierNum, distanceMiles));
+            successTierNum = tierConfig.tierNum;
+            successRadiusMiles = distanceMiles;
+            break;
+          }
+        } catch (radiusErr) {
+          console.warn(`[fetchCompsFromBatchData] Tier ${tierConfig.tierNum} radius ${distanceMiles}mi error:`, radiusErr.message);
           continue;
         }
-
-        const data = await response.json();
-        const results = data.results?.[0]?.properties || [];
-        console.log(`[fetchCompsFromBatchData] Tier ${tier.radiusLabel}: ${results.length} results`);
-
-        if (results.length >= 3) {
-          // Success — format and return
-          allComps = results.map(p => ({
-            address: `${p.address?.street || ''}, ${p.address?.city || ''}, ${p.address?.state || ''}`,
-            sale_price: p.lastSalePrice?.amount || null,
-            sale_date: p.lastSalePrice?.date || null,
-            sqft: p.buildingArea?.sqft || null,
-            bedrooms: p.bedrooms || null,
-            bathrooms: p.bathrooms || null,
-            price_per_sqft: p.lastSalePrice?.amount && p.buildingArea?.sqft
-              ? Math.round(p.lastSalePrice.amount / p.buildingArea.sqft)
-              : null,
-            source: 'batchdata',
-            perplexity_confirmed: false,
-            perplexity_variance: null,
-            condition_vs_subject: 'Similar',
-            agent_excluded: false,
-            agent_notes: '',
-            found_on: [],
-          }));
-          successTier = tier.radius;
-          break;
-        }
-      } catch (tierErr) {
-        console.warn(`[fetchCompsFromBatchData] Tier ${tier.radiusLabel} error:`, tierErr.message);
-        continue;
       }
+
+      if (allComps.length >= 3) break; // Exit tier loop if we found enough comps
     }
 
     if (allComps.length === 0) {
@@ -172,12 +190,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    console.log(`[fetchCompsFromBatchData] Found ${allComps.length} comps at tier ${successTier}mi`);
+    console.log(`[fetchCompsFromBatchData] Found ${allComps.length} comps at tier ${successTierNum} radius ${successRadiusMiles}mi`);
     return Response.json({
       success: true,
       comps: allComps,
-      search_tier: successTier <= 0.5 ? 1 : successTier <= 1.0 ? 2 : successTier <= 2.0 ? 3 : 4,
-      search_radius: successTier,
+      search_tier: successTierNum,
+      search_radius: successRadiusMiles,
       large_property_flag: isLargeProperty,
       researcher_note: null,
     });
