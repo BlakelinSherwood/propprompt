@@ -665,7 +665,20 @@ Deno.serve(async (req) => {
 
     // Assemble prompt
     const promptRes = await base44.functions.invoke("assemblePrompt", { analysisId });
-    const prompt = promptRes.data?.prompt || `Analyze this property for a PropPrompt™ listing pricing analysis: ${JSON.stringify(analysis.intake_data)}`;
+    let prompt = promptRes.data?.prompt || `Analyze this property for a PropPrompt™ listing pricing analysis: ${JSON.stringify(analysis.intake_data)}`;
+
+    // Inject agent comps block
+    const agentComps = analysis.agent_comps;
+    if (Array.isArray(agentComps) && agentComps.length > 0) {
+      prompt += `\n\nVERIFIED COMPARABLE SALES (agent-provided — use these and ONLY these):\n${JSON.stringify(agentComps, null, 2)}\n\nSource: agent_provided\nCount: ${agentComps.length}`;
+    } else {
+      prompt += `\n\nCOMPARABLE SALES: None provided.\nSet data_quality_flag to 'red', comps to [], and implied_value_range to null per data integrity rules.`;
+    }
+
+    // Inject prior sale history if present
+    if (analysis.prior_sale_price || analysis.prior_sale_year) {
+      prompt += `\n\nPRIOR SALE HISTORY:\n  Last known sale price: ${analysis.prior_sale_price ? '$' + analysis.prior_sale_price.toLocaleString() : 'unknown'}\n  Year of last sale: ${analysis.prior_sale_year || 'unknown'}\nUse this to cross-check valuation and flag anomalies.`;
+    }
 
     // Mark as in_progress
     await base44.asServiceRole.entities.Analysis.update(analysisId, { status: "in_progress" });

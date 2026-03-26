@@ -12,21 +12,18 @@ import Step6Confirm from "../components/wizard/Step6Confirm";
 import StepClientFinancial from "../components/wizard/StepClientFinancial";
 import StepBuyerIntelligence from "../components/wizard/StepBuyerIntelligence";
 import StepReportEnhancements from "../components/wizard/StepReportEnhancements";
+import StepComparableSales from "../components/wizard/StepComparableSales";
+import StepPriorSaleHistory from "../components/wizard/StepPriorSaleHistory";
 
 function getStepLabels(assessmentType) {
   const base = ["Assessment", "Client Role", "Property"];
+  const hasComps = ["listing_pricing", "cma"].includes(assessmentType);
+  const compsSteps = hasComps ? ["Comparable Sales", "Prior Sale History"] : [];
   const afterProperty = [];
-  
-  // Add context step based on assessment type
-  if (assessmentType === "client_portfolio") {
-    afterProperty.push("Financial Context");
-  } else if (["listing_pricing", "buyer_intelligence"].includes(assessmentType)) {
-    afterProperty.push("Buyer Context");
-  } else if (["cma", "investment_analysis"].includes(assessmentType)) {
-    afterProperty.push("Enhancements");
-  }
-  
-  return [...base, ...afterProperty, "Output", "Confirm"];
+  if (assessmentType === "client_portfolio") afterProperty.push("Financial Context");
+  else if (["listing_pricing", "buyer_intelligence"].includes(assessmentType)) afterProperty.push("Buyer Context");
+  else if (["cma", "investment_analysis"].includes(assessmentType)) afterProperty.push("Enhancements");
+  return [...base, ...compsSteps, ...afterProperty, "Output", "Confirm"];
 }
 
 function getMaxStep(assessmentType) {
@@ -45,6 +42,12 @@ const INITIAL_INTAKE = {
   on_behalf_of_email: "",
   drive_sync: true,
   selected_modules: [],
+  // Comparable sales
+  agent_comps: [],
+  comps_source: "none",
+  // Prior sale history
+  prior_sale_price: null,
+  prior_sale_year: null,
   // Financial context (portfolio)
   mortgage_balance: null,
   mortgage_source: "approximate",
@@ -177,12 +180,16 @@ export default function NewAnalysis() {
             heloc_info: intake.heloc_info,
             client_interests: intake.client_interests,
           }),
-          ...(intake.assessment_type === "listing_pricing" || intake.assessment_type === "buyer_intelligence") && {
+          ...(["listing_pricing", "buyer_intelligence"].includes(intake.assessment_type)) && {
             buyer_pool_expectation: intake.buyer_pool_expectation,
             known_employer_draws: intake.known_employer_draws,
             key_selling_attributes: intake.key_selling_attributes,
           },
         },
+        agent_comps: intake.agent_comps || [],
+        comps_source: intake.comps_source || "none",
+        prior_sale_price: intake.prior_sale_price ?? null,
+        prior_sale_year: intake.prior_sale_year ?? null,
         drive_sync_status: intake.drive_sync ? "pending" : "not_synced",
         include_migration: intake.include_migration || false,
         include_archetypes: intake.include_archetypes || false,
@@ -203,6 +210,7 @@ export default function NewAnalysis() {
   const stepProps = { intake, update, user, userTier, onNext: next, onBack: back };
   const maxStep = getMaxStep(intake.assessment_type);
   const stepLabels = getStepLabels(intake.assessment_type);
+  const hasCompsStep = ["listing_pricing", "cma"].includes(intake.assessment_type);
   const hasFinancialStep = intake.assessment_type === "client_portfolio";
   const hasBuyerStep = ["listing_pricing", "buyer_intelligence"].includes(intake.assessment_type);
   const hasEnhancementStep = ["cma", "investment_analysis"].includes(intake.assessment_type);
@@ -213,20 +221,28 @@ export default function NewAnalysis() {
     if (step === 1) return <Step2Assessment {...stepProps} />;
     if (step === 2) return <Step3ClientRelationship {...stepProps} />;
     if (step === 3) return <Step4PropertyDetails {...stepProps} />;
-    
-    // Context step (step 4)
-    if (hasContextStep && step === 4) {
-      if (hasFinancialStep) return <StepClientFinancial {...stepProps} />;
-      if (hasBuyerStep) return <StepBuyerIntelligence {...stepProps} />;
-      if (hasEnhancementStep) return <StepReportEnhancements {...stepProps} />;
+
+    let nextStep = 4;
+
+    if (hasCompsStep) {
+      if (step === nextStep) return <StepComparableSales {...stepProps} />;
+      nextStep++;
+      if (step === nextStep) return <StepPriorSaleHistory {...stepProps} />;
+      nextStep++;
     }
-    
-    // Output step (5 if context exists, 4 otherwise)
-    const outputStep = hasContextStep ? 5 : 4;
-    const confirmStep = hasContextStep ? 6 : 5;
-    
-    if (step === outputStep) return <Step5OutputFormat {...stepProps} />;
-    if (step === confirmStep) {
+
+    if (hasContextStep) {
+      if (step === nextStep) {
+        if (hasFinancialStep) return <StepClientFinancial {...stepProps} />;
+        if (hasBuyerStep) return <StepBuyerIntelligence {...stepProps} />;
+        if (hasEnhancementStep) return <StepReportEnhancements {...stepProps} />;
+      }
+      nextStep++;
+    }
+
+    if (step === nextStep) return <Step5OutputFormat {...stepProps} />;
+    nextStep++;
+    if (step === nextStep) {
       return (
         <Step6Confirm
           {...stepProps}
@@ -236,7 +252,7 @@ export default function NewAnalysis() {
         />
       );
     }
-    
+
     return null;
   }
 
