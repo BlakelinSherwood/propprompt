@@ -22,21 +22,30 @@ export default function Members() {
 
   async function loadData() {
     try {
-      const [users, invites] = await Promise.all([
+      const [users, invitesByOrg, invitesByInviter] = await Promise.all([
         base44.entities.User.list(),
         base44.entities.OrgMembership.filter({ status: 'pending_invite' }),
+        base44.entities.OrgMembership.filter({ status: 'pending_invite', invited_by_email: user?.email }),
       ]);
       setMembers(users);
-      // Only show pending invites for emails not already in the user list
       const userEmails = new Set(users.map(u => u.email?.toLowerCase()));
-      const pending = invites
-        .filter(i => !userEmails.has(i.user_email?.toLowerCase()))
+      // Merge and dedupe by id
+      const allInvites = [...invitesByOrg, ...invitesByInviter];
+      const seen = new Set();
+      const pending = allInvites
+        .filter(i => {
+          if (seen.has(i.id)) return false;
+          seen.add(i.id);
+          return !userEmails.has(i.user_email?.toLowerCase());
+        })
         .map(i => ({
           id: `pending_${i.id}`,
           email: i.user_email,
           full_name: null,
           role: i.role_in_org || 'agent',
           status: 'pending_invite',
+          invited_by: i.invited_by_email,
+          invite_sent_at: i.invite_sent_at,
         }));
       setPendingInvites(pending);
     } catch (e) {

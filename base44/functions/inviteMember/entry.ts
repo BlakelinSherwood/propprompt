@@ -38,9 +38,16 @@ Deno.serve(async (req) => {
 
     // Create an OrgMembership record so the invite shows as pending in the Members list
     try {
-      // Find the inviter's org
-      const orgs = await base44.asServiceRole.entities.Organization.filter({ owner_email: user.email });
-      const orgId = orgs?.[0]?.id;
+      // Find the inviter's org — first try as owner, then via their own membership
+      let orgId = null;
+      const ownedOrgs = await base44.asServiceRole.entities.Organization.filter({ owner_email: user.email });
+      if (ownedOrgs?.length > 0) {
+        orgId = ownedOrgs[0].id;
+      } else {
+        // inviter is a member (admin/team_lead) not the owner
+        const memberships = await base44.asServiceRole.entities.OrgMembership.filter({ user_email: user.email, status: 'active' });
+        if (memberships?.length > 0) orgId = memberships[0].org_id;
+      }
       if (orgId) {
         // Check if membership already exists
         const existing = await base44.asServiceRole.entities.OrgMembership.filter({ user_email: email, org_id: orgId });
@@ -55,6 +62,17 @@ Deno.serve(async (req) => {
             invite_expires_at: new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString(),
           });
         }
+      } else {
+        // No org found — still create a record keyed by invited_by so it shows up
+        console.log('[inviteMember] No org found for inviter, creating membership without org_id');
+        await base44.asServiceRole.entities.OrgMembership.create({
+          user_email: email,
+          role_in_org: appRole,
+          status: 'pending_invite',
+          invited_by_email: user.email,
+          invite_sent_at: new Date().toISOString(),
+          invite_expires_at: new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString(),
+        });
       }
     } catch (e) {
       console.log('Could not create OrgMembership:', e.message);

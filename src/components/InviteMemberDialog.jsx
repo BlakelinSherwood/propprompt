@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { X } from "lucide-react";
+import { X, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,6 +30,18 @@ const ROLE_LABELS = {
   individual_agent: "Individual Agent (with Broker Permissions)",
   team_agent: "Team Agent",
   assistant: "Assistant",
+};
+
+const ROLE_GUIDE = {
+  brokerage_admin: { color: "bg-[#1A3226]/10 text-[#1A3226]", desc: "Manages the brokerage account, members, and billing. Full admin access." },
+  team_lead: { color: "bg-blue-50 text-blue-700", desc: "Leads a team. Can invite agents and assistants within their team." },
+  agent: { color: "bg-gray-100 text-gray-700", desc: "Standard licensed agent seat. Runs analyses, accesses reports." },
+  team_agent: { color: "bg-gray-100 text-gray-700", desc: "Agent working under a team lead. Same analysis access as Agent." },
+  assistant: { color: "bg-purple-50 text-purple-700", desc: "Supports agents. Can run analyses on behalf of an agent. Lower seat cost." },
+  team_admin: { color: "bg-blue-50 text-blue-700", desc: "Admin for a specific team. Manages team members and settings." },
+  individual_agent: { color: "bg-[#B8982F]/10 text-[#B8982F]", desc: "Independent agent with broker-level permissions. No team required." },
+  platform_owner: { color: "bg-[#B8982F]/10 text-[#B8982F]", desc: "Full platform access. Reserved for Sherwood & Company admins." },
+  brokerage_owner: { color: "bg-[#1A3226]/10 text-[#1A3226]", desc: "Owns the brokerage license. Highest level within a brokerage." },
 };
 
 export default function InviteMemberDialog({ userRole, onClose, onInvited }) {
@@ -98,7 +110,28 @@ export default function InviteMemberDialog({ userRole, onClose, onInvited }) {
                 ))}
               </SelectContent>
             </Select>
+            {role && ROLE_GUIDE[role] && (
+              <div className={`mt-2 rounded-lg px-3 py-2 flex gap-2 items-start ${ROLE_GUIDE[role].color}`}>
+                <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                <p className="text-xs leading-relaxed">{ROLE_GUIDE[role].desc}</p>
+              </div>
+            )}
           </div>
+
+          {/* Role Reference Guide */}
+          <details className="group">
+            <summary className="text-xs text-[#1A3226]/50 cursor-pointer hover:text-[#1A3226]/70 select-none flex items-center gap-1">
+              <Info className="w-3 h-3" /> View all role descriptions
+            </summary>
+            <div className="mt-2 space-y-1.5 rounded-xl border border-[#1A3226]/10 p-3 bg-[#FAF8F4]">
+              {allowedRoles.map(r => ROLE_GUIDE[r] ? (
+                <div key={r} className="flex gap-2 items-start">
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase tracking-wide flex-shrink-0 ${ROLE_GUIDE[r].color}`}>{ROLE_LABELS[r] || r}</span>
+                  <p className="text-xs text-[#1A3226]/60 leading-relaxed">{ROLE_GUIDE[r].desc}</p>
+                </div>
+              ) : null)}
+            </div>
+          </details>
 
           <p className="text-xs text-[#1A3226]/40">
             An invitation email will be sent. The user will set their password upon first login.
