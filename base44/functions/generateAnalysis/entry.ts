@@ -3,7 +3,7 @@
  * Resolves API key → assembles prompt → calls Claude/OpenAI/Gemini → saves & returns output.
  * Used by AnalysisRun page via SDK invoke (avoids SSE auth issues).
  */
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.21';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 
 // Inline section matrix (must match assemblePrompt)
 function getRequiredSections(assessmentType, analysis) {
