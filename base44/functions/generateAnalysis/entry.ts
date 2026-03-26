@@ -624,6 +624,11 @@ Deno.serve(async (req) => {
       console.warn('[generateAnalysis] tier lookup failed, defaulting to starter:', e.message);
     }
 
+    // Platform owner and admin always get pro-tier routing
+    if (user.role === 'platform_owner' || user.role === 'admin') {
+      tier = 'team';
+    }
+
     const isPro = tier === 'pro' || tier === 'team' || tier === 'broker' || tier === 'brokerage' || tier === 'enterprise';
 
     // Fetch PromptLibrary pipeline prompts if pro+
