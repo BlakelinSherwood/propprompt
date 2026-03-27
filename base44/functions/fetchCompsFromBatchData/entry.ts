@@ -12,9 +12,10 @@ Deno.serve(async (req) => {
     // Parse address: "123 Main St, City, State 12345"
     const parts = address.split(',').map(p => p.trim());
     const street = parts[0] || '';
-    const cityState = parts[1] || '';
-    const zip = parts[2] || '';
-    const [city, state] = cityState.split(/\s+/).slice(0, 2);
+    const city = parts[1] || '';
+    const stateZip = (parts[2] || '').trim().split(/\s+/);
+    const state = stateZip[0] || '';
+    const zip = stateZip[1] || '';
 
     // Get BatchData API key from PlatformConfig
     const configs = await base44.asServiceRole.entities.PlatformConfig.list();
