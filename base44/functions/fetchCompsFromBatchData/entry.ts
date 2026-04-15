@@ -28,33 +28,35 @@ Deno.serve(async (req) => {
     // Large property flag (sqft >= 4000)
     const isLargeProperty = sqft && sqft >= 4000;
 
-    // Tiered waterfall radii
+    // Tiered waterfall radii — relaxed for low-inventory markets like coastal MA
     const radiiTiers = isLargeProperty
       ? [
           { radii: [0.5, 1.0, 2.0], soldWithinMonths: 12, tierNum: 1 },
           { radii: [0.5, 1.0, 2.0, 3.0], soldWithinMonths: 18, tierNum: 2 },
           { radii: [1.0, 2.0, 3.0, 5.0], soldWithinMonths: 24, tierNum: 3 },
+          { radii: [1.0, 2.0, 3.0, 5.0, 7.0], soldWithinMonths: 36, tierNum: 4 },
         ]
       : [
           { radii: [0.5, 1.0, 2.0], soldWithinMonths: 12, tierNum: 1 },
-          { radii: [0.5, 1.0, 2.0], soldWithinMonths: 18, tierNum: 2 },
-          { radii: [0.5, 1.0, 2.0, 3.0], soldWithinMonths: 18, tierNum: 3 },
-          { radii: [1.0, 2.0, 3.0], soldWithinMonths: 24, tierNum: 4 },
+          { radii: [0.5, 1.0, 2.0, 3.0], soldWithinMonths: 18, tierNum: 2 },
+          { radii: [1.0, 2.0, 3.0, 5.0], soldWithinMonths: 24, tierNum: 3 },
+          { radii: [1.0, 2.0, 3.0, 5.0, 7.0], soldWithinMonths: 36, tierNum: 4 },
         ];
 
     const compAddress = { street, city, state, zip };
 
-    // Helper: Filter raw BatchData results by property type and sold date
+    // Helper: Filter raw BatchData results by property type and sold date — relaxed for low-inventory markets
     function filterResults(properties, soldWithinMonths) {
       const cutoffDate = new Date();
       cutoffDate.setMonth(cutoffDate.getMonth() - soldWithinMonths);
 
       return properties.filter(p => {
-        // Check property type
+        // Check property type (allow broader residential types for coastal markets)
         const listingType = p.listing?.propertyType || '';
-        const isSF = ['single family', 'other residential', 'sfr'].some(t => 
-          listingType.toLowerCase().includes(t)
-        );
+        const listingTypeLC = listingType.toLowerCase();
+        const isSF = ['single family', 'other residential', 'sfr', 'residential', 'house'].some(t => 
+          listingTypeLC.includes(t)
+        ) && !listingTypeLC.includes('condo') && !listingTypeLC.includes('townhouse') && !listingTypeLC.includes('multi');
         if (!isSF) return false;
 
         // Check sold date from listing or deed history
@@ -163,7 +165,9 @@ Deno.serve(async (req) => {
           const filtered = filterResults(rawProperties, tierConfig.soldWithinMonths);
           console.log(`[fetchCompsFromBatchData] After filtering: ${filtered.length} recently-sold SFR comps`);
 
-          if (filtered.length >= 3) {
+          // Relax to 2 comps for low-inventory markets (tier 3+)
+          const compThreshold = tierConfig.tierNum >= 3 ? 2 : 3;
+          if (filtered.length >= compThreshold) {
             // Success — normalize and return
             allComps = filtered.map(p => normalizeProp(p, tierConfig.tierNum, distanceMiles));
             successTierNum = tierConfig.tierNum;
@@ -176,7 +180,7 @@ Deno.serve(async (req) => {
         }
       }
 
-      if (allComps.length >= 3) break; // Exit tier loop if we found enough comps
+      if (allComps.length >= 2) break; // Exit tier loop if we found at least 2 comps (tier 3+)
     }
 
     if (allComps.length === 0) {
