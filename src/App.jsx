@@ -40,6 +40,7 @@ import DataQuality from "./pages/admin/DataQuality";
 import AlertSettings from "./pages/AlertSettings";
 import AiSettings from "./pages/admin/AiSettings";
 import BrandingAdmin from "./pages/admin/BrandingAdmin";
+import ActivityLog from "./pages/admin/ActivityLog";
 import FlipbookViewer from "./pages/FlipbookViewer";
 
 function Spinner() {
@@ -95,6 +96,7 @@ function AuthenticatedApp() {
         <Route path="/admin/data-quality" element={<ProtectedRoute element={<DataQuality />} />} />
         <Route path="/admin/ai-settings" element={<ProtectedRoute element={<AiSettings />} />} />
         <Route path="/admin/branding" element={<ProtectedRoute element={<BrandingAdmin />} />} />
+        <Route path="/admin/activity-log" element={<ProtectedRoute element={<ActivityLog />} />} />
         <Route path="/admin/territories/eastern-ma" element={<ProtectedRoute element={<EasternMA />} />} />
         <Route path="/account/alert-settings" element={<ProtectedRoute element={<AlertSettings />} />} />
         <Route path="/training" element={<ProtectedRoute element={<Training />} />} />

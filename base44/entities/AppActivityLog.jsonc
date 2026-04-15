@@ -1,0 +1,50 @@
+{
+  "name": "AppActivityLog",
+  "type": "object",
+  "description": "Error and activity log for troubleshooting. Admin-only access.",
+  "properties": {
+    "log_level": {
+      "type": "string",
+      "enum": [
+        "info",
+        "warn",
+        "error"
+      ],
+      "description": "Log severity level"
+    },
+    "function_name": {
+      "type": "string",
+      "description": "Name of the function/operation that generated this log"
+    },
+    "message": {
+      "type": "string",
+      "description": "Log message"
+    },
+    "context": {
+      "type": "object",
+      "description": "Contextual data (e.g., address, tier, attempt count)"
+    },
+    "error_details": {
+      "type": "string",
+      "description": "Full error stack or detailed error info"
+    },
+    "user_email": {
+      "type": "string",
+      "description": "Email of user whose action triggered this log (if applicable)"
+    },
+    "analysis_id": {
+      "type": "string",
+      "description": "Reference to Analysis ID if log is related to a report generation"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the event occurred"
+    }
+  },
+  "required": [
+    "log_level",
+    "function_name",
+    "message"
+  ]
+}

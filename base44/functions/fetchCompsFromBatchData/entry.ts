@@ -122,7 +122,19 @@ Deno.serve(async (req) => {
 
     // Run tiered waterfall
     for (const tierConfig of radiiTiers) {
-      console.log(`[fetchCompsFromBatchData] Tier ${tierConfig.tierNum}: trying radii ${tierConfig.radii.join(', ')} mi, sold within ${tierConfig.soldWithinMonths} months`);
+      const logMsg = `Tier ${tierConfig.tierNum}: trying radii ${tierConfig.radii.join(', ')} mi, sold within ${tierConfig.soldWithinMonths} months`;
+      console.log(`[fetchCompsFromBatchData] ${logMsg}`);
+      try {
+        await base44.functions.invoke('logActivity', {
+          log_level: 'info',
+          function_name: 'fetchCompsFromBatchData',
+          message: logMsg,
+          context: { address, tier: tierConfig.tierNum, radii: tierConfig.radii },
+          analysis_id: null,
+        });
+      } catch (logErr) {
+        console.warn('[fetchCompsFromBatchData] logging failed:', logErr.message);
+      }
 
       for (const distanceMiles of tierConfig.radii) {
         try {
@@ -148,7 +160,16 @@ Deno.serve(async (req) => {
           });
 
           if (response.status === 403) {
-            console.error('[fetchCompsFromBatchData] 403 Forbidden — check BatchData token permissions (property-search, property-lookup-all-attributes)');
+            const errMsg = '403 Forbidden — check BatchData token permissions (property-search, property-lookup-all-attributes)';
+            console.error('[fetchCompsFromBatchData] ' + errMsg);
+            try {
+              await base44.functions.invoke('logActivity', {
+                log_level: 'error',
+                function_name: 'fetchCompsFromBatchData',
+                message: errMsg,
+                error_details: 'BatchData API returned 403 Forbidden',
+              });
+            } catch (logErr) {}
             return Response.json({ success: false, message: 'BatchData API authentication failed — token may not have property-search permission' }, { status: 403 });
           }
 
@@ -184,7 +205,16 @@ Deno.serve(async (req) => {
     }
 
     if (allComps.length === 0) {
-      console.log('[fetchCompsFromBatchData] No comps found after all tiers — escalating to Perplexity deep search');
+      const noCompsMsg = 'No comps found after exhaustive tier search — escalating to Perplexity deep search';
+      console.log('[fetchCompsFromBatchData] ' + noCompsMsg);
+      try {
+        await base44.functions.invoke('logActivity', {
+          log_level: 'warn',
+          function_name: 'fetchCompsFromBatchData',
+          message: noCompsMsg,
+          context: { address, propertyType, bedrooms, bathrooms, sqft, isLargeProperty },
+        });
+      } catch (logErr) {}
       return Response.json({
         success: true,
         comps: [],
