@@ -78,7 +78,6 @@ import DataQuality from './pages/DataQuality';
 import EasternMAAdmin from './pages/EasternMAAdmin';
 import FounderProfileSettings from './pages/FounderProfileSettings';
 import PlatformSettings from './pages/PlatformSettings';
-import PricingAdmin from './pages/PricingAdmin';
 import TrainingAdmin from './pages/TrainingAdmin';
 import EasternMA from './pages/EasternMA';
 
