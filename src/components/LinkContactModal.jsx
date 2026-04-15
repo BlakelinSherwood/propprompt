@@ -54,6 +54,13 @@ export default function LinkContactModal({ analysis, orgId, onSave, onCancel }) 
     }
   };
 
+  // Auto-save when perfect match is found and selected
+  useEffect(() => {
+    if (suggestedContact && !analysis.contact_id && selectedId === suggestedContact.id && !loading) {
+      handleSave();
+    }
+  }, [suggestedContact?.id, selectedId, analysis.contact_id]);
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] flex flex-col">

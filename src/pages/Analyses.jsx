@@ -199,15 +199,19 @@ export default function Analyses() {
             <Link
               key={a.id}
               to={`/Analysis/${a.id}`}
-              className={`flex items-center gap-4 px-5 py-4 hover:bg-[#FAF8F4]/70 transition-colors ${
+              className={`flex items-center gap-4 px-5 py-4 hover:bg-[#FAF8F4]/70 transition-colors border-l-4 ${
+                linkedContact ? "border-l-blue-400 bg-blue-50/30" : "border-l-transparent"
+              } ${
                 i !== displayedAnalyses.length - 1 ? "border-b border-[#1A3226]/5" : ""
               }`}
             >
-              <div className="w-9 h-9 rounded-lg bg-[#1A3226]/5 flex items-center justify-center flex-shrink-0">
+              <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                linkedContact ? "bg-blue-100" : "bg-[#1A3226]/5"
+              }`}>
                 {a.is_private ? (
-                  <Lock className="w-4 h-4 text-[#1A3226]/60" />
+                  <Lock className={`w-4 h-4 ${linkedContact ? "text-blue-600" : "text-[#1A3226]/60"}`} />
                 ) : (
-                  <FileText className="w-4 h-4 text-[#1A3226]/40" />
+                  <FileText className={`w-4 h-4 ${linkedContact ? "text-blue-600" : "text-[#1A3226]/40"}`} />
                 )}
               </div>
               <div className="flex-1 min-w-0">
