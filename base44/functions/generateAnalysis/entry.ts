@@ -711,20 +711,52 @@ Deno.serve(async (req) => {
       return Response.json({ output: analysis.output_text, model: analysis.ai_model, keySource: "cached", outputJson: !!analysis.output_json });
     }
 
-    // Resolve API key
-    const keyRes = await base44.functions.invoke("resolveApiKey", {
-      platform: analysis.ai_platform,
-      orgId: analysis.org_id || orgId,
-      agentEmail: analysis.run_by_email,
-    });
-    if (!keyRes.data?.apiKey) {
-      return Response.json({ error: keyRes.data?.error || `No API key for platform: ${analysis.ai_platform}` }, { status: 402 });
+    // Resolve API key inline (avoids sub-function auth issues)
+    const PLATFORM_ENV_VARS = { claude: "ANTHROPIC_API_KEY", chatgpt: "OPENAI_API_KEY", gemini: "GEMINI_API_KEY", perplexity: "PERPLEXITY_API_KEY", grok: "GROK_API_KEY" };
+    const PLATFORM_CONFIG_FIELDS = { claude: "anthropic_api_key", chatgpt: "openai_api_key", gemini: "google_api_key", perplexity: "perplexity_api_key", grok: "grok_api_key" };
+    let apiKey = null;
+    let keySource = 'env';
+    const aiPlatform = analysis.ai_platform || 'claude';
+    try {
+      const configs = await base44.asServiceRole.entities.PlatformConfig.filter({});
+      const cfg = configs[0];
+      const cfgField = PLATFORM_CONFIG_FIELDS[aiPlatform];
+      if (cfg && cfgField && cfg[cfgField]) { apiKey = cfg[cfgField]; keySource = 'sc_platform'; }
+    } catch (e) { console.warn('[generateAnalysis] PlatformConfig lookup failed:', e.message); }
+    if (!apiKey) {
+      const envVar = PLATFORM_ENV_VARS[aiPlatform];
+      apiKey = envVar ? Deno.env.get(envVar) : null;
     }
-    const { apiKey, source: keySource } = keyRes.data;
+    if (!apiKey) return Response.json({ error: `No API key configured for platform: ${aiPlatform}` }, { status: 402 });
 
-    // Assemble prompt
-    const promptRes = await base44.functions.invoke("assemblePrompt", { analysisId });
-    let prompt = promptRes.data?.prompt || `Analyze this property for a PropPrompt™ listing pricing analysis: ${JSON.stringify(analysis.intake_data)}`;
+    // Resolve perplexity key inline for AVM lookup
+    const resolvePerplexityKey = async () => {
+      try {
+        const configs = await base44.asServiceRole.entities.PlatformConfig.filter({});
+        const cfg = configs[0];
+        if (cfg?.perplexity_api_key) return cfg.perplexity_api_key;
+      } catch (e) {}
+      return Deno.env.get("PERPLEXITY_API_KEY") || null;
+    };
+
+    // Assemble prompt inline (baseline — library prompts handled in pipeline path below)
+    const buildBaselinePrompt = (a) => {
+      const d = a.intake_data || {};
+      const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+      return `ASSESSMENT TYPE: ${a.assessment_type?.replace(/_/g, " ").toUpperCase()}\nPROPERTY TYPE: ${a.property_type?.replace(/_/g, " ")}\nADDRESS: ${d.address || "Not provided"}\nLOCATION CLASS: ${a.location_class || "unknown"}\nCLIENT RELATIONSHIP: ${d.client_relationship || "buyer's agent"}\nTODAY'S DATE: ${today}\n\nINTAKE DATA:\n${JSON.stringify(d, null, 2)}\n\nPerform a complete PropPrompt™ analysis for the above property. Follow the JSON schema and all instructions in the system prompt exactly. Return a single JSON object with all required fields populated with real, specific data for this property, location, and market conditions.`;
+    };
+
+    // Try to get assembled prompt from PromptLibrary (full_assembled / baseline)
+    let prompt = buildBaselinePrompt(analysis);
+    try {
+      const libraryPrompts = await base44.asServiceRole.entities.PromptLibrary.filter({ is_active: true, prompt_section: 'full_assembled' });
+      const match = libraryPrompts.find(p => p.ai_platform === aiPlatform && p.assessment_type === analysis.assessment_type)
+        || libraryPrompts.find(p => p.ai_platform === aiPlatform && p.property_type === 'all')
+        || libraryPrompts.find(p => p.ai_platform === 'generic');
+      if (match?.prompt_text && !match.prompt_text.startsWith('ENC:') && !match.prompt_text.startsWith('FILE:')) {
+        prompt = match.prompt_text;
+      }
+    } catch (e) { console.warn('[generateAnalysis] PromptLibrary lookup failed, using baseline:', e.message); }
 
     // Inject data quality flag based on comp count
     const agentComps = analysis.agent_comps || [];
@@ -754,12 +786,7 @@ Deno.serve(async (req) => {
       const address = analysis.intake_data?.address || '';
       let avmResult = null;
       try {
-        const perpKeyRes = await base44.functions.invoke('resolveApiKey', {
-          platform: 'perplexity',
-          orgId: analysis.org_id,
-          agentEmail: analysis.run_by_email,
-        });
-        const perpKey = perpKeyRes.data?.apiKey;
+        const perpKey = await resolvePerplexityKey();
         if (perpKey && address) {
           console.log('[generateAnalysis] Fetching AVM data via Perplexity for:', address);
           avmResult = await callPerplexityAVM(perpKey, address);
@@ -816,10 +843,15 @@ Deno.serve(async (req) => {
       const startTime = Date.now();
 
       const getKey = async (platform) => {
-        const r = await base44.functions.invoke('resolveApiKey', {
-          platform, orgId: analysis.org_id, agentEmail: analysis.run_by_email,
-        });
-        return r.data?.apiKey || null;
+        const envVars = { claude: "ANTHROPIC_API_KEY", chatgpt: "OPENAI_API_KEY", gemini: "GEMINI_API_KEY", perplexity: "PERPLEXITY_API_KEY", grok: "GROK_API_KEY" };
+        const cfgFields = { claude: "anthropic_api_key", chatgpt: "openai_api_key", gemini: "google_api_key", perplexity: "perplexity_api_key", grok: "grok_api_key" };
+        try {
+          const cfgs = await base44.asServiceRole.entities.PlatformConfig.filter({});
+          const c = cfgs[0];
+          const field = cfgFields[platform];
+          if (c && field && c[field]) return c[field];
+        } catch (e) {}
+        return Deno.env.get(envVars[platform] || '') || null;
       };
 
       const callProvider = async (platform, key, p) => {
