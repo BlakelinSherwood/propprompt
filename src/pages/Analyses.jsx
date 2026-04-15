@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import PullToRefresh from "../components/PullToRefresh";
 import { Link, useNavigate } from "react-router-dom";
-import { Plus, FileText, Lock, RotateCw } from "lucide-react";
+import { Plus, FileText, Lock, RotateCw, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { STATUS_STYLES } from "@/lib/constants";
 import PrivateToggle from "../components/PrivateToggle";
@@ -28,6 +28,7 @@ export default function Analyses() {
   const [orgAllowsPrivate, setOrgAllowsPrivate] = useState(false);
   const [orgId, setOrgId] = useState(null);
   const [rerunning, setRerunning] = useState(null);
+  const [contactsMap, setContactsMap] = useState({});
 
   useEffect(() => {
     async function load() {
@@ -48,6 +49,14 @@ export default function Analyses() {
         // Load collections for this org
         const cols = await base44.entities.AnalysisCollection.filter({ org_id: org.org_id }, "sort_order");
         setCollections(cols);
+
+        // Load all contacts for this org to build map
+        const contacts = await base44.entities.Contact.filter({ org_id: org.org_id });
+        const map = {};
+        contacts.forEach((c) => {
+          map[c.id] = c;
+        });
+        setContactsMap(map);
       }
 
       setLoading(false);
@@ -169,7 +178,9 @@ export default function Analyses() {
         </div>
       ) : (
         <div className="rounded-2xl border border-[#1A3226]/10 bg-white overflow-hidden">
-          {displayedAnalyses.map((a, i) => (
+          {displayedAnalyses.map((a, i) => {
+            const linkedContact = a.contact_id ? contactsMap[a.contact_id] : null;
+            return (
             <Link
               key={a.id}
               to={`/Analysis/${a.id}`}
@@ -195,10 +206,18 @@ export default function Analyses() {
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-[#1A3226]/40 mt-0.5">
-                   {TYPE_LABELS[a.assessment_type] || a.assessment_type} · {a.ensemble_mode_used ? "Ensemble" : a.ai_platform} ·{" "}
-                   {new Date(a.created_date).toLocaleDateString()}
-                 </p>
+                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                  <p className="text-xs text-[#1A3226]/40">
+                     {TYPE_LABELS[a.assessment_type] || a.assessment_type} · {a.ensemble_mode_used ? "Ensemble" : a.ai_platform} ·{" "}
+                     {new Date(a.created_date).toLocaleDateString()}
+                   </p>
+                  {linkedContact && (
+                    <span className="text-xs text-[#1A3226]/50 flex items-center gap-1">
+                      <User className="w-3 h-3" />
+                      {linkedContact.first_name} {linkedContact.last_name}
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                  {a.status === "complete" && (
@@ -231,7 +250,8 @@ export default function Analyses() {
                  </span>
                </div>
             </Link>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

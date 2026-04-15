@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ExternalLink, Clock, RotateCw } from "lucide-react";
+import { ArrowLeft, ExternalLink, Clock, RotateCw, User, ChevronRight } from "lucide-react";
 import ExportPanel from "../components/ExportPanel";
 
 const PLATFORM_LABELS = { claude: "Claude", chatgpt: "ChatGPT", gemini: "Gemini", perplexity: "Perplexity", grok: "Grok" };
@@ -26,6 +26,7 @@ export default function AnalysisDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [analysis, setAnalysis] = useState(null);
+  const [contact, setContact] = useState(null);
   const [orgPlan, setOrgPlan] = useState(null);
   const [loading, setLoading] = useState(true);
   const [rerunning, setRerunning] = useState(false);
@@ -35,6 +36,18 @@ export default function AnalysisDetail() {
       const records = await base44.entities.Analysis.filter({ id });
       const rec = records[0];
       setAnalysis(rec || null);
+
+      // Load linked contact if exists
+      if (rec?.contact_id) {
+        try {
+          const contacts = await base44.entities.Contact.filter({ id: rec.contact_id });
+          if (contacts.length > 0) {
+            setContact(contacts[0]);
+          }
+        } catch (err) {
+          console.warn("Failed to load contact:", err);
+        }
+      }
 
       // Determine org plan for tier gating
       const me = await base44.auth.me().catch(() => null);
@@ -163,6 +176,33 @@ export default function AnalysisDetail() {
               className="flex-shrink-0 border-emerald-300 text-emerald-700 hover:bg-emerald-100 gap-1"
             >
               View Output <ExternalLink className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Contact card — if linked */}
+      {contact && (
+        <div className="rounded-2xl border border-[#1A3226]/10 bg-white p-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-[#1A3226]/5 flex items-center justify-center">
+                <User className="w-5 h-5 text-[#1A3226]/60" />
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wider text-[#1A3226]/40 font-semibold">Contact</p>
+                <p className="text-sm font-medium text-[#1A3226] mt-0.5">
+                  {contact.first_name} {contact.last_name}
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/Contacts", { state: { scrollToContact: contact.id } })}
+              className="text-[#1A3226]/60 hover:text-[#1A3226] gap-1"
+            >
+              View <ChevronRight className="w-3.5 h-3.5" />
             </Button>
           </div>
         </div>
