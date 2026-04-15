@@ -33,7 +33,7 @@ export default function PromptLibraryEditor() {
   async function loadPrompts() {
     setLoading(true);
     try {
-      const prompts = await base44.asServiceRole.entities.PromptLibrary.list('-created_date', 200);
+      const prompts = await base44.entities.PromptLibrary.list('-created_date', 200);
       setPrompts(prompts || []);
     } catch (e) {
       console.error('[PromptLibrary] load error:', e);
@@ -61,9 +61,9 @@ export default function PromptLibraryEditor() {
       const me = await base44.auth.me();
       const payload = { ...form, last_updated_by: me?.email };
       if (editing === 'new') {
-        await base44.asServiceRole.entities.PromptLibrary.create(payload);
+        await base44.entities.PromptLibrary.create(payload);
       } else {
-        await base44.asServiceRole.entities.PromptLibrary.update(editing, payload);
+        await base44.entities.PromptLibrary.update(editing, payload);
       }
       await loadPrompts();
       setEditing(null);
@@ -74,7 +74,7 @@ export default function PromptLibraryEditor() {
 
   async function handleDelete(id) {
     if (!confirm('Delete this prompt permanently?')) return;
-    await base44.asServiceRole.entities.PromptLibrary.delete(id);
+    await base44.entities.PromptLibrary.delete(id);
     setPrompts((prev) => prev.filter((p) => p.id !== id));
     if (editing === id) setEditing(null);
   }
