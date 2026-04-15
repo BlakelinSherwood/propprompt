@@ -6,6 +6,7 @@ import { Plus, FileText, Lock, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { STATUS_STYLES } from "@/lib/constants";
 import PrivateToggle from "../components/PrivateToggle";
+import CollectionManager from "../components/CollectionManager";
 import { base44 } from "@/api/base44Client";
 
 const TYPE_LABELS = {
@@ -21,8 +22,11 @@ export default function Analyses() {
   const { user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [analyses, setAnalyses] = useState([]);
+  const [collections, setCollections] = useState([]);
+  const [selectedCollection, setSelectedCollection] = useState(null);
   const [loading, setLoading] = useState(true);
   const [orgAllowsPrivate, setOrgAllowsPrivate] = useState(false);
+  const [orgId, setOrgId] = useState(null);
   const [rerunning, setRerunning] = useState(null);
 
   useEffect(() => {
@@ -36,8 +40,14 @@ export default function Analyses() {
       setAnalyses(data);
 
       if (memberships.length > 0) {
-        const orgs = await base44.entities.Organization.filter({ id: memberships[0].org_id });
+        const org = memberships[0];
+        setOrgId(org.org_id);
+        const orgs = await base44.entities.Organization.filter({ id: org.org_id });
         if (orgs[0]?.allow_agent_private_toggle) setOrgAllowsPrivate(true);
+
+        // Load collections for this org
+        const cols = await base44.entities.AnalysisCollection.filter({ org_id: org.org_id }, "sort_order");
+        setCollections(cols);
       }
 
       setLoading(false);
@@ -47,11 +57,13 @@ export default function Analyses() {
 
   const handleRefresh = useCallback(async () => {
     if (!user) return;
-    const [data] = await Promise.all([
+    const [data, cols] = await Promise.all([
       base44.entities.Analysis.filter({ run_by_email: user.email }, "-created_date", 30),
+      orgId ? base44.entities.AnalysisCollection.filter({ org_id: orgId }, "sort_order") : Promise.resolve([]),
     ]);
     setAnalyses(data);
-  }, [user]);
+    setCollections(cols);
+  }, [user, orgId]);
 
   const handleRerun = useCallback(async (e, analysis) => {
     e.preventDefault();
@@ -77,6 +89,11 @@ export default function Analyses() {
     );
   }
 
+  // Filter analyses by selected collection
+  const displayedAnalyses = selectedCollection
+    ? analyses.filter((a) => a.collection_id === selectedCollection)
+    : analyses;
+
   return (
     <PullToRefresh onRefresh={handleRefresh}>
     <div className="space-y-6">
@@ -85,7 +102,7 @@ export default function Analyses() {
           <h1 className="text-xl font-semibold text-[#1A3226]" style={{ fontFamily: "Georgia, serif" }}>
             Analyses
           </h1>
-          <p className="text-sm text-[#1A3226]/50 mt-0.5">{analyses.length} total</p>
+          <p className="text-sm text-[#1A3226]/50 mt-0.5">{displayedAnalyses.length} {selectedCollection ? "in this collection" : "total"}</p>
         </div>
         <Link to="/NewAnalysis">
           <Button className="bg-[#1A3226] hover:bg-[#1A3226]/90 text-white gap-2">
@@ -95,28 +112,69 @@ export default function Analyses() {
         </Link>
       </div>
 
-      {analyses.length === 0 ? (
+      {/* Collections */}
+      {orgId && (
+        <CollectionManager
+          collections={collections}
+          orgId={orgId}
+          onCollectionsUpdated={handleRefresh}
+        />
+      )}
+
+      {/* Collection filter pills */}
+      {collections.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setSelectedCollection(null)}
+            className={`text-sm px-3 py-1.5 rounded-full transition-all ${
+              !selectedCollection
+                ? "bg-[#1A3226] text-white"
+                : "bg-[#1A3226]/5 text-[#1A3226] hover:bg-[#1A3226]/10"
+            }`}
+          >
+            All
+          </button>
+          {collections.map((col) => (
+            <button
+              key={col.id}
+              onClick={() => setSelectedCollection(col.id)}
+              className={`text-sm px-3 py-1.5 rounded-full transition-all ${
+                selectedCollection === col.id
+                  ? "text-white"
+                  : "bg-[#1A3226]/5 text-[#1A3226] hover:bg-[#1A3226]/10"
+              }`}
+              style={selectedCollection === col.id ? { backgroundColor: col.color || "#1A3226" } : {}}
+            >
+              {col.name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {displayedAnalyses.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[#1A3226]/15 bg-white p-16 flex flex-col items-center text-center">
           <div className="w-14 h-14 rounded-2xl bg-[#1A3226]/5 flex items-center justify-center mb-4">
             <FileText className="w-7 h-7 text-[#1A3226]/25" />
           </div>
-          <p className="text-sm font-medium text-[#1A3226]/50 mb-1">No analyses yet</p>
-          <p className="text-xs text-[#1A3226]/30 mb-5">Run your first PropPrompt analysis to get started.</p>
-          <Link to="/NewAnalysis">
-            <Button className="bg-[#1A3226] hover:bg-[#1A3226]/90 text-white gap-2 text-sm">
-              <Plus className="w-4 h-4" />
-              New Analysis
-            </Button>
-          </Link>
+          <p className="text-sm font-medium text-[#1A3226]/50 mb-1">{selectedCollection ? "No analyses in this collection" : "No analyses yet"}</p>
+          <p className="text-xs text-[#1A3226]/30 mb-5">{!selectedCollection && "Run your first PropPrompt analysis to get started."}</p>
+          {!selectedCollection && (
+            <Link to="/NewAnalysis">
+              <Button className="bg-[#1A3226] hover:bg-[#1A3226]/90 text-white gap-2 text-sm">
+                <Plus className="w-4 h-4" />
+                New Analysis
+              </Button>
+            </Link>
+          )}
         </div>
       ) : (
         <div className="rounded-2xl border border-[#1A3226]/10 bg-white overflow-hidden">
-          {analyses.map((a, i) => (
+          {displayedAnalyses.map((a, i) => (
             <Link
               key={a.id}
               to={`/Analysis/${a.id}`}
               className={`flex items-center gap-4 px-5 py-4 hover:bg-[#FAF8F4]/70 transition-colors ${
-                i !== analyses.length - 1 ? "border-b border-[#1A3226]/5" : ""
+                i !== displayedAnalyses.length - 1 ? "border-b border-[#1A3226]/5" : ""
               }`}
             >
               <div className="w-9 h-9 rounded-lg bg-[#1A3226]/5 flex items-center justify-center flex-shrink-0">

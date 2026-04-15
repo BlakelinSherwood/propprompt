@@ -92,6 +92,10 @@
       "type": "boolean",
       "default": false
     },
+    "collection_id": {
+      "type": "string",
+      "description": "Optional reference to AnalysisCollection for organization"
+    },
     "intake_data": {
       "type": "object"
     },
