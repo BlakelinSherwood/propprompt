@@ -98,16 +98,17 @@ function CardForm({ clientSecret, setupIntentId, onSuccess, onBack, summary, aut
 export default function PaymentStep({ onSuccess, onBack, summary, pricing }) {
   const [clientSecret, setClientSecret] = useState(null);
   const [setupIntentId, setSetupIntentId] = useState(null);
+  const [resolvedStripePromise, setResolvedStripePromise] = useState(null);
   const [loadError, setLoadError] = useState("");
 
   const autoApproveHours = parseInt(pricing?.auto_approve_hours || 48);
 
   useEffect(() => {
     base44.functions.invoke("createSetupIntent", {}).then(res => {
-      const { clientSecret, setupIntentId } = res.data;
+      const { clientSecret, setupIntentId, publishableKey } = res.data;
       setClientSecret(clientSecret);
       setSetupIntentId(setupIntentId);
-      setStripePromise(getStripePromise(publishableKey));
+      setResolvedStripePromise(getStripePromise(publishableKey));
     }).catch(err => setLoadError(err.message));
   }, []);
 
@@ -118,14 +119,14 @@ export default function PaymentStep({ onSuccess, onBack, summary, pricing }) {
     </div>
   );
 
-  if (!clientSecret || !stripePromise) return (
+  if (!clientSecret || !resolvedStripePromise) return (
     <div className="flex items-center justify-center py-16">
       <Loader2 className="w-7 h-7 animate-spin text-[#1A3226]/40" />
     </div>
   );
 
   return (
-    <Elements stripe={stripePromise} options={{ clientSecret }}>
+    <Elements stripe={resolvedStripePromise} options={{ clientSecret }}>
       <CardForm
         clientSecret={clientSecret}
         setupIntentId={setupIntentId}

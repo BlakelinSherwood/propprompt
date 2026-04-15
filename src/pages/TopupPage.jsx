@@ -99,6 +99,7 @@ export default function TopupPage() {
   const [loadingCheckout, setLoadingCheckout] = useState(false);
   const [success, setSuccess] = useState(null);
   const [user, setUser] = useState(null);
+  const [resolvedStripe, setResolvedStripe] = useState(null);
 
   const packs = pricing ? [
     { key: 'starter', analyses: parseInt(pricing.topup_starter_analyses || 10), price: parseFloat(pricing.topup_starter_price || 29) },
@@ -139,7 +140,7 @@ export default function TopupPage() {
       bundle_id: sub?.type === 'bundle' ? sub.id : undefined,
     });
     const { clientSecret, paymentIntentId, publishableKey } = res.data;
-    setStripePromise(getStripePromise(publishableKey));
+    setResolvedStripe(getStripePromise(publishableKey));
     setCheckoutData({ clientSecret, paymentIntentId, pack });
     setSelectedPack(pack);
     setLoadingCheckout(false);
@@ -194,8 +195,8 @@ export default function TopupPage() {
       ) : (
         <div className="max-w-md mx-auto">
           <div className="bg-white rounded-2xl border border-[#1A3226]/10 p-7">
-            {stripePromise && (
-              <Elements stripe={stripePromise} options={{ clientSecret: checkoutData.clientSecret }}>
+            {resolvedStripe && (
+              <Elements stripe={resolvedStripe} options={{ clientSecret: checkoutData.clientSecret }}>
                 <CheckoutForm
                   pack={checkoutData.pack}
                   clientSecret={checkoutData.clientSecret}

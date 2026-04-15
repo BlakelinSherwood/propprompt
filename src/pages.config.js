@@ -115,7 +115,6 @@ export const PAGES = {
     "EasternMAAdmin": EasternMAAdmin,
     "FounderProfileSettings": FounderProfileSettings,
     "PlatformSettings": PlatformSettings,
-    "PricingAdmin": PricingAdmin,
     "TrainingAdmin": TrainingAdmin,
     "EasternMA": EasternMA,
 }

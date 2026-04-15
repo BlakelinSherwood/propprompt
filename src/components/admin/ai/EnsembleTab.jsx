@@ -293,10 +293,10 @@ export default function EnsembleTab() {
         </div>
 
         {/* Task rows */}
-        {displayTasks.length === 0 ? (
+        {(tasks || []).length === 0 ? (
           <div className="py-12 text-center text-sm text-[#1A3226]/40">No ensemble tasks configured.</div>
         ) : (
-          displayTasks.map(task => (
+          (tasks || []).map(task => (
             <TaskRow
               key={task.id}
               task={task}
