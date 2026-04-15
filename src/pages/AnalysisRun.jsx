@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import ReactMarkdown from "react-markdown";
 import { Button } from "@/components/ui/button";
 import { Copy, Download, Mail, CheckCircle, AlertCircle, Loader2, ArrowLeft, Cloud, Database, Presentation, Send, Link, ExternalLink } from "lucide-react";
 import ValuationAnomalyModal from "../components/ValuationAnomalyModal";
 import StreamProgressBar from "../components/StreamProgressBar";
+import AnalysisLoadingScreen from "../components/AnalysisLoadingScreen";
 
 const DISCLAIMER = `**DISCLAIMER:** This AI-generated analysis is provided for informational purposes only and does not constitute legal, financial, or professional real estate advice. All valuations and recommendations should be verified by a licensed real estate professional. PropPrompt™ analyses are tools to augment, not replace, professional judgment. © 2026 Sherwood & Company, Brokered by Compass.`;
 
@@ -295,6 +297,16 @@ export default function AnalysisRun() {
 
   return (
     <div className="max-w-4xl mx-auto">
+      {/* Show loading screen only on initial generation (not for cached results) */}
+      {status === "loading" && (
+        <AnalysisLoadingScreen
+          status={status}
+          onComplete={() => {
+            // Loading screen will auto-hide when analysis completes
+          }}
+        />
+      )}
+
       {anomalyData && (
         <ValuationAnomalyModal
           anomalyData={anomalyData}
