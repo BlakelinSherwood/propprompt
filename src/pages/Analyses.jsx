@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import PullToRefresh from "../components/PullToRefresh";
-import { Link } from "react-router-dom";
-import { Plus, FileText, Lock } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Plus, FileText, Lock, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { STATUS_STYLES } from "@/lib/constants";
 import PrivateToggle from "../components/PrivateToggle";
@@ -19,9 +19,11 @@ const TYPE_LABELS = {
 
 export default function Analyses() {
   const { user, isLoading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const [analyses, setAnalyses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [orgAllowsPrivate, setOrgAllowsPrivate] = useState(false);
+  const [rerunning, setRerunning] = useState(null);
 
   useEffect(() => {
     async function load() {
@@ -50,6 +52,22 @@ export default function Analyses() {
     ]);
     setAnalyses(data);
   }, [user]);
+
+  const handleRerun = useCallback(async (e, analysis) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setRerunning(analysis.id);
+    try {
+      const res = await base44.functions.invoke("rerunnAnalysis", { analysis_id: analysis.id });
+      if (res.data.success) {
+        navigate(`/AnalysisRun?id=${analysis.id}&orgId=${analysis.org_id}`);
+      }
+    } catch (err) {
+      console.error("Rerun failed:", err);
+    } finally {
+      setRerunning(null);
+    }
+  }, [navigate]);
 
   if (authLoading || loading) {
     return (
@@ -120,28 +138,40 @@ export default function Analyses() {
                   )}
                 </div>
                 <p className="text-xs text-[#1A3226]/40 mt-0.5">
-                  {TYPE_LABELS[a.assessment_type] || a.assessment_type} · {a.ai_platform} ·{" "}
-                  {new Date(a.created_date).toLocaleDateString()}
-                </p>
+                   {TYPE_LABELS[a.assessment_type] || a.assessment_type} · {a.ensemble_mode_used ? "Ensemble" : a.ai_platform} ·{" "}
+                   {new Date(a.created_date).toLocaleDateString()}
+                 </p>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
-                <PrivateToggle
-                  analysis={a}
-                  orgAllowsPrivate={orgAllowsPrivate}
-                  onToggled={(newVal) =>
-                    setAnalyses((prev) =>
-                      prev.map((x) => (x.id === a.id ? { ...x, is_private: newVal } : x))
-                    )
-                  }
-                />
-                <span
-                  className={`text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-full font-semibold ${
-                    STATUS_STYLES[a.status] || STATUS_STYLES.draft
-                  }`}
-                >
-                  {a.status}
-                </span>
-              </div>
+                 {a.status === "complete" && (
+                   <Button
+                     variant="ghost"
+                     size="sm"
+                     onClick={(e) => handleRerun(e, a)}
+                     disabled={rerunning === a.id}
+                     className="text-[#1A3226]/60 hover:text-[#1A3226] px-2"
+                     title="Re-run analysis (uses 1 token)"
+                   >
+                     <RotateCw className={`w-4 h-4 ${rerunning === a.id ? "animate-spin" : ""}`} />
+                   </Button>
+                 )}
+                 <PrivateToggle
+                   analysis={a}
+                   orgAllowsPrivate={orgAllowsPrivate}
+                   onToggled={(newVal) =>
+                     setAnalyses((prev) =>
+                       prev.map((x) => (x.id === a.id ? { ...x, is_private: newVal } : x))
+                     )
+                   }
+                 />
+                 <span
+                   className={`text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-full font-semibold ${
+                     STATUS_STYLES[a.status] || STATUS_STYLES.draft
+                   }`}
+                 >
+                   {a.status}
+                 </span>
+               </div>
             </Link>
           ))}
         </div>

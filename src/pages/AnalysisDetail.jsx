@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ExternalLink, Clock } from "lucide-react";
+import { ArrowLeft, ExternalLink, Clock, RotateCw } from "lucide-react";
 import ExportPanel from "../components/ExportPanel";
 
 const PLATFORM_LABELS = { claude: "Claude", chatgpt: "ChatGPT", gemini: "Gemini", perplexity: "Perplexity", grok: "Grok" };
@@ -28,6 +28,7 @@ export default function AnalysisDetail() {
   const [analysis, setAnalysis] = useState(null);
   const [orgPlan, setOrgPlan] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [rerunning, setRerunning] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -132,14 +133,38 @@ export default function AnalysisDetail() {
             <Clock className="w-4 h-4 text-emerald-600 flex-shrink-0" />
             <p className="text-sm text-emerald-700 font-medium">Analysis complete</p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate(`/AnalysisRun?id=${analysis.id}&orgId=${analysis.org_id}`)}
-            className="flex-shrink-0 border-emerald-300 text-emerald-700 hover:bg-emerald-100 gap-1"
-          >
-            View Output <ExternalLink className="w-3.5 h-3.5" />
-          </Button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                setRerunning(true);
+                try {
+                  const res = await base44.functions.invoke("rerunnAnalysis", { analysis_id: analysis.id });
+                  if (res.data.success) {
+                    navigate(`/AnalysisRun?id=${analysis.id}&orgId=${analysis.org_id}`);
+                  }
+                } catch (err) {
+                  console.error("Rerun failed:", err);
+                } finally {
+                  setRerunning(false);
+                }
+              }}
+              disabled={rerunning}
+              className="flex-shrink-0 border-emerald-300 text-emerald-700 hover:bg-emerald-100 gap-1"
+              title="Re-run analysis (uses 1 token)"
+            >
+              <RotateCw className={`w-3.5 h-3.5 ${rerunning ? "animate-spin" : ""}`} />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(`/AnalysisRun?id=${analysis.id}&orgId=${analysis.org_id}`)}
+              className="flex-shrink-0 border-emerald-300 text-emerald-700 hover:bg-emerald-100 gap-1"
+            >
+              View Output <ExternalLink className="w-3.5 h-3.5" />
+            </Button>
+          </div>
         </div>
       )}
 
