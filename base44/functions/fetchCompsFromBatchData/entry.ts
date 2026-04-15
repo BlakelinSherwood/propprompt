@@ -138,10 +138,16 @@ Deno.serve(async (req) => {
 
       for (const distanceMiles of tierConfig.radii) {
         try {
-          // CORRECT FLAT REQUEST BODY STRUCTURE
+          // CORRECT FLAT REQUEST BODY STRUCTURE with property filters
           const requestBody = {
             searchCriteria: {
-              compAddress
+              compAddress,
+              bedroomsMin: bedrooms ? bedrooms - 1 : null,
+              bedroomsMax: bedrooms ? bedrooms + 1 : null,
+              bathroomsMin: bathrooms ? bathrooms - 1 : null,
+              bathroomsMax: bathrooms ? bathrooms + 1 : null,
+              sqftMin: sqft ? Math.round(sqft * 0.80) : null,
+              sqftMax: sqft ? Math.round(sqft * 1.20) : null
             },
             options: {
               useDistance: true,
