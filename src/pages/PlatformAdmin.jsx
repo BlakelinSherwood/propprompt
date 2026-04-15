@@ -7,6 +7,7 @@ import { Sparkles } from "lucide-react";
 import PromptLibraryEditor from "../components/admin/platform/PromptLibraryEditor";
 import PlatformAIConfig from "../components/admin/platform/PlatformAIConfig";
 import PlatformAnalytics from "../components/admin/platform/PlatformAnalytics";
+import ActivityLog from "./admin/ActivityLog";
 
 export default function PlatformAdmin() {
   const [user, setUser] = useState(null);
@@ -48,6 +49,7 @@ export default function PlatformAdmin() {
           <TabsTrigger value="prompts">Prompt Library</TabsTrigger>
           <TabsTrigger value="ai">AI Config</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="logs">Activity Log</TabsTrigger>
         </TabsList>
 
         <TabsContent value="orgs" className="mt-6">
@@ -64,6 +66,10 @@ export default function PlatformAdmin() {
 
         <TabsContent value="analytics" className="mt-6">
           <PlatformAnalytics />
+        </TabsContent>
+
+        <TabsContent value="logs" className="mt-6">
+          <ActivityLog />
         </TabsContent>
       </Tabs>
     </div>
