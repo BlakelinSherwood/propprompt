@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
-import { X } from "lucide-react";
+import { X, FileText } from "lucide-react";
 
 export default function ContactForm({ orgId, contact, onSave, onCancel }) {
   const [loading, setLoading] = useState(false);
+  const [analyses, setAnalyses] = useState([]);
   const [formData, setFormData] = useState({
     first_name: "",
     last_name: "",
@@ -32,6 +33,16 @@ export default function ContactForm({ orgId, contact, onSave, onCancel }) {
         contact_type: contact.contact_type || "prospect",
         notes: contact.notes || "",
       });
+
+      // Load analyses linked to this contact
+      const loadAnalyses = async () => {
+        const data = await base44.entities.Analysis.filter(
+          { contact_id: contact.id },
+          "-created_date"
+        );
+        setAnalyses(data);
+      };
+      loadAnalyses();
     }
   }, [contact]);
 
@@ -225,6 +236,42 @@ export default function ContactForm({ orgId, contact, onSave, onCancel }) {
               className="w-full px-3 py-2 rounded-lg border border-[#1A3226]/15 focus:outline-none focus:border-[#1A3226] transition-colors text-sm resize-none h-20"
             />
           </div>
+
+          {/* Linked Analyses */}
+          {contact && analyses.length > 0 && (
+            <div className="border-t border-[#1A3226]/10 pt-4 mt-4">
+              <h3 className="text-sm font-semibold text-[#1A3226] mb-3">
+                Linked Analyses ({analyses.length})
+              </h3>
+              <div className="space-y-2">
+                {analyses.map((analysis) => (
+                  <a
+                    key={analysis.id}
+                    href={`/Analysis/${analysis.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block p-3 rounded-lg border border-[#1A3226]/10 hover:bg-[#1A3226]/5 transition-colors"
+                  >
+                    <div className="flex items-start gap-3">
+                      <FileText className="w-4 h-4 text-[#1A3226]/40 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-[#1A3226] truncate">
+                          {analysis.intake_data?.address || "Untitled"}
+                        </p>
+                        <p className="text-xs text-[#1A3226]/50 mt-0.5">
+                          {new Date(analysis.created_date).toLocaleDateString()} at{" "}
+                          {new Date(analysis.created_date).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="flex gap-3 pt-4 border-t border-[#1A3226]/10">
             <Button
