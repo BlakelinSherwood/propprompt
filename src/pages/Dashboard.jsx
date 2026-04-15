@@ -9,6 +9,7 @@ import TrainingProgressWidget from "../components/training/TrainingProgressWidge
 import FairHousingBanner from "../components/FairHousingBanner";
 import PrivacyNoticeModal from "../components/PrivacyNoticeModal";
 import OnboardingWelcomeModal from "../components/OnboardingWelcomeModal";
+import OrgSetupButton from "../components/OrgSetupButton";
 import { base44 } from "@/api/base44Client";
 
 export default function Dashboard() {
@@ -19,6 +20,7 @@ export default function Dashboard() {
   const [marketLabel, setMarketLabel] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showPrivacyNotice, setShowPrivacyNotice] = useState(false);
+  const [hasOrg, setHasOrg] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -29,10 +31,16 @@ export default function Dashboard() {
       // Safety timeout — never spin forever on mobile
       const timeout = setTimeout(() => setLoading(false), 8000);
       try {
-        if (!user.privacy_notice_accepted_at) setShowPrivacyNotice(true);
+         if (!user.privacy_notice_accepted_at) setShowPrivacyNotice(true);
 
-        // Resolve subscribed territory names for the subtitle
-        try {
+         // Check if platform owner has an org
+         if (user.role === 'platform_owner') {
+           const memberships = await base44.entities.OrgMembership.filter({ user_email: user.email });
+           setHasOrg(memberships.length > 0);
+         }
+
+         // Resolve subscribed territory names for the subtitle
+         try {
           if (user.role === 'platform_owner') {
             setMarketLabel(null);
           } else {
@@ -121,7 +129,20 @@ export default function Dashboard() {
 
         <WelcomeHero user={user} roleLabel={ROLE_LABELS[user?.role]} marketLabel={marketLabel} />
 
-        {/* Quick Stats */}
+         {/* Org setup prompt for platform owners without an org */}
+         {user?.role === 'platform_owner' && !hasOrg && (
+           <div className="rounded-2xl border border-[#B8982F]/30 bg-[#B8982F]/5 p-6">
+             <div className="flex items-center justify-between gap-4">
+               <div>
+                 <h3 className="font-semibold text-[#1A3226] mb-1">Set Up Your Organization</h3>
+                 <p className="text-sm text-[#1A3226]/60">Create Sherwood & Company Team to start managing analyses and team members.</p>
+               </div>
+               <OrgSetupButton />
+             </div>
+           </div>
+         )}
+
+         {/* Quick Stats */}
         {isAdmin && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <DashboardStatCard
