@@ -29,6 +29,7 @@ export default function AnalysisRun() {
   const [status, setStatus] = useState("loading"); // loading | streaming | complete | error
   const [errorMsg, setErrorMsg] = useState("");
   const [keySource, setKeySource] = useState(null);
+  const [branding, setBranding] = useState({ primary: "#1A3226", accent: "#B8982F" });
   const [copied, setCopied] = useState(false);
   const [crmPushing, setCrmPushing] = useState(false);
   const [crmPushed, setCrmPushed] = useState(false);
@@ -79,6 +80,12 @@ export default function AnalysisRun() {
       const rec = records[0];
       if (!rec) { setStatus("error"); setErrorMsg("Analysis not found."); return; }
       setAnalysis(rec);
+
+      // Load branding colors
+      try {
+        const brands = await base44.asServiceRole.entities.BrandingConfig.filter({ org_id: rec.org_id || "default" });
+        if (brands[0]) setBranding({ primary: brands[0].primary_color, accent: brands[0].accent_color });
+      } catch (e) { /* use defaults */ }
 
       // If already complete, show stored output with typing effect
       if (rec.status === "complete" && rec.output_text) {
@@ -296,10 +303,12 @@ export default function AnalysisRun() {
 
   return (
     <div className="max-w-4xl mx-auto">
-      {/* Show loading screen only on initial generation (not for cached results) */}
-      {status === "loading" && (
+      {/* Show loading screen during generation and initial streaming */}
+      {(status === "loading" || status === "streaming") && !output && (
         <AnalysisLoadingScreen
           status={status}
+          primaryColor={branding.primary}
+          accentColor={branding.accent}
           onComplete={() => {
             // Loading screen will auto-hide when analysis completes
           }}

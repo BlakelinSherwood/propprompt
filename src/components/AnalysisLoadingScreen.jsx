@@ -8,7 +8,7 @@ const MODELS = [
   { id: 'grok', name: 'Grok', task: 'Generating buyer archetypes...', delay: 1200 },
 ];
 
-export default function AnalysisLoadingScreen({ status = 'loading', onComplete }) {
+export default function AnalysisLoadingScreen({ status = 'loading', onComplete, primaryColor = '#1A3226', accentColor = '#B8982F' }) {
   const [progress, setProgress] = useState(0);
   const [completedModels, setCompletedModels] = useState(new Set());
 
@@ -45,7 +45,7 @@ export default function AnalysisLoadingScreen({ status = 'loading', onComplete }
   }, [status, onComplete]);
 
   return (
-    <div className="fixed inset-0 bg-[#0A0F1E] flex flex-col items-center justify-center overflow-hidden">
+    <div className="fixed inset-0 flex flex-col items-center justify-center overflow-hidden" style={{ backgroundColor: primaryColor }}>
       {/* Market Pulse Background */}
       <div className="absolute inset-0 opacity-15">
         <svg
@@ -56,9 +56,9 @@ export default function AnalysisLoadingScreen({ status = 'loading', onComplete }
           {/* Blurred grid background */}
           <defs>
             <linearGradient id="gridGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#B8982F" stopOpacity="0.2" />
-              <stop offset="50%" stopColor="#1A3226" stopOpacity="0.1" />
-              <stop offset="100%" stopColor="#B8982F" stopOpacity="0.2" />
+              <stop offset="0%" stopColor={accentColor} stopOpacity="0.2" />
+              <stop offset="50%" stopColor={primaryColor} stopOpacity="0.1" />
+              <stop offset="100%" stopColor={accentColor} stopOpacity="0.2" />
             </linearGradient>
             <filter id="chartBlur">
               <feGaussianBlur in="SourceGraphic" stdDeviation="2" />
@@ -76,7 +76,7 @@ export default function AnalysisLoadingScreen({ status = 'loading', onComplete }
                     y={150 + Math.sin(i * 0.5) * 40}
                     width="40"
                     height={100 + Math.cos(i * 0.5) * 50}
-                    fill="#B8982F"
+                    fill={accentColor}
                     opacity={0.3 + Math.sin(i) * 0.15}
                   />
                   <line
@@ -84,7 +84,7 @@ export default function AnalysisLoadingScreen({ status = 'loading', onComplete }
                     y1={120 + Math.sin(i * 0.7) * 50}
                     x2={x + 20}
                     y2={250 + Math.cos(i * 0.7) * 50}
-                    stroke="#B8982F"
+                    stroke={accentColor}
                     strokeWidth="1"
                     opacity="0.4"
                   />
@@ -98,7 +98,7 @@ export default function AnalysisLoadingScreen({ status = 'loading', onComplete }
                 ' '
               )}
               fill="none"
-              stroke="#B8982F"
+              stroke={accentColor}
               strokeWidth="2"
               opacity="0.4"
             />
@@ -113,7 +113,7 @@ export default function AnalysisLoadingScreen({ status = 'loading', onComplete }
       <div className="relative z-10 flex flex-col items-center gap-8 w-full max-w-lg px-6">
         {/* Header */}
         <div className="text-center">
-          <p className="text-[#B8982F] text-xs font-medium uppercase tracking-widest mb-2">
+          <p className="text-xs font-medium uppercase tracking-widest mb-2" style={{ color: accentColor }}>
             PropPrompt™ Ensemble AI
           </p>
           <h2 className="text-2xl font-semibold text-white mb-1" style={{ fontFamily: 'Georgia, serif' }}>
@@ -137,17 +137,17 @@ export default function AnalysisLoadingScreen({ status = 'loading', onComplete }
                   opacity: isCompleted ? 0.5 : 1,
                 }}
               >
-                <div className="rounded-lg border border-[#B8982F]/30 bg-[#0A0F1E]/80 backdrop-blur-sm p-4 flex items-center gap-3 transition-all duration-300">
+                <div className="rounded-lg border backdrop-blur-sm p-4 flex items-center gap-3 transition-all duration-300" style={{ borderColor: `${accentColor}4D`, backgroundColor: `${primaryColor}14` }}>
                   {/* Status Indicator */}
                   <div className="flex-shrink-0">
                     {isCompleted ? (
-                      <div className="w-6 h-6 rounded-full bg-[#B8982F]/60 flex items-center justify-center">
+                      <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: `${accentColor}99` }}>
                         <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
                         </svg>
                       </div>
                     ) : (
-                      <div className="w-6 h-6 rounded-full border-2 border-[#B8982F]/40 border-t-[#B8982F] animate-spin" />
+                      <div className="w-6 h-6 rounded-full border-2 animate-spin" style={{ borderColor: `${accentColor}66`, borderTopColor: accentColor }} />
                     )}
                   </div>
 
@@ -166,10 +166,10 @@ export default function AnalysisLoadingScreen({ status = 'loading', onComplete }
 
         {/* Progress Bar */}
         <div className="w-full">
-          <div className="h-1 bg-[#1A3226]/40 rounded-full overflow-hidden">
+          <div className="h-1 rounded-full overflow-hidden" style={{ backgroundColor: `${primaryColor}66` }}>
             <div
-              className="h-full bg-gradient-to-r from-[#B8982F] to-[#1A3226] transition-all duration-500 ease-out rounded-full"
-              style={{ width: `${progress}%` }}
+              className="h-full transition-all duration-500 ease-out rounded-full"
+              style={{ width: `${progress}%`, background: `linear-gradient(to right, ${accentColor}, ${primaryColor})` }}
             />
           </div>
           <p className="text-xs text-[#E0E0E0]/50 mt-2 text-center">
