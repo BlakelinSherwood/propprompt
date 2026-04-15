@@ -8,15 +8,33 @@ export default function LinkContactModal({ analysis, orgId, onSave, onCancel }) 
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedId, setSelectedId] = useState(analysis.contact_id || null);
+  const [suggestedContact, setSuggestedContact] = useState(null);
 
   useEffect(() => {
     async function load() {
       const data = await base44.entities.Contact.filter({ org_id: orgId });
       setContacts(data);
+
+      // Auto-suggest contact with matching address
+      const address = analysis.intake_data?.address?.toLowerCase().trim();
+      if (address) {
+        const match = data.find(
+          (c) =>
+            c.property_address &&
+            c.property_address.toLowerCase().trim() === address
+        );
+        if (match) {
+          setSuggestedContact(match);
+          if (!analysis.contact_id) {
+            setSelectedId(match.id);
+          }
+        }
+      }
+
       setLoading(false);
     }
     load();
-  }, [orgId]);
+  }, [orgId, analysis.intake_data?.address, analysis.contact_id]);
 
   const filtered = contacts.filter((c) =>
     [c.first_name, c.last_name, c.property_address]
@@ -76,6 +94,15 @@ export default function LinkContactModal({ analysis, orgId, onSave, onCancel }) 
             </div>
           ) : (
             <div className="divide-y divide-[#1A3226]/5">
+              {/* Suggested contact banner */}
+              {suggestedContact && (
+                <div className="bg-blue-50 border-b border-blue-200 px-4 py-2">
+                  <p className="text-xs text-blue-700 font-medium">
+                    ✓ Address match found
+                  </p>
+                </div>
+              )}
+
               {/* None option */}
               <button
                 onClick={() => setSelectedId(null)}
@@ -97,11 +124,22 @@ export default function LinkContactModal({ analysis, orgId, onSave, onCancel }) 
                     selectedId === contact.id
                       ? "bg-[#1A3226] text-white"
                       : "hover:bg-[#1A3226]/5"
+                  } ${
+                    suggestedContact?.id === contact.id && selectedId === contact.id
+                      ? "border-l-4 border-[#1A3226]"
+                      : ""
                   }`}
                 >
-                  <p className="text-sm font-medium">
-                    {contact.first_name} {contact.last_name}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium flex-1">
+                      {contact.first_name} {contact.last_name}
+                    </p>
+                    {suggestedContact?.id === contact.id && (
+                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+                        Auto-match
+                      </span>
+                    )}
+                  </div>
                   {contact.property_address && (
                     <p className="text-xs mt-0.5 opacity-70">
                       {contact.property_address}
