@@ -93,9 +93,9 @@ export default function AnalysisDetail() {
         </div>
 
         {/* Metadata grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-5 pt-5 border-t border-[#1A3226]/8">
-          {[
-            ["AI Platform", PLATFORM_LABELS[analysis.ai_platform] || analysis.ai_platform],
+         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-5 pt-5 border-t border-[#1A3226]/8">
+           {[
+             ["AI Platform", analysis.ensemble_mode_used ? "Ensemble" : (PLATFORM_LABELS[analysis.ai_platform] || analysis.ai_platform)],
             ["Property Type", analysis.property_type?.replace(/_/g, " ")],
             ["Output Format", FORMAT_LABELS[analysis.output_format] || analysis.output_format],
             ["Location Class", analysis.location_class?.replace(/_/g, " ")],
