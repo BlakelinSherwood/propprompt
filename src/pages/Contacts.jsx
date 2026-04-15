@@ -2,10 +2,11 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
-import { Plus, Search, Star, MapPin, Mail, Phone, MoreVertical } from "lucide-react";
+import { Plus, Search, Star, MapPin, Mail, Phone, MoreVertical, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PullToRefresh from "../components/PullToRefresh";
 import ContactForm from "../components/ContactForm";
+import CrmImportModal from "../components/CrmImportModal";
 
 export default function Contacts() {
   const { user, isLoading: authLoading } = useAuth();
@@ -16,6 +17,7 @@ export default function Contacts() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingContact, setEditingContact] = useState(null);
+  const [showCrmImport, setShowCrmImport] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -104,24 +106,34 @@ export default function Contacts() {
     <PullToRefresh onRefresh={handleRefresh}>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-semibold text-[#1A3226]" style={{ fontFamily: "Georgia, serif" }}>
-              Contacts
-            </h1>
-            <p className="text-sm text-[#1A3226]/50 mt-0.5">{filtered.length} contact{filtered.length !== 1 ? "s" : ""}</p>
-          </div>
-          <Button
-            onClick={() => {
-              setEditingContact(null);
-              setShowForm(true);
-            }}
-            className="bg-[#1A3226] hover:bg-[#1A3226]/90 text-white gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            New Contact
-          </Button>
-        </div>
+         <div className="flex items-center justify-between">
+           <div>
+             <h1 className="text-xl font-semibold text-[#1A3226]" style={{ fontFamily: "Georgia, serif" }}>
+               Contacts
+             </h1>
+             <p className="text-sm text-[#1A3226]/50 mt-0.5">{filtered.length} contact{filtered.length !== 1 ? "s" : ""}</p>
+           </div>
+           <div className="flex gap-2">
+             <Button
+               onClick={() => setShowCrmImport(true)}
+               variant="outline"
+               className="gap-2"
+             >
+               <Download className="w-4 h-4" />
+               Import from CRM
+             </Button>
+             <Button
+               onClick={() => {
+                 setEditingContact(null);
+                 setShowForm(true);
+               }}
+               className="bg-[#1A3226] hover:bg-[#1A3226]/90 text-white gap-2"
+             >
+               <Plus className="w-4 h-4" />
+               New Contact
+             </Button>
+           </div>
+         </div>
 
         {/* Form Modal */}
         {showForm && (
@@ -132,6 +144,18 @@ export default function Contacts() {
             onCancel={() => {
               setShowForm(false);
               setEditingContact(null);
+            }}
+          />
+        )}
+
+        {/* CRM Import Modal */}
+        {showCrmImport && (
+          <CrmImportModal
+            orgId={orgId}
+            onClose={() => setShowCrmImport(false)}
+            onSuccess={() => {
+              setShowCrmImport(false);
+              handleRefresh();
             }}
           />
         )}
