@@ -2,11 +2,12 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import PullToRefresh from "../components/PullToRefresh";
 import { Link, useNavigate } from "react-router-dom";
-import { Plus, FileText, Lock, RotateCw, User } from "lucide-react";
+import { Plus, FileText, Lock, RotateCw, User, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { STATUS_STYLES } from "@/lib/constants";
 import PrivateToggle from "../components/PrivateToggle";
 import CollectionManager from "../components/CollectionManager";
+import LinkContactModal from "../components/LinkContactModal";
 import { base44 } from "@/api/base44Client";
 
 const TYPE_LABELS = {
@@ -29,6 +30,7 @@ export default function Analyses() {
   const [orgId, setOrgId] = useState(null);
   const [rerunning, setRerunning] = useState(null);
   const [contactsMap, setContactsMap] = useState({});
+  const [linkingAnalysis, setLinkingAnalysis] = useState(null);
 
   useEffect(() => {
     async function load() {
@@ -180,7 +182,20 @@ export default function Analyses() {
         <div className="rounded-2xl border border-[#1A3226]/10 bg-white overflow-hidden">
           {displayedAnalyses.map((a, i) => {
             const linkedContact = a.contact_id ? contactsMap[a.contact_id] : null;
-            return (
+            return [
+              linkingAnalysis?.id === a.id && (
+                <LinkContactModal
+                  key={`modal-${a.id}`}
+                  analysis={a}
+                  orgId={orgId}
+                  onSave={() => {
+                    setLinkingAnalysis(null);
+                    handleRefresh();
+                  }}
+                  onCancel={() => setLinkingAnalysis(null)}
+                />
+              ),
+              (
             <Link
               key={a.id}
               to={`/Analysis/${a.id}`}
@@ -220,6 +235,19 @@ export default function Analyses() {
                 </div>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
+                 <Button
+                   variant="ghost"
+                   size="sm"
+                   onClick={(e) => {
+                     e.preventDefault();
+                     e.stopPropagation();
+                     setLinkingAnalysis(a);
+                   }}
+                   className="text-[#1A3226]/60 hover:text-[#1A3226] px-2"
+                   title="Link to a contact"
+                 >
+                   <Link2 className="w-4 h-4" />
+                 </Button>
                  {a.status === "complete" && (
                    <Button
                      variant="ghost"
@@ -250,7 +278,8 @@ export default function Analyses() {
                  </span>
                </div>
             </Link>
-            );
+              ),
+            ].filter(Boolean);
           })}
         </div>
       )}
