@@ -9,23 +9,22 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get org membership
-    const memberships = await base44.asServiceRole.entities.OrgMembership.filter({
-      user_email: user.email,
-      status: 'active',
+    // Get all analyses run by this user without a contact_id
+    const allAnalyses = await base44.asServiceRole.entities.Analysis.filter({
+      run_by_email: user.email,
     });
+    const analyses = allAnalyses.filter(a => !a.contact_id);
 
-    if (memberships.length === 0) {
-      return Response.json({ error: 'No organization found' }, { status: 400 });
+    // Get org from first analysis if available
+    const orgId = analyses[0]?.org_id;
+    if (!orgId) {
+      return Response.json({
+        success: true,
+        message: 'No analyses found for this user',
+        linked: 0,
+        total: 0,
+      });
     }
-
-    const orgId = memberships[0].org_id;
-
-    // Get all analyses for this org without a contact_id
-    const analyses = await base44.asServiceRole.entities.Analysis.filter({
-      org_id: orgId,
-      contact_id: { $exists: false },
-    });
 
     // Get all contacts for this org
     const contacts = await base44.asServiceRole.entities.Contact.filter({
