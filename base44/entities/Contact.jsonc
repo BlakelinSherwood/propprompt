@@ -1,0 +1,95 @@
+{
+  "name": "Contact",
+  "type": "object",
+  "description": "Address book contact for real estate clients or prospects. Can be synced from CRM and linked to analyses.",
+  "properties": {
+    "org_id": {
+      "type": "string",
+      "description": "Organization this contact belongs to"
+    },
+    "created_by_email": {
+      "type": "string",
+      "description": "Email of user who created/imported this contact"
+    },
+    "first_name": {
+      "type": "string",
+      "description": "Contact first name"
+    },
+    "last_name": {
+      "type": "string",
+      "description": "Contact last name"
+    },
+    "email": {
+      "type": "string",
+      "description": "Contact email address"
+    },
+    "phone": {
+      "type": "string",
+      "description": "Contact phone number"
+    },
+    "property_address": {
+      "type": "string",
+      "description": "Full property address"
+    },
+    "property_city": {
+      "type": "string",
+      "description": "City of property"
+    },
+    "property_state": {
+      "type": "string",
+      "description": "State code (e.g., MA)"
+    },
+    "property_zip": {
+      "type": "string",
+      "description": "Property ZIP code"
+    },
+    "contact_type": {
+      "type": "string",
+      "enum": [
+        "buyer",
+        "seller",
+        "prospect",
+        "past_client",
+        "other"
+      ],
+      "description": "Type of contact relationship"
+    },
+    "crm_source": {
+      "type": "string",
+      "description": "Source CRM system (salesforce, hubspot, pipedrive, etc) if imported"
+    },
+    "crm_contact_id": {
+      "type": "string",
+      "description": "External ID in the source CRM system"
+    },
+    "crm_url": {
+      "type": "string",
+      "description": "Deep link to contact in CRM"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Internal notes about this contact"
+    },
+    "analyses_count": {
+      "type": "integer",
+      "default": 0,
+      "description": "Number of analyses run for this contact"
+    },
+    "last_analysis_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the last analysis was run for this contact"
+    },
+    "is_favorite": {
+      "type": "boolean",
+      "default": false,
+      "description": "Starred/favorite contact"
+    }
+  },
+  "required": [
+    "org_id",
+    "created_by_email",
+    "first_name",
+    "last_name"
+  ]
+}

@@ -42,6 +42,7 @@ import AiSettings from "./pages/admin/AiSettings";
 import BrandingAdmin from "./pages/admin/BrandingAdmin";
 import ActivityLog from "./pages/admin/ActivityLog";
 import FlipbookViewer from "./pages/FlipbookViewer";
+import Contacts from "./pages/Contacts";
 
 function Spinner() {
   return (
@@ -101,6 +102,7 @@ function AuthenticatedApp() {
         <Route path="/account/alert-settings" element={<ProtectedRoute element={<AlertSettings />} />} />
         <Route path="/training" element={<ProtectedRoute element={<Training />} />} />
         <Route path="/training/:videoId" element={<ProtectedRoute element={<TrainingVideo />} />} />
+        <Route path="/Contacts" element={<ProtectedRoute element={<Contacts />} requiresSubscription />} />
         <Route path="/Territories" element={<TerritoriesPublic />} />
         <Route path="/account/topup" element={<ProtectedRoute element={<TopupPage />} requiresSubscription />} />
         <Route path="/account/bundle/:bundle_id" element={<ProtectedRoute element={<BundleManagement />} requiresSubscription />} />

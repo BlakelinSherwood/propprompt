@@ -14,7 +14,8 @@ import {
   CreditCard,
   Settings,
   GraduationCap,
-  Palette
+  Palette,
+  BookOpen
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import FairHousingOverdueBanner from "./FairHousingOverdueBanner";
@@ -34,7 +35,7 @@ const ROLE_LABELS = {
 };
 
 // Tab roots for stack preservation
-const TAB_ROOTS = ["/Dashboard", "/NewAnalysis", "/Analyses", "/training", "/AccountSettings"];
+const TAB_ROOTS = ["/Dashboard", "/NewAnalysis", "/Analyses", "/Contacts", "/training", "/AccountSettings"];
 
 function getTabRoot(pathname) {
   return TAB_ROOTS.find(r => pathname === r || pathname.startsWith(r + "/")) || null;
@@ -72,6 +73,7 @@ export default function Layout() {
     { label: "Dashboard", path: "/Dashboard", icon: LayoutDashboard },
     { label: "New Analysis", path: "/NewAnalysis", icon: PlusCircle },
     { label: "Analyses", path: "/Analyses", icon: FileText },
+    { label: "Contacts", path: "/Contacts", icon: BookOpen },
     ...(isAdmin ? [{ label: "Members", path: "/Members", icon: Users }] : []),
     ...(isAdmin ? [{ label: "Billing", path: "/Billing", icon: CreditCard }] : []),
     ...(user?.role === "platform_owner" ? [{ label: "Platform Admin", path: "/PlatformAdmin", icon: Shield }] : []),

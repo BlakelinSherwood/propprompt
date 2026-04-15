@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
 import { selectAIModel } from "@/lib/aiModelSelector";
@@ -39,6 +39,7 @@ const INITIAL_INTAKE = {
   on_behalf_of_email: "",
   drive_sync: true,
   selected_modules: [],
+  contact_id: null,
   // Comparable sales
   agent_comps: [],
   comps_source: "none",
@@ -60,6 +61,7 @@ const INITIAL_INTAKE = {
 
 export default function NewAnalysis() {
   const { user, isLoadingAuth } = useAuth();
+  const [searchParams] = useSearchParams();
   const [step, setStep] = useState(1);
   const [intake, setIntake] = useState(INITIAL_INTAKE);
   const [orgMembers, setOrgMembers] = useState([]);
@@ -71,6 +73,25 @@ export default function NewAnalysis() {
   useEffect(() => {
     async function load() {
       if (!user) return;
+      
+      // Load contact if contactId in URL params
+      const contactId = searchParams.get("contactId");
+      if (contactId) {
+        try {
+          const contacts = await base44.entities.Contact.filter({ id: contactId });
+          if (contacts.length > 0) {
+            const contact = contacts[0];
+            let address = contact.property_address || "";
+            if (contact.property_city) address += ` ${contact.property_city}`;
+            if (contact.property_state) address += `, ${contact.property_state}`;
+            if (contact.property_zip) address += ` ${contact.property_zip}`;
+            update({ address: address.trim(), contact_id: contactId });
+          }
+        } catch (e) {
+          console.error("Failed to load contact:", e);
+        }
+      }
+      
       if (user.role === "assistant" || user.role === "team_lead") {
         const members = await base44.entities.User.list();
         setOrgMembers(members.filter((m) => m.email !== user.email && ["agent", "team_agent"].includes(m.role)));
@@ -94,7 +115,7 @@ export default function NewAnalysis() {
       }
     }
     load();
-  }, [user]);
+  }, [user, searchParams]);
 
   function update(fields) {
     setIntake((prev) => ({ ...prev, ...fields }));
@@ -158,31 +179,32 @@ export default function NewAnalysis() {
         console.warn("Quota check failed, proceeding anyway:", quotaErr);
       }
       const analysisData = {
-        run_by_email: user.email,
-        assessment_type: intake.assessment_type,
-        property_type: intake.property_type,
-        location_class: intake.location_class,
-        ai_platform: intake.ai_platform,
-        output_format: intake.output_format,
-        status: "draft",
-        intake_data: {
-          address: intake.address,
-          client_relationship: intake.client_relationship,
-          drive_sync: intake.drive_sync,
-          ...(intake.assessment_type === "client_portfolio" && {
-            mortgage_balance: intake.mortgage_balance,
-            mortgage_source: intake.mortgage_source,
-            mortgage_rate: intake.mortgage_rate,
-            known_improvements: intake.known_improvements,
-            heloc_info: intake.heloc_info,
-            client_interests: intake.client_interests,
-          }),
-          ...((["listing_pricing", "buyer_intelligence"].includes(intake.assessment_type)) && {
-            buyer_pool_expectation: intake.buyer_pool_expectation,
-            known_employer_draws: intake.known_employer_draws,
-            key_selling_attributes: intake.key_selling_attributes,
-          }),
-        },
+       run_by_email: user.email,
+       assessment_type: intake.assessment_type,
+       property_type: intake.property_type,
+       location_class: intake.location_class,
+       ai_platform: intake.ai_platform,
+       output_format: intake.output_format,
+       status: "draft",
+       ...(intake.contact_id && { contact_id: intake.contact_id }),
+       intake_data: {
+         address: intake.address,
+         client_relationship: intake.client_relationship,
+         drive_sync: intake.drive_sync,
+         ...(intake.assessment_type === "client_portfolio" && {
+           mortgage_balance: intake.mortgage_balance,
+           mortgage_source: intake.mortgage_source,
+           mortgage_rate: intake.mortgage_rate,
+           known_improvements: intake.known_improvements,
+           heloc_info: intake.heloc_info,
+           client_interests: intake.client_interests,
+         }),
+         ...((["listing_pricing", "buyer_intelligence"].includes(intake.assessment_type)) && {
+           buyer_pool_expectation: intake.buyer_pool_expectation,
+           known_employer_draws: intake.known_employer_draws,
+           key_selling_attributes: intake.key_selling_attributes,
+         }),
+       },
         agent_comps: intake.agent_comps || [],
         comps_source: intake.comps_source || "none",
         raw_batchdata_comps: intake.raw_batchdata_comps || [],
