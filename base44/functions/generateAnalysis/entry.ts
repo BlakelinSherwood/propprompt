@@ -749,9 +749,33 @@ Deno.serve(async (req) => {
       prompt += `\n\nPRIOR SALE HISTORY:\n  Last known sale price: ${analysis.prior_sale_price ? '$' + analysis.prior_sale_price.toLocaleString() : 'unknown'}\n  Year of last sale: ${analysis.prior_sale_year || 'unknown'}\nUse this to cross-check valuation and flag anomalies.`;
     }
 
-    // Starter tier: AVM lookup not available — instruct AI to set avm_perception to null
+    // AVM lookup via Perplexity for listing_pricing and cma (all tiers)
     if (['listing_pricing', 'cma'].includes(analysis.assessment_type)) {
-      prompt += `\n\nAVM PERCEPTION DATA: null (Starter tier — live search not available)\nSet avm_perception to null in the output JSON. Do NOT attempt to search, estimate, look up, or generate any AVM platform values. The key must exist in the JSON and its value must be null — not an object, not an empty array.`;
+      const address = analysis.intake_data?.address || '';
+      let avmResult = null;
+      try {
+        const perpKeyRes = await base44.functions.invoke('resolveApiKey', {
+          platform: 'perplexity',
+          orgId: analysis.org_id,
+          agentEmail: analysis.run_by_email,
+        });
+        const perpKey = perpKeyRes.data?.apiKey;
+        if (perpKey && address) {
+          console.log('[generateAnalysis] Fetching AVM data via Perplexity for:', address);
+          avmResult = await callPerplexityAVM(perpKey, address);
+          console.log('[generateAnalysis] AVM result received:', avmResult ? Object.keys(avmResult).join(',') : 'null');
+        } else {
+          console.warn('[generateAnalysis] No Perplexity key available for AVM lookup');
+        }
+      } catch (avmErr) {
+        console.warn('[generateAnalysis] AVM lookup failed (non-fatal):', avmErr.message);
+      }
+
+      if (avmResult) {
+        prompt += `\n\nAVM PERCEPTION DATA (from live Perplexity search — use ONLY these values, do NOT invent or guess):\n${JSON.stringify(avmResult, null, 2)}\n\nBuild the avm_perception object in the output JSON from this data. Structure:\n{\n  "platforms": [{"name": "Zillow", "estimate": "$X or null", "range_low": "$X or null", "range_high": "$X or null", "trend": "rising/stable/falling or null", "as_of": "Month YYYY or null"}, ...],\n  "composite_average": "average of all non-null estimates as currency string, or null",\n  "avm_vs_professional_gap": "gap between composite and implied_value_range midpoint as currency string, or null",\n  "gap_direction": "professional_higher | avm_higher | aligned",\n  "gap_percent": "e.g. 4.2%",\n  "alignment_narrative": "one sentence explaining gap in plain English for the agent"\n}`;
+      } else {
+        prompt += `\n\nAVM PERCEPTION DATA: null (live search unavailable)\nSet avm_perception to null in the output JSON. Do NOT attempt to search, estimate, look up, or generate any AVM platform values.`;
+      }
     }
 
     // Mark as in_progress
