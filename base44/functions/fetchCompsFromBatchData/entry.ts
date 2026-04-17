@@ -1,16 +1,29 @@
 /**
- * fetchCompsFromBatchData — RentCast primary, Perplexity fallback.
+ * fetchCompsFromBatchData — ATTOM primary → RentCast → Perplexity fallback.
  * 
  * Pipeline:
- * 1. RentCast /avm/value — returns real sold comps with full detail (primary)
- * 2. If RentCast returns < 3 comps OR fails → Perplexity sonar-pro deep search (fallback)
+ * 1. ATTOM /salescomps/snapshot — real sold comps from property records (primary)
+ * 2. If ATTOM returns < 3 comps OR fails → RentCast /avm/value (secondary)
+ * 3. If RentCast also < 3 comps OR fails → Perplexity sonar-pro deep search (tertiary)
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
+const ATTOM_BASE = 'https://api.gateway.attomdata.com/propertyapi/v1.0.0';
 const RENTCAST_BASE = 'https://api.rentcast.io/v1';
 
-// Map our property_type values to RentCast propertyType values
-function mapPropertyType(type) {
+// Map property_type to ATTOM propertyType values
+function mapPropertyTypeAttom(type) {
+  const map = {
+    single_family: 'SFR',
+    condo: 'CONDOMINIUM',
+    multi_family: 'MULTI FAMILY DWELLING',
+    land: 'VACANT LAND (NEC)',
+  };
+  return map[type] || 'SFR';
+}
+
+// Map property_type to RentCast propertyType values
+function mapPropertyTypeRentCast(type) {
   const map = {
     single_family: 'Single Family',
     condo: 'Condo',
@@ -20,10 +33,78 @@ function mapPropertyType(type) {
   return map[type] || 'Single Family';
 }
 
+// ── ATTOM COMPS ─────────────────────────────────────────────────────────────
+
+async function fetchAttomComps(apiKey, { address, bedrooms, bathrooms, sqft, propertyType }) {
+  // Parse address to extract address1 and zip
+  const parts = address.split(',');
+  if (parts.length < 2) throw new Error('Address must be in format: "Street, City, State Zip"');
+  
+  const address1 = parts[0].trim();
+  const stateZip = parts[parts.length - 1].trim();
+  const postalcode = stateZip.match(/\d{5}/)?.[0];
+  
+  if (!postalcode) throw new Error('Could not extract ZIP code from address');
+
+  const params = new URLSearchParams({
+    address1,
+    postalcode,
+    orderby: 'saleamt',
+    pagesize: '10',
+  });
+
+  if (bedrooms)  params.set('bedrooms', String(bedrooms));
+  if (bathrooms) params.set('bathrooms', String(bathrooms));
+  if (propertyType) params.set('propertytype', mapPropertyTypeAttom(propertyType));
+
+  const url = `${ATTOM_BASE}/salescomps/snapshot?${params.toString()}`;
+  console.log('[ATTOM] GET', url.split('?')[0], `(${bedrooms}bed, ${bathrooms}bath, ${sqft}sqft)`);
+
+  const res = await fetch(url, {
+    headers: {
+      'apikey': apiKey,
+      'Accept': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error('[ATTOM] Error', res.status, errText.slice(0, 300));
+    throw new Error(`ATTOM API error ${res.status}`);
+  }
+
+  const data = await res.json();
+  const comps = data.property || [];
+  console.log('[ATTOM] returned', comps.length, 'comps');
+
+  return {
+    comps: comps
+      .filter(c => c.saleTransactionDate && c.saleAmount && c.address?.address1)
+      .map(c => ({
+        address: `${c.address?.address1 || ''}, ${c.address?.city || ''}, ${c.address?.state || ''}`,
+        sale_price: Number(c.saleAmount) || null,
+        sale_date: c.saleTransactionDate ? c.saleTransactionDate.slice(0, 10) : null,
+        sqft: c.building?.squareFootage ? Number(c.building.squareFootage) : null,
+        bedrooms: c.building?.bedrooms ? Number(c.building.bedrooms) : null,
+        bathrooms: c.building?.bathrooms ? Number(c.building.bathrooms) : null,
+        price_per_sqft: (Number(c.saleAmount) && c.building?.squareFootage) 
+          ? Math.round(Number(c.saleAmount) / Number(c.building.squareFootage)) 
+          : null,
+        source: 'attom',
+        search_tier: 'attom',
+        search_radius: null,
+        perplexity_confirmed: false,
+        perplexity_variance: null,
+        agent_excluded: false,
+        agent_notes: '',
+      })),
+  };
+}
+
 async function fetchRentCastComps(apiKey, { address, bedrooms, bathrooms, sqft, propertyType }) {
   const params = new URLSearchParams({
     address,
-    propertyType: mapPropertyType(propertyType),
+    propertyType: mapPropertyTypeRentCast(propertyType),
     compCount: '10',
     daysOld: '730', // 2 years of sold data
   });
@@ -193,7 +274,40 @@ Deno.serve(async (req) => {
     const isLargeProperty = sqft && sqft >= 4000;
     const params = { address, bedrooms, bathrooms, sqft, propertyType };
 
-    // ── Step 1: Try RentCast ─────────────────────────────────────────────────
+    // ── Step 1: Try ATTOM ────────────────────────────────────────────────────
+    const attomKey = Deno.env.get('ATTOM_API_KEY');
+    let attomComps = [];
+    let attomNote = null;
+
+    if (attomKey) {
+      try {
+        const result = await fetchAttomComps(attomKey, params);
+        attomComps = result.comps;
+        console.log(`[fetchComps] ATTOM returned ${attomComps.length} comps`);
+      } catch (err) {
+        console.error('[fetchComps] ATTOM failed:', err.message);
+        attomNote = `ATTOM search error: ${err.message}`;
+      }
+    } else {
+      console.warn('[fetchComps] No ATTOM_API_KEY set');
+    }
+
+    // If ATTOM gave us 3+ comps, return them directly
+    if (attomComps.length >= 3) {
+      return Response.json({
+        success: true,
+        comps: attomComps,
+        search_tier: 'attom',
+        search_radius: null,
+        large_property_flag: isLargeProperty,
+        researcher_note: null,
+        source_used: 'attom',
+      });
+    }
+
+    // ── Step 2: Try RentCast if ATTOM returned < 3 comps ───────────────────
+    console.log(`[fetchComps] ATTOM only found ${attomComps.length} comps — trying RentCast`);
+
     const rentcastKey = Deno.env.get('RENTCAST_API_KEY');
     let rentcastComps = [];
     let rentcastNote = null;
@@ -211,7 +325,7 @@ Deno.serve(async (req) => {
       console.warn('[fetchComps] No RENTCAST_API_KEY set');
     }
 
-    // If RentCast gave us 3+ comps, return them directly
+    // If RentCast gave us 3+ comps, return them
     if (rentcastComps.length >= 3) {
       return Response.json({
         success: true,
@@ -224,8 +338,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ── Step 2: Perplexity fallback if RentCast returned < 3 comps ──────────
-    console.log(`[fetchComps] RentCast only found ${rentcastComps.length} comps — trying Perplexity fallback`);
+    // ── Step 3: Perplexity fallback if both ATTOM & RentCast returned < 3 comps ──
+    console.log(`[fetchComps] ATTOM+RentCast only found ${attomComps.length + rentcastComps.length} comps — trying Perplexity fallback`);
 
     let perpKey = null;
     try {
@@ -249,23 +363,31 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Merge: RentCast comps first, then unique Perplexity comps (avoid duplicates by address)
-    const rentcastAddresses = new Set(rentcastComps.map(c => c.address.toLowerCase()));
-    const uniquePerpComps = perpComps.filter(c => !rentcastAddresses.has(c.address.toLowerCase()));
-    const mergedComps = [...rentcastComps, ...uniquePerpComps];
+    // Merge: ATTOM + RentCast + Perplexity (avoid duplicates by address)
+    const allApiAddresses = new Set([
+      ...attomComps.map(c => c.address.toLowerCase()),
+      ...rentcastComps.map(c => c.address.toLowerCase()),
+    ]);
+    const uniquePerpComps = perpComps.filter(c => !allApiAddresses.has(c.address.toLowerCase()));
+    const mergedComps = [...attomComps, ...rentcastComps, ...uniquePerpComps];
 
+    const sources = [];
+    if (attomComps.length > 0) sources.push(`ATTOM (${attomComps.length})`);
+    if (rentcastComps.length > 0) sources.push(`RentCast (${rentcastComps.length})`);
+    if (uniquePerpComps.length > 0) sources.push(`Perplexity (${uniquePerpComps.length})`);
+    
     const finalNote = mergedComps.length === 0
       ? 'No comparable sales found automatically. Add comps manually using your MLS or public records.'
-      : (perpNote || (rentcastComps.length > 0 ? `RentCast found ${rentcastComps.length} comp(s); Perplexity supplemented with ${uniquePerpComps.length} additional.` : null));
+      : (perpNote || (sources.length > 0 ? `Found via: ${sources.join(', ')}` : null));
 
     return Response.json({
       success: true,
       comps: mergedComps,
-      search_tier: mergedComps.length > 0 ? 'rentcast+perplexity' : 'none',
+      search_tier: mergedComps.length > 0 ? (attomComps.length > 0 ? 'attom' : rentcastComps.length > 0 ? 'rentcast' : 'perplexity') : 'none',
       search_radius: null,
       large_property_flag: isLargeProperty,
       researcher_note: finalNote,
-      source_used: rentcastComps.length > 0 ? 'rentcast+perplexity' : 'perplexity',
+      source_used: sources.length > 0 ? sources.join('+') : 'none',
     });
 
   } catch (error) {
