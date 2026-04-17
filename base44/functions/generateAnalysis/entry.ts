@@ -664,25 +664,66 @@ async function callPerplexity(apiKey, prompt) {
   };
 }
 
-// ── Perplexity AVM lookup (sonar model, NOT sonar-pro) ──────────────────────
+// ── Perplexity AVM lookup ──────────────────────────────────────────────────
 async function callPerplexityAVM(apiKey, address) {
-  const systemPrompt = 'You are a real estate data researcher. Your only job is to look up current automated valuation estimates from major real estate platforms. Return ONLY valid JSON. No explanation, no preamble, no markdown.';
-  const userPrompt = `Search for current automated valuation estimates for this property:\nAddress: ${address}\n\nFind the current estimated value for each platform:\n1. Zillow (Zestimate)\n2. Redfin Estimate\n3. Realtor.com Estimate\n4. Homes.com Estimate\n\nReturn ONLY this JSON. No other text:\n{\n  "zillow": {"estimate": "$XXX,XXX or null", "range_low": "$XXX,XXX or null", "range_high": "$XXX,XXX or null", "trend": "rising/stable/falling or null", "as_of": "Month YYYY or null"},\n  "redfin": {"estimate": "$XXX,XXX or null", "range_low": "$XXX,XXX or null", "range_high": "$XXX,XXX or null", "trend": "rising/stable/falling or null", "as_of": "Month YYYY or null"},\n  "realtor_com": {"estimate": "$XXX,XXX or null", "range_low": "$XXX,XXX or null", "range_high": "$XXX,XXX or null", "trend": "rising/stable/falling or null", "as_of": "Month YYYY or null"},\n  "homes_com": {"estimate": "$XXX,XXX or null", "range_low": "$XXX,XXX or null", "range_high": "$XXX,XXX or null", "trend": "rising/stable/falling or null", "as_of": "Month YYYY or null"}\n}\n\nIf a platform has no estimate for this property, set all its fields to null.\nDo not interpolate, estimate, or guess. Only return values found via search.`;
+  const systemPrompt = 'You are a real estate data researcher with web search access. Your job is to find current AVM estimates by searching the web. Return ONLY valid JSON with no markdown, no explanation, no preamble.';
+
+  // Build targeted search queries for each platform
+  const userPrompt = `Search the web RIGHT NOW for the current automated valuation estimates for this specific property:
+
+Address: ${address}
+
+You MUST search these exact sites:
+1. Search zillow.com for "${address}" — find the Zestimate value and range shown on the property page
+2. Search redfin.com for "${address}" — find the "Redfin Estimate" or "Estimated sale price" and range
+3. Search realtor.com for "${address}" — find the home value estimate
+4. Search homes.com for "${address}" — find the estimated value
+
+These properties are indexed on all major real estate platforms. Search for each one individually using queries like:
+- site:zillow.com "${address}"
+- site:redfin.com "${address}"
+- "${address}" Zestimate
+- "${address}" Redfin Estimate
+
+Return ONLY this JSON structure. Use numeric values (no $ signs or commas):
+{
+  "zillow": {"estimate": 1126100, "range_low": 1050000, "range_high": 1200000, "trend": "stable", "as_of": "April 2026"},
+  "redfin": {"estimate": 1075651, "range_low": 1020000, "range_high": 1240000, "trend": "stable", "as_of": "April 2026"},
+  "realtor_com": {"estimate": null, "range_low": null, "range_high": null, "trend": null, "as_of": null},
+  "homes_com": {"estimate": null, "range_low": null, "range_high": null, "trend": null, "as_of": null}
+}
+
+Rules:
+- Use ONLY values you actually find via web search on those platforms right now
+- If you cannot find a value for a platform after searching, set ALL its fields to null
+- Do NOT guess or estimate — only report what is on the page
+- Numbers must be plain integers (no $, no commas)`;
+
   const res = await fetch('https://api.perplexity.ai/chat/completions', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: 'sonar-pro', messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }] }),
+    body: JSON.stringify({
+      model: 'sonar-pro',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      search_recency_filter: 'month',
+    }),
   });
   if (!res.ok) throw new Error(`Perplexity AVM error ${res.status}`);
   const data = await res.json();
   const text = (data.choices?.[0]?.message?.content || '').trim();
-  console.log('[callPerplexityAVM] raw response length:', text.length, '| first 200:', text.slice(0, 200));
+  console.log('[callPerplexityAVM] raw response:', text.slice(0, 500));
   try {
     let clean = text;
     if (clean.startsWith('```')) clean = clean.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+    // Extract JSON if wrapped in other text
+    const jsonMatch = clean.match(/\{[\s\S]*\}/);
+    if (jsonMatch) clean = jsonMatch[0];
     return JSON.parse(clean);
   } catch (e) {
-    console.warn('[callPerplexityAVM] JSON parse failed:', e.message);
+    console.warn('[callPerplexityAVM] JSON parse failed:', e.message, '| raw:', text.slice(0, 200));
     return null;
   }
 }
