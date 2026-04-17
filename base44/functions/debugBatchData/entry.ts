@@ -13,7 +13,7 @@ Deno.serve(async (req) => {
 
     const results = {};
 
-    // Test correct base URL (no /api/v1/) with datasets for enriched data
+    // ── TEST 1: Property search (stub data only — confirms search works) ─────
     const searchRes = await fetch('https://api.batchdata.com/api/v1/property/search', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${batchDataKey}`, 'Content-Type': 'application/json' },
@@ -21,84 +21,67 @@ Deno.serve(async (req) => {
         searchCriteria: {
           compAddress: { street: "11 Holly Lane", city: "Beverly", state: "MA", zip: "01915" },
         },
-        options: { useDistance: true, distanceMiles: 5.0 },
-        take: 3,
-        datasets: ["basic", "listing", "deed"],
+        options: { useDistance: true, distanceMiles: 2.0 },
       }),
     });
     const searchData = await searchRes.json();
     const searchProps = searchData.results?.properties || [];
-    results['search_with_datasets'] = {
-      status: searchRes.status,
-      count: searchProps.length,
-      prop_keys: searchProps[0] ? Object.keys(searchProps[0]) : [],
-      listing_keys: searchProps[0]?.listing ? Object.keys(searchProps[0].listing) : [],
-      deed_count: searchProps[0]?.deedHistory?.length || 0,
-      sample_listing: searchProps[0]?.listing || null,
-      sample_deed_last: searchProps[0]?.deedHistory?.[0] || null,
-    };
+    results['search_status'] = searchRes.status;
+    results['search_count'] = searchProps.length;
+    results['search_prop_keys'] = searchProps[0] ? Object.keys(searchProps[0]) : [];
+    results['search_sample_address'] = searchProps[0]?.address || null;
 
-    // Test lookup/all-attributes with requests array format
-    const lookupRes = await fetch('https://api.batchdata.com/api/v1/property/lookup/all-attributes', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${batchDataKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        requests: [{
-          address: { street: "11 Holly Lane", city: "Beverly", state: "MA", zip: "01915" },
-        }],
-      }),
-    });
-    const lookupData = await lookupRes.json();
-    results['lookup_all_attributes'] = {
-      status: lookupRes.status,
-      top_keys: Object.keys(lookupData),
-      results_keys: lookupData.results ? Object.keys(lookupData.results) : [],
-      prop_keys: lookupData.results?.property ? Object.keys(lookupData.results.property) : [],
-      listing_keys: lookupData.results?.property?.listing ? Object.keys(lookupData.results.property.listing) : [],
-      deed_count: lookupData.results?.property?.deedHistory?.length || 0,
-      sale_price: lookupData.results?.property?.listing?.soldPrice || null,
-      snippet: JSON.stringify(lookupData).slice(0, 600),
-    };
-
-    // Also test property/comps endpoint directly
-    const compsRes = await fetch('https://api.batchdata.com/api/v1/property/comps', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${batchDataKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        searchCriteria: {
-          address: { street: "11 Holly Lane", city: "Beverly", state: "MA", zip: "01915" },
-        },
-        options: { distanceMiles: 5.0 },
-        take: 5,
-      }),
-    });
-    const compsData = await compsRes.json();
-    results['property_comps_endpoint'] = {
-      status: compsRes.status,
-      snippet: JSON.stringify(compsData).slice(0, 600),
-    };
-
-    const sampleProps = searchProps;
-    results['total_from_search'] = sampleProps.length;
-    results['sample_prop_id'] = sampleProps[0]?._id;
-
-    // Now fetch full details for the first property using all-attributes with _id
-    if (sampleProps[0]) {
-      const firstId = sampleProps[0]._id;
+    // ── TEST 2: Full lookup — hardcoded known address (bypass search dependency) ──
+    const knownAddr = searchProps[0]?.address || { street: "40 James St", city: "Beverly", state: "MA", zip: "01915" };
+    if (knownAddr) {
       const fullRes = await fetch('https://api.batchdata.com/api/v1/property/lookup/all-attributes', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${batchDataKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requests: [{ id: firstId }] }),
+        body: JSON.stringify({
+          requests: [{
+            address: {
+              street: knownAddr.street,  // e.g. "40 James St" (already includes house number)
+              city: knownAddr.city,
+              state: knownAddr.state,
+              zip: knownAddr.zip,
+            }
+          }]
+        }),
       });
       const fullData = await fullRes.json();
       const fullProp = fullData.results?.properties?.[0] || null;
       results['full_lookup_status'] = fullRes.status;
+      results['full_match_count'] = fullData.results?.meta?.results?.matchCount ?? fullData.results?.properties?.length ?? 0;
       results['full_prop_keys'] = fullProp ? Object.keys(fullProp) : [];
       results['full_listing'] = fullProp?.listing || null;
-      results['full_listing_keys'] = fullProp?.listing ? Object.keys(fullProp.listing) : [];
       results['full_deed_count'] = fullProp?.deedHistory?.length || 0;
       results['full_deed_last'] = fullProp?.deedHistory?.[fullProp.deedHistory.length - 1] || null;
-      results['full_address'] = fullProp?.address || null;
+      results['full_building'] = fullProp?.building || null;
+      results['full_assessed'] = fullProp?.assessed || null;
+      results['full_address_confirmed'] = fullProp?.address || null;
+    } else {
+      results['full_lookup_skip'] = 'search returned 0 props — nothing to look up';
+    }
+
+    // ── TEST 3: Bulk lookup of first 3 search result addresses (if search worked) ──
+    if (searchProps.length >= 3) {
+      const requests = searchProps.slice(0, 3).map(p => ({
+        address: { street: p.address.street, city: p.address.city, state: p.address.state, zip: p.address.zip }
+      }));
+      const bulkRes = await fetch('https://api.batchdata.com/api/v1/property/lookup/all-attributes', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${batchDataKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requests }),
+      });
+      const bulkData = await bulkRes.json();
+      const bulkProps = bulkData.results?.properties || [];
+      results['bulk_lookup_status'] = bulkRes.status;
+      results['bulk_match_count'] = bulkData.results?.meta?.results?.matchCount ?? bulkProps.length;
+      results['bulk_props_with_listing'] = bulkProps.filter(p => p.listing?.soldPrice).length;
+      results['bulk_props_with_deed'] = bulkProps.filter(p => p.deedHistory?.length > 0).length;
+      results['bulk_sample_prop0_keys'] = bulkProps[0] ? Object.keys(bulkProps[0]) : [];
+      results['bulk_sample_listing'] = bulkProps[0]?.listing || null;
+      results['bulk_sample_deed_last'] = bulkProps[0]?.deedHistory?.[bulkProps[0].deedHistory.length - 1] || null;
     }
 
     return Response.json(results);
