@@ -11,19 +11,17 @@ function normalizeAddress(address, state) {
 // Search strategy by state
 async function searchRecordsByState(address, state, base44, forceRefresh = false) {
   const normalized = normalizeAddress(address, state);
-  
-  if (!forceRefresh) {
-    // Check cache first (30-day TTL)
-    const cached = await base44.entities.PropertyPublicRecord.filter({
-      property_address_normalized: normalized
-    });
-    
-    if (cached.length > 0) {
-      const record = cached[0];
-      const daysSinceSearch = (new Date() - new Date(record.searched_at)) / (1000 * 60 * 60 * 24);
-      if (daysSinceSearch < 30 && (record.search_status === 'found' || record.search_status === 'partial')) {
-        return { ...record, from_cache: true };
-      }
+
+  // Always check for existing record (needed for update vs create decision)
+  const existing = await base44.entities.PropertyPublicRecord.filter({
+    property_address_normalized: normalized
+  });
+
+  if (!forceRefresh && existing.length > 0) {
+    const record = existing[0];
+    const daysSinceSearch = (new Date() - new Date(record.searched_at)) / (1000 * 60 * 60 * 24);
+    if (daysSinceSearch < 30 && (record.search_status === 'found' || record.search_status === 'partial')) {
+      return { ...record, from_cache: true };
     }
   }
 
@@ -55,9 +53,9 @@ async function searchRecordsByState(address, state, base44, forceRefresh = false
     ...results
   };
 
-  if (cached.length > 0) {
-    await base44.entities.PropertyPublicRecord.update(cached[0].id, recordData);
-    return base44.entities.PropertyPublicRecord.get(cached[0].id);
+  if (existing.length > 0) {
+    await base44.entities.PropertyPublicRecord.update(existing[0].id, recordData);
+    return await base44.entities.PropertyPublicRecord.filter({ id: existing[0].id }).then(r => r[0]);
   } else {
     return await base44.entities.PropertyPublicRecord.create(recordData);
   }
