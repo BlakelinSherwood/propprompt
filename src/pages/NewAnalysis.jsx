@@ -13,9 +13,10 @@ import StepClientFinancial from "../components/wizard/StepClientFinancial";
 import StepBuyerIntelligence from "../components/wizard/StepBuyerIntelligence";
 import StepReportEnhancements from "../components/wizard/StepReportEnhancements";
 import StepPublicRecords from "../components/wizard/StepPublicRecords";
+import StepComparableSales from "../components/wizard/StepComparableSales";
 
 function getStepLabels(assessmentType) {
-  const base = ["Assessment", "Client Role", "Property", "Public Records"];
+  const base = ["Assessment", "Client Role", "Property", "Public Records", "Comparables"];
   const afterProperty = [];
   if (assessmentType === "listing_pricing") afterProperty.push("Buyer Context");
   else if (assessmentType === "client_portfolio") afterProperty.push("Financial Context");
@@ -259,8 +260,9 @@ export default function NewAnalysis() {
     if (step === 2) return <Step3ClientRelationship {...stepProps} />;
     if (step === 3) return <Step4PropertyDetails {...stepProps} />;
     if (step === 4) return <StepPublicRecords {...stepProps} />;
+    if (step === 5) return <StepComparableSales {...stepProps} />;
 
-    let nextStep = 5;
+    let nextStep = 6;
 
     if (hasContextStep) {
       if (step === nextStep) {
