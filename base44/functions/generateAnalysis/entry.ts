@@ -913,8 +913,8 @@ Deno.serve(async (req) => {
         sections_total: pipelinePrompts.length,
       });
 
-      // Start AVM lookup in parallel with pipeline step 1 (listing_pricing + cma only)
-      const isAvmType = ['listing_pricing', 'cma'].includes(analysis.assessment_type);
+      // Start AVM lookup in parallel with pipeline step 1 (listing_pricing, cma, client_portfolio)
+      const isAvmType = ['listing_pricing', 'cma', 'client_portfolio', 'buyer_intelligence'].includes(analysis.assessment_type);
       let avmDataPromise = null;
       if (isAvmType) {
         try {
@@ -1006,9 +1006,14 @@ Deno.serve(async (req) => {
         }
       }
 
-      const finalOutput = sectionOutputs['report_assembly']
+      const rawFinalOutput = sectionOutputs['report_assembly']
         || sectionOutputs['narrative_layer']
         || Object.values(sectionOutputs).join('\n\n---\n\n');
+
+      // Try to extract structured JSON from pipeline final output
+      const { cleanText: pipelineCleanText, outputJson: pipelineOutputJson } = extractJsonOutput(rawFinalOutput);
+      const finalOutput = pipelineCleanText || rawFinalOutput;
+      console.log('[generateAnalysis] pipeline output_json populated:', !!pipelineOutputJson, '| output length:', rawFinalOutput.length);
 
       const generationEnd = Date.now();
       const generationTime = generationEnd - startTime;
@@ -1031,7 +1036,26 @@ Deno.serve(async (req) => {
       } catch (timingErr) { console.warn('[generateAnalysis] ProTimingLog failed:', timingErr.message); }
       console.log('[PropPrompt Timing]', { analysis_id: analysisId, tier, report_type: analysis.assessment_type, duration_s: durationSeconds, threshold_s: tierThreshold, exceeded: durationSeconds > tierThreshold });
 
-      await base44.asServiceRole.entities.Analysis.update(analysisId, {
+      // Valuation sanity check on pipeline output too
+      if (pipelineOutputJson) {
+        const pipelineValidation = runValidation({
+          reportJSON: pipelineOutputJson,
+          prior_sale_price: analysis.prior_sale_price ?? null,
+          prior_sale_year: analysis.prior_sale_year ?? null,
+        });
+        console.log('[generateAnalysis] pipeline validation result:', JSON.stringify(pipelineValidation));
+        if (!pipelineValidation.valid) {
+          await base44.asServiceRole.entities.Analysis.update(analysisId, {
+            status: 'anomaly_flagged',
+            valuation_anomaly: pipelineValidation,
+            output_json: pipelineOutputJson,
+            output_text: finalOutput,
+          });
+          return Response.json({ anomaly: pipelineValidation, model: `pipeline-${tier}` });
+        }
+      }
+
+      const pipelineSaveData = {
         status: 'complete',
         output_text: finalOutput,
         completed_at: new Date().toISOString(),
@@ -1040,7 +1064,9 @@ Deno.serve(async (req) => {
         sections_completed: Object.keys(sectionOutputs).length,
         ensemble_mode_used: true,
         generation_time_ms: generationTime,
-      });
+      };
+      if (pipelineOutputJson) pipelineSaveData.output_json = pipelineOutputJson;
+      await base44.asServiceRole.entities.Analysis.update(analysisId, pipelineSaveData);
 
       try {
         await base44.functions.invoke('deductAnalysisQuota', { analysisId, orgId: analysis.org_id });
@@ -1049,7 +1075,7 @@ Deno.serve(async (req) => {
       }
 
       // Calculate net proceeds server-side (listing_pricing only, best-effort)
-      if (analysis.assessment_type === 'listing_pricing' && outputJson) {
+      if (analysis.assessment_type === 'listing_pricing' && pipelineOutputJson) {
         try {
           await base44.functions.invoke('calculateNetProceeds', { analysisId });
         } catch (e) {
@@ -1059,6 +1085,7 @@ Deno.serve(async (req) => {
 
       return Response.json({
         output: finalOutput,
+        outputJson: !!pipelineOutputJson,
         model: `pipeline-${tier}`,
         keySource: 'platform',
         sectionsCompleted: Object.keys(sectionOutputs).length,
