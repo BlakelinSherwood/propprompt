@@ -144,49 +144,6 @@ export default function Step4PropertyDetails({ intake, update, onNext, onBack })
         </div>
       </div>
 
-      {/* Property Size */}
-      <div className="mb-5">
-        <Label className="text-xs font-medium text-[#1A3226]/60 mb-2 block">
-          Property Details <span className="text-[#1A3226]/30">(used for comp search)</span>
-        </Label>
-        <div className="grid grid-cols-3 gap-3">
-          <div>
-            <label className="text-xs text-[#1A3226]/50 mb-1 block">Bedrooms</label>
-            <Input
-              type="number"
-              placeholder="3"
-              value={intake.bedrooms || ''}
-              onChange={e => update({ bedrooms: e.target.value ? Number(e.target.value) : null })}
-              className="border-[#1A3226]/15 focus-visible:ring-[#B8982F]/30 bg-white"
-            />
-          </div>
-          <div>
-            <label className="text-xs text-[#1A3226]/50 mb-1 block">Bathrooms</label>
-            <Input
-              type="number"
-              step="0.5"
-              placeholder="2"
-              value={intake.bathrooms || ''}
-              onChange={e => update({ bathrooms: e.target.value ? Number(e.target.value) : null })}
-              className="border-[#1A3226]/15 focus-visible:ring-[#B8982F]/30 bg-white"
-            />
-          </div>
-          <div>
-            <label className="text-xs text-[#1A3226]/50 mb-1 block">Sq Ft</label>
-            <Input
-              type="number"
-              placeholder="1,800"
-              value={intake.sqft || ''}
-              onChange={e => update({ sqft: e.target.value ? Number(e.target.value) : null })}
-              className="border-[#1A3226]/15 focus-visible:ring-[#B8982F]/30 bg-white"
-            />
-          </div>
-        </div>
-        {(intake.sqft || 0) >= 4000 && (
-          <p className="text-xs text-[#B8982F] mt-1">★ Large property — comp search will use sqft-only matching</p>
-        )}
-      </div>
-
       <WizardNav step={4} onNext={onNext} onBack={onBack} canNext={!!canNext} />
     </div>
   );

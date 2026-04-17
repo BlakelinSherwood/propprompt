@@ -12,9 +12,10 @@ import Step6Confirm from "../components/wizard/Step6Confirm";
 import StepClientFinancial from "../components/wizard/StepClientFinancial";
 import StepBuyerIntelligence from "../components/wizard/StepBuyerIntelligence";
 import StepReportEnhancements from "../components/wizard/StepReportEnhancements";
+import StepPublicRecords from "../components/wizard/StepPublicRecords";
 
 function getStepLabels(assessmentType) {
-  const base = ["Assessment", "Client Role", "Property"];
+  const base = ["Assessment", "Client Role", "Property", "Public Records"];
   const afterProperty = [];
   if (assessmentType === "listing_pricing") afterProperty.push("Buyer Context");
   else if (assessmentType === "client_portfolio") afterProperty.push("Financial Context");
@@ -191,6 +192,10 @@ export default function NewAnalysis() {
          address: intake.address,
          client_relationship: intake.client_relationship,
          drive_sync: intake.drive_sync,
+         bedrooms: intake.bedrooms ?? null,
+         bathrooms: intake.bathrooms ?? null,
+         sqft: intake.sqft ?? null,
+         year_built: intake.year_built ?? null,
          ...(intake.assessment_type === "client_portfolio" && {
            mortgage_balance: intake.mortgage_balance,
            mortgage_source: intake.mortgage_source,
@@ -253,8 +258,9 @@ export default function NewAnalysis() {
     if (step === 1) return <Step2Assessment {...stepProps} />;
     if (step === 2) return <Step3ClientRelationship {...stepProps} />;
     if (step === 3) return <Step4PropertyDetails {...stepProps} />;
+    if (step === 4) return <StepPublicRecords {...stepProps} />;
 
-    let nextStep = 4;
+    let nextStep = 5;
 
     if (hasContextStep) {
       if (step === nextStep) {
@@ -268,6 +274,7 @@ export default function NewAnalysis() {
     if (step === nextStep) return <Step5OutputFormat {...stepProps} />;
     nextStep++;
     if (step === nextStep) {
+
       return (
         <Step6Confirm
           {...stepProps}

@@ -1,0 +1,166 @@
+{
+  "name": "PropertyPublicRecord",
+  "type": "object",
+  "description": "Cached results of AI-powered public records searches per property address.",
+  "properties": {
+    "territory_id": {
+      "type": "string",
+      "description": "References Territory.id (nullable)"
+    },
+    "property_address": {
+      "type": "string",
+      "maxLength": 300
+    },
+    "property_address_normalized": {
+      "type": "string",
+      "maxLength": 300,
+      "description": "Standardized format for deduplication"
+    },
+    "state_code": {
+      "type": "string",
+      "maxLength": 2,
+      "enum": [
+        "MA",
+        "ME",
+        "NH",
+        "VT"
+      ]
+    },
+    "county": {
+      "type": "string",
+      "maxLength": 100
+    },
+    "municipality": {
+      "type": "string",
+      "maxLength": 150,
+      "description": "Town-level for Vermont (town-recorded)"
+    },
+    "owner_of_record": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "owner_verified": {
+      "type": "boolean",
+      "default": false,
+      "description": "True if owner matches client name provided"
+    },
+    "last_sale_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "last_sale_price": {
+      "type": "number"
+    },
+    "deed_book_page": {
+      "type": "string",
+      "maxLength": 50
+    },
+    "deed_instrument_number": {
+      "type": "string",
+      "maxLength": 100
+    },
+    "original_mortgage_amount": {
+      "type": "number"
+    },
+    "original_mortgage_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "original_mortgage_lender": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "original_mortgage_term_years": {
+      "type": "integer"
+    },
+    "most_recent_mortgage_amount": {
+      "type": "number"
+    },
+    "most_recent_mortgage_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "most_recent_mortgage_lender": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "mortgage_discharged": {
+      "type": "boolean",
+      "default": false,
+      "description": "True if discharge of mortgage found"
+    },
+    "assessed_value": {
+      "type": "number"
+    },
+    "assessed_year": {
+      "type": "integer"
+    },
+    "annual_property_tax": {
+      "type": "number"
+    },
+    "liens_found": {
+      "type": "boolean",
+      "default": false
+    },
+    "lien_details": {
+      "type": "string",
+      "description": "Summary of liens, attachments, judgments"
+    },
+    "bedrooms": {
+      "type": "integer",
+      "description": "Number of bedrooms from assessor record"
+    },
+    "bathrooms": {
+      "type": "number",
+      "description": "Number of bathrooms from assessor record"
+    },
+    "sqft": {
+      "type": "number",
+      "description": "Living area square footage from assessor record"
+    },
+    "lot_size_sqft": {
+      "type": "number",
+      "description": "Lot size in square feet from assessor record"
+    },
+    "year_built": {
+      "type": "integer",
+      "description": "Year built from assessor record"
+    },
+    "property_style": {
+      "type": "string",
+      "description": "Style/type from assessor (e.g. Colonial, Cape, Ranch)"
+    },
+    "source_urls": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Array of source URLs searched"
+    },
+    "search_status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "found",
+        "partial",
+        "not_found",
+        "error"
+      ],
+      "default": "pending"
+    },
+    "search_notes": {
+      "type": "string",
+      "description": "Caveats, assumptions, or issues with search"
+    },
+    "searched_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "property_address",
+    "property_address_normalized",
+    "state_code",
+    "search_status"
+  ]
+}

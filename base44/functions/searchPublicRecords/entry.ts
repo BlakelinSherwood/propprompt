@@ -65,14 +65,14 @@ async function searchRecordsByState(address, state, base44, forceRefresh = false
 
 async function searchMassachusetts(address, base44) {
   // Use AI to search masslandrecords.com and assessor databases
-  const prompt = `Search Massachusetts land records for property: "${address}"
+  const prompt = `Search Massachusetts land records and assessor database for property: "${address}"
   1. Try https://www.masslandrecords.com - search by address
   2. Find deed history (last sale date, price, deed book/page)
   3. Find mortgage recordings (amount, date, lender)
   4. Check for mortgage discharge
-  5. Search "[municipality] MA assessor property search ${address}" for assessed value and annual tax
+  5. Search "[municipality] MA assessor property search ${address}" for assessed value, annual tax, bedrooms, bathrooms, square footage, year built, lot size, and property style (Colonial, Cape, Ranch, etc.)
 
-  Return structured JSON with: last_sale_date, last_sale_price, original_mortgage_amount, original_mortgage_date,
+  Return structured JSON with all property attributes including bedrooms, bathrooms, sqft, year_built, lot_size_sqft, property_style, last_sale_date, last_sale_price, original_mortgage_amount, original_mortgage_date,
   original_mortgage_lender, most_recent_mortgage_amount, most_recent_mortgage_date, assessed_value, annual_property_tax,
   search_status (found/partial/not_found), source_urls, search_notes`;
 
@@ -81,15 +81,15 @@ async function searchMassachusetts(address, base44) {
 
 async function searchMaine(address, base44) {
   // Extract county, search county registry portal
-  const prompt = `Search Maine Registry of Deeds for property: "${address}"
+  const prompt = `Search Maine Registry of Deeds and assessor for property: "${address}"
   1. Determine county from address
   2. Search "[county]countyme.com" or Maine Registry portal
   3. Find deed/transfer records (ownership, last sale)
   4. Find mortgage recordings
   5. Check for discharges
-  6. Search "[municipality] ME online assessing" for assessed value
+  6. Search "[municipality] ME online assessing" for assessed value, bedrooms, bathrooms, square footage, year built, lot size, and property style
 
-  Return structured JSON with deed, mortgage, tax assessment data, search_status, source_urls, search_notes`;
+  Return structured JSON with bedrooms, bathrooms, sqft, year_built, lot_size_sqft, property_style, deed, mortgage, tax assessment data, search_status, source_urls, search_notes`;
 
   return await invokeAISearch(prompt, base44);
 }
@@ -100,9 +100,9 @@ async function searchNewHampshire(address, base44) {
   2. Find deed history and ownership
   3. Find mortgage recordings
   4. Check discharge status
-  5. Search "[municipality] NH kiosk assessing ${address}" for value/tax
+  5. Search "[municipality] NH kiosk assessing ${address}" for value/tax, bedrooms, bathrooms, square footage, year built, lot size, and property style
 
-  Return structured JSON with property data, search_status, source_urls, search_notes`;
+  Return structured JSON with bedrooms, bathrooms, sqft, year_built, lot_size_sqft, property_style, property data, search_status, source_urls, search_notes`;
 
   return await invokeAISearch(prompt, base44);
 }
@@ -114,9 +114,9 @@ async function searchVermont(address, base44) {
   2. Determine correct town/municipality
   3. Find deed/transfer records by grantor/grantee
   4. Find mortgage recordings
-  5. Search "[town] VT listers property record ${address}" (note: "listers" not assessors)
+  5. Search "[town] VT listers property record ${address}" (note: "listers" not assessors) for assessed value, bedrooms, bathrooms, square footage, year built, lot size, and property style
 
-  Return structured JSON with deed, mortgage, lister assessment data, search_status, source_urls, search_notes`;
+  Return structured JSON with bedrooms, bathrooms, sqft, year_built, lot_size_sqft, property_style, deed, mortgage, lister assessment data, search_status, source_urls, search_notes`;
 
   return await invokeAISearch(prompt, base44);
 }
@@ -147,6 +147,12 @@ async function invokeAISearch(prompt, base44) {
           annual_property_tax: { type: "number" },
           liens_found: { type: "boolean" },
           lien_details: { type: "string" },
+          bedrooms: { type: "integer" },
+          bathrooms: { type: "number" },
+          sqft: { type: "number" },
+          lot_size_sqft: { type: "number" },
+          year_built: { type: "integer" },
+          property_style: { type: "string" },
           search_status: { type: "string", enum: ["found", "partial", "not_found", "error"] },
           source_urls: { type: "array", items: { type: "string" } },
           search_notes: { type: "string" }
