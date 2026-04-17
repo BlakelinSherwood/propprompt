@@ -28,36 +28,27 @@ Deno.serve(async (req) => {
     // Large property flag (sqft >= 4000)
     const isLargeProperty = sqft && sqft >= 4000;
 
-    // Tiered waterfall radii — relaxed for low-inventory markets like coastal MA
-    const radiiTiers = isLargeProperty
-      ? [
-          { radii: [0.5, 1.0, 2.0], soldWithinMonths: 12, tierNum: 1 },
-          { radii: [0.5, 1.0, 2.0, 3.0], soldWithinMonths: 18, tierNum: 2 },
-          { radii: [1.0, 2.0, 3.0, 5.0], soldWithinMonths: 24, tierNum: 3 },
-          { radii: [1.0, 2.0, 3.0, 5.0, 7.0], soldWithinMonths: 36, tierNum: 4 },
-        ]
-      : [
-          { radii: [0.5, 1.0, 2.0], soldWithinMonths: 12, tierNum: 1 },
-          { radii: [0.5, 1.0, 2.0, 3.0], soldWithinMonths: 18, tierNum: 2 },
-          { radii: [1.0, 2.0, 3.0, 5.0], soldWithinMonths: 24, tierNum: 3 },
-          { radii: [1.0, 2.0, 3.0, 5.0, 7.0], soldWithinMonths: 36, tierNum: 4 },
-        ];
+    // Tiered waterfall radii — progressively wider search
+    const radiiTiers = [
+      { radii: [0.5, 1.0, 2.0],             soldWithinMonths: 12, tierNum: 1 },
+      { radii: [0.5, 1.0, 2.0, 3.0],        soldWithinMonths: 18, tierNum: 2 },
+      { radii: [1.0, 2.0, 3.0, 5.0],        soldWithinMonths: 24, tierNum: 3 },
+      { radii: [1.0, 2.0, 3.0, 5.0, 7.0],   soldWithinMonths: 36, tierNum: 4 },
+      { radii: [3.0, 5.0, 7.0, 10.0],       soldWithinMonths: 48, tierNum: 5 }, // ultra-wide fallback
+    ];
 
     const compAddress = { street, city, state, zip };
 
-    // Helper: Filter raw BatchData results by property type and sold date — relaxed for low-inventory markets
+    // Helper: Filter raw BatchData results by sold date only — allow all residential types
     function filterResults(properties, soldWithinMonths) {
       const cutoffDate = new Date();
       cutoffDate.setMonth(cutoffDate.getMonth() - soldWithinMonths);
 
       return properties.filter(p => {
-        // Check property type (allow broader residential types for coastal markets)
-        const listingType = p.listing?.propertyType || '';
-        const listingTypeLC = listingType.toLowerCase();
-        const isSF = ['single family', 'other residential', 'sfr', 'residential', 'house'].some(t => 
-          listingTypeLC.includes(t)
-        ) && !listingTypeLC.includes('condo') && !listingTypeLC.includes('townhouse') && !listingTypeLC.includes('multi');
-        if (!isSF) return false;
+        // Accept any residential type — exclude only commercial/land
+        const listingType = (p.listing?.propertyType || '').toLowerCase();
+        const isCommercialOrLand = ['commercial', 'industrial', 'land', 'farm', 'vacant'].some(t => listingType.includes(t));
+        if (isCommercialOrLand) return false;
 
         // Check sold date from listing or deed history
         const soldDate = p.listing?.soldDate
@@ -69,7 +60,7 @@ Deno.serve(async (req) => {
         if (!soldDate || soldDate < cutoffDate) return false;
 
         // Check has sold price
-        const hasSoldPrice = !!p.listing?.soldPrice || 
+        const hasSoldPrice = !!p.listing?.soldPrice ||
                             (p.deedHistory && p.deedHistory.length > 0 && !!p.deedHistory[p.deedHistory.length - 1].salePrice);
         return hasSoldPrice;
       });
@@ -139,20 +130,22 @@ Deno.serve(async (req) => {
       for (const distanceMiles of tierConfig.radii) {
         try {
           // CORRECT FLAT REQUEST BODY STRUCTURE with property filters
+          // Relax filters progressively by tier — tier 3+ drops bedroom/bath constraints
+          const relaxed = tierConfig.tierNum >= 3;
           const requestBody = {
             searchCriteria: {
               compAddress,
-              bedroomsMin: bedrooms ? bedrooms - 1 : null,
-              bedroomsMax: bedrooms ? bedrooms + 1 : null,
-              bathroomsMin: bathrooms ? bathrooms - 1 : null,
-              bathroomsMax: bathrooms ? bathrooms + 1 : null,
-              sqftMin: sqft ? Math.round(sqft * 0.80) : null,
-              sqftMax: sqft ? Math.round(sqft * 1.20) : null
+              bedroomsMin: (!relaxed && bedrooms) ? Math.max(1, bedrooms - 2) : null,
+              bedroomsMax: (!relaxed && bedrooms) ? bedrooms + 2 : null,
+              bathroomsMin: null, // always open — too restrictive
+              bathroomsMax: null,
+              sqftMin: sqft ? Math.round(sqft * (relaxed ? 0.60 : 0.70)) : null,
+              sqftMax: sqft ? Math.round(sqft * (relaxed ? 1.40 : 1.30)) : null,
             },
             options: {
               useDistance: true,
               distanceMiles: distanceMiles,
-              take: 25
+              take: 50, // increased from 25 to catch more before filtering
             }
           };
 
@@ -192,8 +185,8 @@ Deno.serve(async (req) => {
           const filtered = filterResults(rawProperties, tierConfig.soldWithinMonths);
           console.log(`[fetchCompsFromBatchData] After filtering: ${filtered.length} recently-sold SFR comps`);
 
-          // Relax to 2 comps for low-inventory markets (tier 3+)
-          const compThreshold = tierConfig.tierNum >= 3 ? 2 : 3;
+          // Relax comp threshold for higher tiers
+          const compThreshold = tierConfig.tierNum >= 4 ? 1 : tierConfig.tierNum >= 3 ? 2 : 3;
           if (filtered.length >= compThreshold) {
             // Success — normalize and return
             allComps = filtered.map(p => normalizeProp(p, tierConfig.tierNum, distanceMiles));
@@ -207,7 +200,7 @@ Deno.serve(async (req) => {
         }
       }
 
-      if (allComps.length >= 2) break; // Exit tier loop if we found at least 2 comps (tier 3+)
+      if (allComps.length >= 1) break; // Exit tier loop once we have any comps
     }
 
     if (allComps.length === 0) {

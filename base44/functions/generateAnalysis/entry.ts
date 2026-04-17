@@ -671,7 +671,7 @@ async function callPerplexityAVM(apiKey, address) {
   const res = await fetch('https://api.perplexity.ai/chat/completions', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: 'sonar', messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }] }),
+    body: JSON.stringify({ model: 'sonar-pro', messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }] }),
   });
   if (!res.ok) throw new Error(`Perplexity AVM error ${res.status}`);
   const data = await res.json();
