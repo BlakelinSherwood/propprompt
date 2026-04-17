@@ -119,6 +119,45 @@ async function searchVermont(address, base44) {
   return await invokeAISearch(prompt, base44);
 }
 
+// Sanitize AI response — convert any non-numeric strings in numeric fields to null
+function sanitizeRecord(data) {
+  const numericFields = [
+    'last_sale_price', 'original_mortgage_amount', 'most_recent_mortgage_amount',
+    'assessed_value', 'annual_property_tax', 'bathrooms', 'sqft', 'lot_size_sqft'
+  ];
+  const integerFields = [
+    'original_mortgage_term_years', 'assessed_year', 'year_built', 'bedrooms'
+  ];
+  const dateFields = [
+    'last_sale_date', 'original_mortgage_date', 'most_recent_mortgage_date'
+  ];
+
+  const result = { ...data };
+
+  for (const f of numericFields) {
+    const v = result[f];
+    if (v !== null && v !== undefined) {
+      const n = typeof v === 'string' ? parseFloat(v.replace(/[^0-9.]/g, '')) : Number(v);
+      result[f] = isNaN(n) ? null : n;
+    }
+  }
+  for (const f of integerFields) {
+    const v = result[f];
+    if (v !== null && v !== undefined) {
+      const n = typeof v === 'string' ? parseInt(v.replace(/[^0-9]/g, ''), 10) : parseInt(v, 10);
+      result[f] = isNaN(n) ? null : n;
+    }
+  }
+  for (const f of dateFields) {
+    const v = result[f];
+    if (v && typeof v === 'string' && !/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+      result[f] = null; // Drop malformed dates
+    }
+  }
+
+  return result;
+}
+
 async function invokeAISearch(prompt, base44) {
 
   try {
@@ -158,7 +197,7 @@ async function invokeAISearch(prompt, base44) {
       }
     });
     
-    return response;
+    return sanitizeRecord(response);
   } catch (error) {
     console.error('[searchPublicRecords] AI search error:', error);
     return {
