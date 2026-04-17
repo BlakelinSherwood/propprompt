@@ -666,38 +666,19 @@ async function callPerplexity(apiKey, prompt) {
 
 // ── Perplexity AVM lookup ──────────────────────────────────────────────────
 async function callPerplexityAVM(apiKey, address) {
-  const systemPrompt = 'You are a real estate data researcher with web search access. Your job is to find current AVM estimates by searching the web. Return ONLY valid JSON with no markdown, no explanation, no preamble.';
+  const systemPrompt = 'You are a real estate data researcher. Use your web search to look up current AVM estimates for the given property on Zillow, Redfin, Realtor.com, and Homes.com. Only report values you actually find via search. Return ONLY valid JSON with no markdown, no preamble.';
 
-  // Build targeted search queries for each platform
-  const userPrompt = `Search the web RIGHT NOW for the current automated valuation estimates for this specific property:
+  const userPrompt = `What is the current Zestimate on Zillow for ${address}? Also search for the Redfin Estimate, Realtor.com home value, and Homes.com estimate for this same property.
 
-Address: ${address}
+Search each platform and tell me exactly what dollar estimate you find for each. These are public AVM values shown on each platform's property detail page.
 
-You MUST search these exact sites:
-1. Search zillow.com for "${address}" — find the Zestimate value and range shown on the property page
-2. Search redfin.com for "${address}" — find the "Redfin Estimate" or "Estimated sale price" and range
-3. Search realtor.com for "${address}" — find the home value estimate
-4. Search homes.com for "${address}" — find the estimated value
-
-These properties are indexed on all major real estate platforms. Search for each one individually using queries like:
-- site:zillow.com "${address}"
-- site:redfin.com "${address}"
-- "${address}" Zestimate
-- "${address}" Redfin Estimate
-
-Return ONLY this JSON structure. Use numeric values (no $ signs or commas):
+Return ONLY valid JSON with the values you actually found (plain integers, no $ or commas). If a platform shows no estimate after searching, use null:
 {
-  "zillow": {"estimate": 1126100, "range_low": 1050000, "range_high": 1200000, "trend": "stable", "as_of": "April 2026"},
-  "redfin": {"estimate": 1075651, "range_low": 1020000, "range_high": 1240000, "trend": "stable", "as_of": "April 2026"},
+  "zillow": {"estimate": 1126100, "range_low": 1070000, "range_high": 1190000, "trend": "stable", "as_of": "April 2026"},
+  "redfin": {"estimate": 1075651, "range_low": 1020000, "range_high": 1130000, "trend": "rising", "as_of": "April 2026"},
   "realtor_com": {"estimate": null, "range_low": null, "range_high": null, "trend": null, "as_of": null},
   "homes_com": {"estimate": null, "range_low": null, "range_high": null, "trend": null, "as_of": null}
-}
-
-Rules:
-- Use ONLY values you actually find via web search on those platforms right now
-- If you cannot find a value for a platform after searching, set ALL its fields to null
-- Do NOT guess or estimate — only report what is on the page
-- Numbers must be plain integers (no $, no commas)`;
+}`;
 
   const res = await fetch('https://api.perplexity.ai/chat/completions', {
     method: 'POST',
@@ -708,7 +689,9 @@ Rules:
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
       ],
-      search_recency_filter: 'month',
+      search_context_size: 'high',
+      return_images: false,
+      return_related_questions: false,
     }),
   });
   if (!res.ok) throw new Error(`Perplexity AVM error ${res.status}`);
