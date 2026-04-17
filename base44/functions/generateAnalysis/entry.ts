@@ -664,31 +664,53 @@ async function callPerplexity(apiKey, prompt) {
   };
 }
 
-// ── Perplexity AVM lookup ──────────────────────────────────────────────────
+// ── AVM lookup helpers ────────────────────────────────────────────────────
+
+function parseAvmJson(text, source) {
+  try {
+    let clean = (text || '').trim();
+    if (clean.startsWith('```')) clean = clean.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+    const jsonMatch = clean.match(/\{[\s\S]*\}/);
+    if (jsonMatch) clean = jsonMatch[0];
+    return JSON.parse(clean);
+  } catch (e) {
+    console.warn(`[AVM ${source}] JSON parse failed:`, e.message, '| raw:', text?.slice(0, 200));
+    return null;
+  }
+}
+
+// Merge two AVM results — prefer non-null values, with source `a` taking priority
+function mergeAvmResults(a, b) {
+  if (!a && !b) return null;
+  if (!a) return b;
+  if (!b) return a;
+  const platforms = ['zillow', 'redfin', 'realtor_com', 'homes_com'];
+  const merged = {};
+  for (const p of platforms) {
+    const av = a[p] || {};
+    const bv = b[p] || {};
+    merged[p] = {
+      estimate:  av.estimate  ?? bv.estimate  ?? null,
+      range_low: av.range_low ?? bv.range_low ?? null,
+      range_high:av.range_high?? bv.range_high?? null,
+      trend:     av.trend     ?? bv.trend     ?? null,
+      as_of:     av.as_of     ?? bv.as_of     ?? null,
+    };
+  }
+  return merged;
+}
+
 async function callPerplexityAVM(apiKey, address) {
   const systemPrompt = 'You are a real estate data researcher. Use your web search to look up current AVM estimates for the given property on Zillow, Redfin, Realtor.com, and Homes.com. Only report values you actually find via search. Return ONLY valid JSON with no markdown, no preamble.';
-
-  const userPrompt = `What is the current Zestimate on Zillow for ${address}? Also search for the Redfin Estimate, Realtor.com home value, and Homes.com estimate for this same property.
-
-Search each platform and tell me exactly what dollar estimate you find for each. These are public AVM values shown on each platform's property detail page.
-
-Return ONLY valid JSON with the values you actually found (plain integers, no $ or commas). If a platform shows no estimate after searching, use null:
-{
-  "zillow": {"estimate": 1126100, "range_low": 1070000, "range_high": 1190000, "trend": "stable", "as_of": "April 2026"},
-  "redfin": {"estimate": 1075651, "range_low": 1020000, "range_high": 1130000, "trend": "rising", "as_of": "April 2026"},
-  "realtor_com": {"estimate": null, "range_low": null, "range_high": null, "trend": null, "as_of": null},
-  "homes_com": {"estimate": null, "range_low": null, "range_high": null, "trend": null, "as_of": null}
-}`;
+  const userPrompt = `What is the current Zestimate on Zillow for ${address}? Also search for the Redfin Estimate, Realtor.com home value, and Homes.com estimate for this same property. Search each platform and tell me exactly what dollar estimate you find. Return ONLY valid JSON (plain integers, no $ or commas), null for any platform with no value:
+{"zillow":{"estimate":1126100,"range_low":1070000,"range_high":1190000,"trend":"stable","as_of":"April 2026"},"redfin":{"estimate":null,"range_low":null,"range_high":null,"trend":null,"as_of":null},"realtor_com":{"estimate":null,"range_low":null,"range_high":null,"trend":null,"as_of":null},"homes_com":{"estimate":null,"range_low":null,"range_high":null,"trend":null,"as_of":null}}`;
 
   const res = await fetch('https://api.perplexity.ai/chat/completions', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: 'sonar-pro',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
+      messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
       search_context_size: 'high',
       return_images: false,
       return_related_questions: false,
@@ -697,18 +719,52 @@ Return ONLY valid JSON with the values you actually found (plain integers, no $ 
   if (!res.ok) throw new Error(`Perplexity AVM error ${res.status}`);
   const data = await res.json();
   const text = (data.choices?.[0]?.message?.content || '').trim();
-  console.log('[callPerplexityAVM] raw response:', text.slice(0, 500));
-  try {
-    let clean = text;
-    if (clean.startsWith('```')) clean = clean.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
-    // Extract JSON if wrapped in other text
-    const jsonMatch = clean.match(/\{[\s\S]*\}/);
-    if (jsonMatch) clean = jsonMatch[0];
-    return JSON.parse(clean);
-  } catch (e) {
-    console.warn('[callPerplexityAVM] JSON parse failed:', e.message, '| raw:', text.slice(0, 200));
-    return null;
+  console.log('[callPerplexityAVM] raw:', text.slice(0, 300));
+  return parseAvmJson(text, 'perplexity');
+}
+
+async function callOpenAIAVM(apiKey, address) {
+  const userPrompt = `What is the current Zestimate on Zillow for ${address}? Also find the Redfin Estimate, Realtor.com home value, and Homes.com estimate for this same property. Search each platform. Return ONLY valid JSON (plain integers, no $ or commas), null for any platform with no value:
+{"zillow":{"estimate":1126100,"range_low":1070000,"range_high":1190000,"trend":"stable","as_of":"April 2026"},"redfin":{"estimate":null,"range_low":null,"range_high":null,"trend":null,"as_of":null},"realtor_com":{"estimate":null,"range_low":null,"range_high":null,"trend":null,"as_of":null},"homes_com":{"estimate":null,"range_low":null,"range_high":null,"trend":null,"as_of":null}}`;
+
+  const res = await fetch('https://api.openai.com/v1/responses', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'gpt-4o',
+      tools: [{ type: 'web_search_preview' }],
+      input: userPrompt,
+    }),
+  });
+  if (!res.ok) throw new Error(`OpenAI AVM error ${res.status}`);
+  const data = await res.json();
+  // Extract text from Responses API format
+  let text = '';
+  for (const item of (data.output || [])) {
+    if (item.type === 'message') {
+      for (const c of (item.content || [])) {
+        if (c.type === 'output_text') text = c.text;
+      }
+    }
   }
+  console.log('[callOpenAIAVM] raw:', text.slice(0, 300));
+  return parseAvmJson(text, 'openai');
+}
+
+// Fire Perplexity + GPT-4o in parallel, merge results for maximum coverage
+async function fetchAVMParallel(perpKey, openaiKey, address) {
+  const tasks = [];
+  if (perpKey) tasks.push(callPerplexityAVM(perpKey, address).catch(e => { console.warn('[AVM perplexity] failed:', e.message); return null; }));
+  else tasks.push(Promise.resolve(null));
+  if (openaiKey) tasks.push(callOpenAIAVM(openaiKey, address).catch(e => { console.warn('[AVM openai] failed:', e.message); return null; }));
+  else tasks.push(Promise.resolve(null));
+
+  const [perpResult, openaiResult] = await Promise.all(tasks);
+  console.log('[fetchAVMParallel] perplexity:', perpResult ? JSON.stringify(perpResult).slice(0, 150) : 'null');
+  console.log('[fetchAVMParallel] openai:', openaiResult ? JSON.stringify(openaiResult).slice(0, 150) : 'null');
+  const merged = mergeAvmResults(perpResult, openaiResult);
+  console.log('[fetchAVMParallel] merged:', merged ? JSON.stringify(merged).slice(0, 200) : 'null');
+  return merged;
 }
 
 Deno.serve(async (req) => {
@@ -753,14 +809,18 @@ Deno.serve(async (req) => {
     }
     if (!apiKey) return Response.json({ error: `No API key configured for platform: ${aiPlatform}` }, { status: 402 });
 
-    // Resolve perplexity key inline for AVM lookup
-    const resolvePerplexityKey = async () => {
+    // Resolve AVM keys inline
+    const resolveAvmKeys = async () => {
+      let perpKey = null, openaiKey = null;
       try {
         const configs = await base44.asServiceRole.entities.PlatformConfig.filter({});
         const cfg = configs[0];
-        if (cfg?.perplexity_api_key) return cfg.perplexity_api_key;
+        if (cfg?.perplexity_api_key) perpKey = cfg.perplexity_api_key;
+        if (cfg?.openai_api_key) openaiKey = cfg.openai_api_key;
       } catch (e) {}
-      return Deno.env.get("PERPLEXITY_API_KEY") || null;
+      if (!perpKey) perpKey = Deno.env.get("PERPLEXITY_API_KEY") || null;
+      if (!openaiKey) openaiKey = Deno.env.get("OPENAI_API_KEY") || null;
+      return { perpKey, openaiKey };
     };
 
     // Assemble prompt inline (baseline — library prompts handled in pipeline path below)
@@ -805,18 +865,18 @@ Deno.serve(async (req) => {
       prompt += `\n\nPRIOR SALE HISTORY:\n  Last known sale price: ${analysis.prior_sale_price ? '$' + analysis.prior_sale_price.toLocaleString() : 'unknown'}\n  Year of last sale: ${analysis.prior_sale_year || 'unknown'}\nUse this to cross-check valuation and flag anomalies.`;
     }
 
-    // AVM lookup via Perplexity for listing_pricing and cma (all tiers)
+    // AVM lookup via Perplexity + GPT-4o in parallel for listing_pricing and cma (all tiers)
     if (['listing_pricing', 'cma'].includes(analysis.assessment_type)) {
       const address = analysis.intake_data?.address || '';
       let avmResult = null;
       try {
-        const perpKey = await resolvePerplexityKey();
-        if (perpKey && address) {
-          console.log('[generateAnalysis] Fetching AVM data via Perplexity for:', address);
-          avmResult = await callPerplexityAVM(perpKey, address);
-          console.log('[generateAnalysis] AVM result received:', avmResult ? Object.keys(avmResult).join(',') : 'null');
+        const { perpKey, openaiKey } = await resolveAvmKeys();
+        if (address && (perpKey || openaiKey)) {
+          console.log('[generateAnalysis] Fetching AVM data (parallel Perplexity+GPT-4o) for:', address);
+          avmResult = await fetchAVMParallel(perpKey, openaiKey, address);
+          console.log('[generateAnalysis] AVM merged result:', avmResult ? Object.keys(avmResult).join(',') : 'null');
         } else {
-          console.warn('[generateAnalysis] No Perplexity key available for AVM lookup');
+          console.warn('[generateAnalysis] No AVM keys available for lookup');
         }
       } catch (avmErr) {
         console.warn('[generateAnalysis] AVM lookup failed (non-fatal):', avmErr.message);
@@ -896,18 +956,18 @@ Deno.serve(async (req) => {
         sections_total: pipelinePrompts.length,
       });
 
-      // Start AVM lookup in parallel with pipeline step 1 (listing_pricing, cma, client_portfolio)
+      // Start AVM lookup in parallel with pipeline step 1 (Perplexity + GPT-4o simultaneously)
       const isAvmType = ['listing_pricing', 'cma', 'client_portfolio', 'buyer_intelligence'].includes(analysis.assessment_type);
       let avmDataPromise = null;
       if (isAvmType) {
         try {
-          const perpAvmKey = await getKey('perplexity');
-          if (perpAvmKey) {
-            const avmAddress = analysis.intake_data?.address || '';
-            console.log('[generateAnalysis] Starting parallel Perplexity AVM lookup (sonar) for:', avmAddress);
-            avmDataPromise = callPerplexityAVM(perpAvmKey, avmAddress);
+          const [perpAvmKey, openaiAvmKey] = await Promise.all([getKey('perplexity'), getKey('chatgpt')]);
+          const avmAddress = analysis.intake_data?.address || '';
+          if (avmAddress && (perpAvmKey || openaiAvmKey)) {
+            console.log('[generateAnalysis] Starting parallel AVM lookup (Perplexity+GPT-4o) for:', avmAddress);
+            avmDataPromise = fetchAVMParallel(perpAvmKey, openaiAvmKey, avmAddress);
           } else {
-            console.warn('[generateAnalysis] No Perplexity key — AVM lookup skipped');
+            console.warn('[generateAnalysis] No AVM keys available — lookup skipped');
           }
         } catch (avmInitErr) {
           console.warn('[generateAnalysis] Could not start AVM lookup:', avmInitErr.message);
