@@ -1,4 +1,9 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
+/**
+ * fetchCompsFromBatchData — Now Perplexity-primary.
+ * BatchData search is 403 / no sold data on current plan.
+ * This function uses Perplexity sonar-pro to research comparable sales directly.
+ */
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 Deno.serve(async (req) => {
   try {
@@ -6,232 +11,151 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { address, bedrooms, bathrooms, sqft, propertyType, forceRefresh } = await req.json();
+    const { address, bedrooms, bathrooms, sqft, propertyType } = await req.json();
     if (!address) return Response.json({ error: 'address required' }, { status: 400 });
 
-    // Parse address: "123 Main St, City, State 12345"
-    const parts = address.split(',').map(p => p.trim());
-    const street = parts[0] || '';
-    const city = parts[1] || '';
-    const stateZip = (parts[2] || '').trim().split(/\s+/);
-    const state = stateZip[0] || '';
-    const zip = stateZip[1] || '';
-
-    // Get BatchData API key from PlatformConfig
-    const configs = await base44.asServiceRole.entities.PlatformConfig.list();
+    // Get Perplexity API key from PlatformConfig
+    const configs = await base44.asServiceRole.entities.PlatformConfig.filter({});
     const config = configs[0];
-    if (!config?.batchdata_api_key) {
-      return Response.json({ success: false, message: 'BatchData API key not configured' }, { status: 402 });
+    const perpKey = config?.perplexity_api_key || Deno.env.get('PERPLEXITY_API_KEY');
+    if (!perpKey) {
+      return Response.json({ success: false, message: 'Perplexity API key not configured' }, { status: 402 });
     }
-    const batchDataKey = config.batchdata_api_key;
 
-    // Large property flag (sqft >= 4000)
     const isLargeProperty = sqft && sqft >= 4000;
+    const propertyDesc = (propertyType || 'single_family').replace(/_/g, ' ');
+    const bedroomRange = bedrooms ? `${Math.max(1, bedrooms - 1)}-${bedrooms + 1} bedrooms` : 'any bedrooms';
+    const sqftRange = sqft ? `${Math.round(sqft * 0.70).toLocaleString()}-${Math.round(sqft * 1.30).toLocaleString()} sq ft` : 'any size';
 
-    // Tiered waterfall radii — progressively wider search
-    const radiiTiers = [
-      { radii: [0.5, 1.0, 2.0],             soldWithinMonths: 12, tierNum: 1 },
-      { radii: [0.5, 1.0, 2.0, 3.0],        soldWithinMonths: 18, tierNum: 2 },
-      { radii: [1.0, 2.0, 3.0, 5.0],        soldWithinMonths: 24, tierNum: 3 },
-      { radii: [1.0, 2.0, 3.0, 5.0, 7.0],   soldWithinMonths: 36, tierNum: 4 },
-      { radii: [3.0, 5.0, 7.0, 10.0],       soldWithinMonths: 48, tierNum: 5 }, // ultra-wide fallback
-    ];
+    const systemPrompt = `You are a licensed real estate researcher specializing in New England comparable sales analysis. 
+Search the web for recent sold properties near the given address. 
+Return ONLY valid JSON — no preamble, no markdown, no explanation.`;
 
-    const compAddress = { street, city, state, zip };
+    const userPrompt = `Search for recently SOLD homes near ${address} to use as comparable sales.
 
-    // Helper: Filter raw BatchData results by sold date only — allow all residential types
-    function filterResults(properties, soldWithinMonths) {
-      const cutoffDate = new Date();
-      cutoffDate.setMonth(cutoffDate.getMonth() - soldWithinMonths);
+Subject property: ${propertyDesc}, ${bedrooms || '?'} bed, ${bathrooms || '?'} bath, ${sqft ? sqft.toLocaleString() + ' sqft' : 'unknown sqft'}
 
-      return properties.filter(p => {
-        // Accept any residential type — exclude only commercial/land
-        const listingType = (p.listing?.propertyType || '').toLowerCase();
-        const isCommercialOrLand = ['commercial', 'industrial', 'land', 'farm', 'vacant'].some(t => listingType.includes(t));
-        if (isCommercialOrLand) return false;
+Please search these sources for recently sold listings:
+1. Search Zillow for "sold homes near ${address}" — look at their sold listings tab
+2. Search Redfin for sold homes in the same neighborhood/zip
+3. Search Realtor.com sold listings
+4. Search "site:zillow.com sold ${(address.split(',')[1] || '').trim()} ${sqft ? Math.round(sqft * 0.8) + '-' + Math.round(sqft * 1.2) : ''}"
 
-        // Check sold date from listing or deed history
-        const soldDate = p.listing?.soldDate
-          ? new Date(p.listing.soldDate)
-          : p.deedHistory && p.deedHistory.length > 0
-            ? new Date(p.deedHistory[p.deedHistory.length - 1].recordingDate)
-            : null;
+Criteria:
+- Sold within last 24 months (2024–2025)
+- ${bedroomRange}
+- Approximately ${sqftRange}
+- Same town preferred; adjacent towns OK for context
 
-        if (!soldDate || soldDate < cutoffDate) return false;
+Return ONLY valid JSON (no markdown fences, no explanation):
+{
+  "comps": [
+    {
+      "address": "123 Example St, Beverly, MA 01915",
+      "sale_price": 485000,
+      "sale_date": "2025-03-12",
+      "sqft": 1650,
+      "bedrooms": 3,
+      "bathrooms": 2,
+      "price_per_sqft": 294,
+      "listing_url": "https://www.zillow.com/... or null",
+      "source_site": "zillow"
+    }
+  ],
+  "researcher_note": null
+}
 
-        // Check has sold price
-        const hasSoldPrice = !!p.listing?.soldPrice ||
-                            (p.deedHistory && p.deedHistory.length > 0 && !!p.deedHistory[p.deedHistory.length - 1].salePrice);
-        return hasSoldPrice;
-      });
+Critical rules:
+- ONLY include properties with confirmed SOLD prices found in your search — never invent or estimate data
+- sale_price = final SOLD price (not list price)
+- sale_date in YYYY-MM-DD format
+- price_per_sqft = Math.round(sale_price / sqft)
+- If you find fewer than 4 comps, explain briefly in researcher_note
+- It is better to return 3-4 real comps than 10 invented ones`;
+
+    console.log('[fetchCompsFromBatchData] Using Perplexity for:', address);
+
+    const res = await fetch('https://api.perplexity.ai/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${perpKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'sonar-pro',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        search_context_size: 'high',
+        return_images: false,
+        return_related_questions: false,
+      }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error('[fetchCompsFromBatchData] Perplexity error:', res.status, errText.slice(0, 200));
+      return Response.json({ success: false, message: `Perplexity API error ${res.status}` }, { status: 500 });
     }
 
-    // Helper: Normalize property to comp schema
-    function normalizeProp(p, tierNum, distanceMiles) {
-      const lastDeed = p.deedHistory && p.deedHistory.length > 0 ? p.deedHistory[p.deedHistory.length - 1] : {};
-      const listing = p.listing || {};
+    const data = await res.json();
+    let rawText = (data.choices?.[0]?.message?.content || '').trim();
+    console.log('[fetchCompsFromBatchData] raw response (first 500):', rawText.slice(0, 500));
 
-      const soldPrice = listing.soldPrice || lastDeed.salePrice || null;
-      const sqftValue = listing.totalBuildingAreaSquareFeet || listing.livingArea || null;
+    // Strip markdown fences
+    if (rawText.startsWith('```')) {
+      rawText = rawText.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+    }
+    // Extract first JSON object
+    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.error('[fetchCompsFromBatchData] No JSON found in response');
+      return Response.json({ success: true, comps: [], researcher_note: 'AI search did not return structured data. Add comps manually.', search_tier: 'perplexity', search_radius: null, large_property_flag: isLargeProperty });
+    }
 
-      const address = [
-        p.address?.houseNumber,
-        p.address?.street,
-        p.address?.city,
-        p.address?.state,
-        p.address?.zip
-      ].filter(Boolean).join(' ');
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonMatch[0]);
+    } catch (e) {
+      console.error('[fetchCompsFromBatchData] JSON parse error:', e.message);
+      return Response.json({ success: true, comps: [], researcher_note: 'Could not parse AI search results. Add comps manually.', search_tier: 'perplexity', search_radius: null, large_property_flag: isLargeProperty });
+    }
 
-      return {
-        address,
-        sale_price: soldPrice,
-        sale_date: listing.soldDate || lastDeed.recordingDate || null,
-        sqft: sqftValue,
-        bedrooms: listing.bedroomCount || null,
-        bathrooms: listing.bathroomCount || null,
-        price_per_sqft: (soldPrice && sqftValue)
-          ? Math.round(soldPrice / sqftValue)
-          : null,
-        lot_sqft: listing.lotSizeSquareFeet || null,
-        year_built: listing.yearBuilt || null,
-        days_on_market: listing.daysOnMarket || null,
-        listing_url: listing.listingUrl || null,
-        batchdata_id: p._id,
-        source: 'batchdata',
-        search_tier: tierNum,
-        search_radius: distanceMiles,
-        perplexity_confirmed: false,
+    const rawComps = parsed.comps || [];
+    console.log('[fetchCompsFromBatchData] Parsed', rawComps.length, 'comps from Perplexity');
+
+    // Normalize and validate comps — require real street address
+    const comps = rawComps
+      .filter(c => c.address && c.sale_price && c.sale_date &&
+        !c.address.toLowerCase().includes('unknown') &&
+        /\d/.test(c.address) // must have a street number
+      )
+      .map(c => ({
+        address: String(c.address),
+        sale_price: Number(c.sale_price) || null,
+        sale_date: String(c.sale_date),
+        sqft: c.sqft ? Number(c.sqft) : null,
+        bedrooms: c.bedrooms ? Number(c.bedrooms) : null,
+        bathrooms: c.bathrooms ? Number(c.bathrooms) : null,
+        price_per_sqft: c.price_per_sqft
+          ? Number(c.price_per_sqft)
+          : (c.sale_price && c.sqft ? Math.round(Number(c.sale_price) / Number(c.sqft)) : null),
+        listing_url: c.listing_url || null,
+        days_on_market: c.days_on_market ? Number(c.days_on_market) : null,
+        source: 'perplexity_deep_search',
+        search_tier: 'perplexity',
+        search_radius: null,
+        perplexity_confirmed: true,
         perplexity_variance: null,
         agent_excluded: false,
-        agent_notes: ''
-      };
-    }
+        agent_notes: '',
+      }));
 
-    let allComps = [];
-    let successTierNum = null;
-    let successRadiusMiles = null;
-
-    // Run tiered waterfall
-    for (const tierConfig of radiiTiers) {
-      const logMsg = `Tier ${tierConfig.tierNum}: trying radii ${tierConfig.radii.join(', ')} mi, sold within ${tierConfig.soldWithinMonths} months`;
-      console.log(`[fetchCompsFromBatchData] ${logMsg}`);
-      try {
-        await base44.functions.invoke('logActivity', {
-          log_level: 'info',
-          function_name: 'fetchCompsFromBatchData',
-          message: logMsg,
-          context: { address, tier: tierConfig.tierNum, radii: tierConfig.radii },
-          analysis_id: null,
-        });
-      } catch (logErr) {
-        console.warn('[fetchCompsFromBatchData] logging failed:', logErr.message);
-      }
-
-      for (const distanceMiles of tierConfig.radii) {
-        try {
-          // CORRECT FLAT REQUEST BODY STRUCTURE with property filters
-          // Relax filters progressively by tier — tier 3+ drops bedroom/bath constraints
-          const relaxed = tierConfig.tierNum >= 3;
-          const requestBody = {
-            searchCriteria: {
-              compAddress,
-              bedroomsMin: (!relaxed && bedrooms) ? Math.max(1, bedrooms - 2) : null,
-              bedroomsMax: (!relaxed && bedrooms) ? bedrooms + 2 : null,
-              bathroomsMin: null, // always open — too restrictive
-              bathroomsMax: null,
-              sqftMin: sqft ? Math.round(sqft * (relaxed ? 0.60 : 0.70)) : null,
-              sqftMax: sqft ? Math.round(sqft * (relaxed ? 1.40 : 1.30)) : null,
-            },
-            options: {
-              useDistance: true,
-              distanceMiles: distanceMiles,
-              take: 50, // increased from 25 to catch more before filtering
-            }
-          };
-
-          const response = await fetch('https://api.batchdata.com/api/v1/property/search', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${batchDataKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(requestBody),
-          });
-
-          if (response.status === 403) {
-            const errMsg = '403 Forbidden — check BatchData token permissions (property-search, property-lookup-all-attributes)';
-            console.error('[fetchCompsFromBatchData] ' + errMsg);
-            try {
-              await base44.functions.invoke('logActivity', {
-                log_level: 'error',
-                function_name: 'fetchCompsFromBatchData',
-                message: errMsg,
-                error_details: 'BatchData API returned 403 Forbidden',
-              });
-            } catch (logErr) {}
-            return Response.json({ success: false, message: 'BatchData API authentication failed — token may not have property-search permission' }, { status: 403 });
-          }
-
-          if (!response.ok) {
-            console.warn(`[fetchCompsFromBatchData] Tier ${tierConfig.tierNum} radius ${distanceMiles}mi failed with status ${response.status}`);
-            continue;
-          }
-
-          const data = await response.json();
-          const rawProperties = data.properties || [];
-          console.log(`[fetchCompsFromBatchData] Tier ${tierConfig.tierNum} radius ${distanceMiles}mi: ${rawProperties.length} raw results`);
-
-          // Filter by property type and sold date
-          const filtered = filterResults(rawProperties, tierConfig.soldWithinMonths);
-          console.log(`[fetchCompsFromBatchData] After filtering: ${filtered.length} recently-sold SFR comps`);
-
-          // Relax comp threshold for higher tiers
-          const compThreshold = tierConfig.tierNum >= 4 ? 1 : tierConfig.tierNum >= 3 ? 2 : 3;
-          if (filtered.length >= compThreshold) {
-            // Success — normalize and return
-            allComps = filtered.map(p => normalizeProp(p, tierConfig.tierNum, distanceMiles));
-            successTierNum = tierConfig.tierNum;
-            successRadiusMiles = distanceMiles;
-            break;
-          }
-        } catch (radiusErr) {
-          console.warn(`[fetchCompsFromBatchData] Tier ${tierConfig.tierNum} radius ${distanceMiles}mi error:`, radiusErr.message);
-          continue;
-        }
-      }
-
-      if (allComps.length >= 1) break; // Exit tier loop once we have any comps
-    }
-
-    if (allComps.length === 0) {
-      const noCompsMsg = 'No comps found after exhaustive tier search — escalating to Perplexity deep search';
-      console.log('[fetchCompsFromBatchData] ' + noCompsMsg);
-      try {
-        await base44.functions.invoke('logActivity', {
-          log_level: 'warn',
-          function_name: 'fetchCompsFromBatchData',
-          message: noCompsMsg,
-          context: { address, propertyType, bedrooms, bathrooms, sqft, isLargeProperty },
-        });
-      } catch (logErr) {}
-      return Response.json({
-        success: true,
-        comps: [],
-        search_tier: 'exhausted',
-        search_radius: 3.0,
-        large_property_flag: isLargeProperty,
-        researcher_note: 'Standard comparable sales search returned limited results. Will perform extended research to find the best available comparables.',
-      });
-    }
-
-    console.log(`[fetchCompsFromBatchData] Found ${allComps.length} comps at tier ${successTierNum} radius ${successRadiusMiles}mi`);
     return Response.json({
       success: true,
-      comps: allComps,
-      search_tier: successTierNum,
-      search_radius: successRadiusMiles,
+      comps,
+      search_tier: 'perplexity',
+      search_radius: null,
       large_property_flag: isLargeProperty,
-      researcher_note: null,
+      researcher_note: parsed.researcher_note || null,
     });
 
   } catch (error) {

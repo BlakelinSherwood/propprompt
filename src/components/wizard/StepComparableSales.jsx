@@ -164,17 +164,8 @@ export default function StepComparableSales({ intake, update, onNext, onBack }) 
       setResearcherNote(note);
       setSearchMeta({ tier: data.search_tier, radius: data.search_radius });
 
-      // Enrich non-deep-search comps with Perplexity
+      // Comps from Perplexity are already enriched — skip secondary enrichment pass
       let finalComps = fetchedComps;
-      if (fetchedComps.length > 0 && data.search_tier !== "agent_deep_search") {
-        try {
-          const enrichRes = await base44.functions.invoke("enrichCompsWithPerplexity", { comps: fetchedComps });
-          if (enrichRes.data?.success) finalComps = enrichRes.data.comps || fetchedComps;
-          update({ raw_perplexity_enrichment: enrichRes.data?.rawEnrichment || [] });
-        } catch (e) {
-          console.warn("[StepComparableSales] Enrichment failed:", e.message);
-        }
-      }
 
       setComps(finalComps);
       setSelected(new Set(finalComps.map(c => c.address)));
@@ -251,7 +242,7 @@ export default function StepComparableSales({ intake, update, onNext, onBack }) 
           <p className="text-xs font-medium uppercase tracking-widest text-[#B8982F] mb-1">Step 4</p>
           <h2 className="text-xl font-semibold text-[#1A3226]" style={{ fontFamily: "Georgia, serif" }}>Find Comparable Sales</h2>
           <p className="text-sm text-[#1A3226]/60 mt-1">
-            PropPrompt will search public deed records for recent sales near {intake.address || "the subject property"} and cross-reference them against Compass, Zillow, Redfin, and Realtor.com.
+            PropPrompt will search Compass, Zillow, Redfin, Realtor.com, and public deed records for recent comparable sales near {intake.address || "the subject property"}.
           </p>
         </div>
         <div className="bg-[#FAF8F4] rounded-xl border border-[#1A3226]/10 p-5 space-y-3">
