@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 
 const MODELS = [
   { id: 'perplexity', name: 'Perplexity', task: 'Fetching live market data...', delay: 0 },
@@ -11,6 +11,7 @@ const MODELS = [
 export default function AnalysisLoadingScreen({ status = 'loading', onComplete, primaryColor = '#1A3226', accentColor = '#B8982F' }) {
   const [progress, setProgress] = useState(0);
   const [completedModels, setCompletedModels] = useState(new Set());
+  const secondsRef = useRef(60 + Math.floor(Math.random() * 30));
 
   // Simulate progress increments
   useEffect(() => {
@@ -45,7 +46,7 @@ export default function AnalysisLoadingScreen({ status = 'loading', onComplete, 
   }, [status, onComplete]);
 
   return (
-    <div className="fixed inset-0 flex flex-col items-center justify-center overflow-hidden" style={{ backgroundColor: primaryColor }}>
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden" style={{ backgroundColor: primaryColor }}>
       {/* Market Pulse Background */}
       <div className="absolute inset-0 opacity-15">
         <svg
@@ -120,7 +121,7 @@ export default function AnalysisLoadingScreen({ status = 'loading', onComplete, 
             Compiling Your Analysis
           </h2>
           <p className="text-sm text-[#E0E0E0]/60">
-            {60 + Math.floor(Math.random() * 30)} seconds of AI research in progress...
+            {secondsRef.current} seconds of AI research in progress...
           </p>
         </div>
 
