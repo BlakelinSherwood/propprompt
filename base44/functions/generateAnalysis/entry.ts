@@ -846,11 +846,11 @@ Deno.serve(async (req) => {
     const agentComps = analysis.agent_comps || [];
     let dataQualityBlock = '';
     if (agentComps.length >= 3) {
-      dataQualityBlock = `\n\nDATA QUALITY: green\nCOMPARABLE SALES SOURCE: BatchData public records (verified)\nCOMP COUNT: ${agentComps.length}\nSet data_quality_flag to 'green' in the output JSON.`;
+      dataQualityBlock = `\n\nDATA QUALITY: green\nCOMPARABLE SALES SOURCE: Perplexity AI research (verified)\nCOMP COUNT: ${agentComps.length}\nSet data_quality_flag to 'green' in the output JSON.`;
     } else if (agentComps.length > 0) {
-      dataQualityBlock = `\n\nDATA QUALITY: yellow\nCOMPARABLE SALES SOURCE: BatchData + Perplexity deep search\nCOMP COUNT: ${agentComps.length}\nNote: Limited comp availability. Set confidence_level to 'low' in the output JSON. Note this limitation briefly in the valuation narrative.\nSet data_quality_flag to 'yellow'.`;
+      dataQualityBlock = `\n\nDATA QUALITY: yellow\nCOMPARABLE SALES SOURCE: Perplexity AI research\nCOMP COUNT: ${agentComps.length}\nNote: Limited comp availability. Set confidence_level to 'low' in the output JSON. Note this limitation briefly in the valuation narrative.\nSet data_quality_flag to 'yellow'.`;
     } else {
-      dataQualityBlock = `\n\nDATA QUALITY: red\nCOMPARABLE SALES: None found after exhaustive search.\nSet data_quality_flag to 'red' in the output JSON.\nDo NOT generate a valuation range. DO generate market context, buyer archetypes, migration data, and a narrative explaining that comp data was unavailable for this property type in this market at this time.\nThe report must still be useful and complete in every other way.`;
+      dataQualityBlock = `\n\nDATA QUALITY: red\nCOMPARABLE SALES: None provided.\n\n⚠️ CRITICAL INSTRUCTIONS FOR ZERO-COMP SCENARIO:\n- Set data_quality_flag to 'red' in the output JSON\n- Set implied_value_range to null\n- Set confidence_level to 'insufficient_data'\n- In the valuation.narrative field, clearly state that no comparable sales data was provided and a defensible valuation range cannot be established\n- Do NOT write speculative valuation language like "likely exceeds $X" or "suggests current market value"\n- Do NOT reference appreciation patterns or prior sale price as a proxy for current value\n- DO generate all other sections fully: market context, buyer archetypes, migration analysis, AVM analysis, pricing scenarios\n- The tiered_comps.comps array must be empty []\n- The report is still valuable for context — just not for valuation`;
     }
     prompt += dataQualityBlock;
 
