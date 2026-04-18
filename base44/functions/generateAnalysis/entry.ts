@@ -848,33 +848,60 @@ Deno.serve(async (req) => {
       ['listing_pricing', 'cma', 'investment_analysis', 'client_portfolio'].includes(analysis.assessment_type);
 
     if (needsComps) {
-      console.log('[generateAnalysis] No comps on analysis — auto-fetching for:', analysis.intake_data.address);
+      console.log('[generateAnalysis] No comps on analysis — auto-fetching inline for:', analysis.intake_data.address);
       try {
+        const d = analysis.intake_data;
         const rentcastKey = Deno.env.get('RENTCAST_API_KEY');
-        const attomKey = Deno.env.get('ATTOM_API_KEY');
-        if (rentcastKey || attomKey) {
-          const compRes = await base44.functions.invoke('fetchCompsFromBatchData', {
-            address: analysis.intake_data.address,
-            bedrooms: analysis.intake_data.bedrooms ? Number(analysis.intake_data.bedrooms) : null,
-            bathrooms: analysis.intake_data.bathrooms ? Number(analysis.intake_data.bathrooms) : null,
-            sqft: analysis.intake_data.sqft ? Number(analysis.intake_data.sqft) : null,
-            propertyType: analysis.property_type,
+        if (rentcastKey) {
+          const rcParams = new URLSearchParams({
+            address: d.address,
+            propertyType: { single_family: 'Single Family', condo: 'Condo', multi_family: 'Multi-Family', land: 'Land' }[analysis.property_type] || 'Single Family',
+            compCount: '10',
+            daysOld: '730',
           });
-          const fetchedComps = compRes?.comps || [];
-          if (fetchedComps.length > 0) {
-            agentComps = fetchedComps;
-            console.log(`[generateAnalysis] Auto-fetched ${agentComps.length} comps via ${compRes?.source_used || 'api'}`);
-            // Save comps back to analysis record
-            await base44.asServiceRole.entities.Analysis.update(analysisId, {
-              agent_comps: agentComps,
-              raw_batchdata_comps: agentComps,
-              comps_fetched_at: new Date().toISOString(),
-              comps_search_tier: compRes?.search_tier || null,
-              comps_source: 'api_verified',
-              large_property_flag: compRes?.large_property_flag || false,
-            });
+          if (d.bedrooms)  rcParams.set('bedrooms',      String(Number(d.bedrooms)));
+          if (d.bathrooms) rcParams.set('bathrooms',     String(Number(d.bathrooms)));
+          if (d.sqft)      rcParams.set('squareFootage', String(Number(d.sqft)));
+
+          const rcRes = await fetch(`https://api.rentcast.io/v1/avm/value?${rcParams.toString()}`, {
+            headers: { 'X-Api-Key': rentcastKey, 'Accept': 'application/json' },
+          });
+          if (rcRes.ok) {
+            const rcData = await rcRes.json();
+            const rawComps = rcData.comparables || [];
+            console.log(`[generateAnalysis] RentCast inline returned ${rawComps.length} comps`);
+            const fetchedComps = rawComps
+              .filter(c => c.price && c.formattedAddress)
+              .map(c => {
+                const price = Number(c.price);
+                const sqftVal = Number(c.squareFootage) || null;
+                return {
+                  address: c.formattedAddress,
+                  sale_price: price || null,
+                  sale_date: (c.lastSaleDate || c.listedDate || '').slice(0, 10) || null,
+                  sqft: sqftVal,
+                  bedrooms: c.bedrooms ? Number(c.bedrooms) : null,
+                  bathrooms: c.bathrooms ? Number(c.bathrooms) : null,
+                  price_per_sqft: (price && sqftVal) ? Math.round(price / sqftVal) : null,
+                  source: 'rentcast',
+                  agent_excluded: false,
+                  agent_notes: '',
+                };
+              });
+
+            if (fetchedComps.length > 0) {
+              agentComps = fetchedComps;
+              console.log(`[generateAnalysis] Auto-fetched ${agentComps.length} comps from RentCast`);
+              await base44.asServiceRole.entities.Analysis.update(analysisId, {
+                agent_comps: agentComps,
+                raw_batchdata_comps: agentComps,
+                comps_fetched_at: new Date().toISOString(),
+                comps_search_tier: 'rentcast',
+                comps_source: 'api_verified',
+              });
+            }
           } else {
-            console.warn('[generateAnalysis] Auto-fetch returned 0 comps');
+            console.warn('[generateAnalysis] RentCast inline error:', rcRes.status);
           }
         }
       } catch (compFetchErr) {
