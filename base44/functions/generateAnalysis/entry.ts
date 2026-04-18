@@ -842,8 +842,47 @@ Deno.serve(async (req) => {
       }
     } catch (e) { console.warn('[generateAnalysis] PromptLibrary lookup failed, using baseline:', e.message); }
 
+    // ── AUTO-FETCH COMPS if none were pre-loaded ────────────────────────────
+    let agentComps = analysis.agent_comps || [];
+    const needsComps = agentComps.length === 0 && analysis.intake_data?.address &&
+      ['listing_pricing', 'cma', 'investment_analysis', 'client_portfolio'].includes(analysis.assessment_type);
+
+    if (needsComps) {
+      console.log('[generateAnalysis] No comps on analysis — auto-fetching for:', analysis.intake_data.address);
+      try {
+        const rentcastKey = Deno.env.get('RENTCAST_API_KEY');
+        const attomKey = Deno.env.get('ATTOM_API_KEY');
+        if (rentcastKey || attomKey) {
+          const compRes = await base44.functions.invoke('fetchCompsFromBatchData', {
+            address: analysis.intake_data.address,
+            bedrooms: analysis.intake_data.bedrooms ? Number(analysis.intake_data.bedrooms) : null,
+            bathrooms: analysis.intake_data.bathrooms ? Number(analysis.intake_data.bathrooms) : null,
+            sqft: analysis.intake_data.sqft ? Number(analysis.intake_data.sqft) : null,
+            propertyType: analysis.property_type,
+          });
+          const fetchedComps = compRes?.comps || [];
+          if (fetchedComps.length > 0) {
+            agentComps = fetchedComps;
+            console.log(`[generateAnalysis] Auto-fetched ${agentComps.length} comps via ${compRes?.source_used || 'api'}`);
+            // Save comps back to analysis record
+            await base44.asServiceRole.entities.Analysis.update(analysisId, {
+              agent_comps: agentComps,
+              raw_batchdata_comps: agentComps,
+              comps_fetched_at: new Date().toISOString(),
+              comps_search_tier: compRes?.search_tier || null,
+              comps_source: 'api_verified',
+              large_property_flag: compRes?.large_property_flag || false,
+            });
+          } else {
+            console.warn('[generateAnalysis] Auto-fetch returned 0 comps');
+          }
+        }
+      } catch (compFetchErr) {
+        console.warn('[generateAnalysis] Auto comp fetch failed (non-fatal):', compFetchErr.message);
+      }
+    }
+
     // Inject data quality flag based on comp count
-    const agentComps = analysis.agent_comps || [];
     let dataQualityBlock = '';
     if (agentComps.length >= 3) {
       dataQualityBlock = `\n\nDATA QUALITY: green\nCOMPARABLE SALES SOURCE: Perplexity AI research (verified)\nCOMP COUNT: ${agentComps.length}\nSet data_quality_flag to 'green' in the output JSON.`;
