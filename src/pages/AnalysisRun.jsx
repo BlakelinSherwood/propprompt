@@ -87,11 +87,17 @@ export default function AnalysisRun() {
         if (brands[0]) setBranding({ primary: brands[0].primary_color, accent: brands[0].accent_color });
       } catch (e) { /* use defaults */ }
 
-      // If already complete, show stored output with typing effect
-      if (rec.status === "complete" && rec.output_text) {
+      // If already complete with comps, show stored output with typing effect
+      // If complete but no comps, reset and re-run to get proper comp data
+      const hasComps = rec.agent_comps && rec.agent_comps.length > 0;
+      if (rec.status === "complete" && rec.output_text && hasComps) {
         setStatus("streaming");
         simulateTyping(rec.output_text);
         return;
+      }
+      // Reset status so generateAnalysis re-runs fresh
+      if (rec.status === "complete" && !hasComps) {
+        await base44.entities.Analysis.update(rec.id, { status: "draft", output_text: null, output_json: null });
       }
 
       // Load CRM connections
