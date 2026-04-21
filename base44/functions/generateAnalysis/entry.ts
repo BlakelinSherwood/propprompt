@@ -989,6 +989,63 @@ Set "market_timing" based on the current rate environment and local market condi
 Address ${d.address || 'this property'} specifically in each option narrative.`;
   }
 
+  // ── DESIGN & RENOVATION TRENDS (client_portfolio only) ───────────────────
+  if (analysis.assessment_type === 'client_portfolio') {
+    const currentYear = new Date().getFullYear();
+    prompt += `\n\nDESIGN & RENOVATION TRENDS — REQUIRED FOR CLIENT PORTFOLIO:
+You MUST include a "design_trends" object in your output JSON. Use your knowledge of current design trends and real estate data for ${currentYear} to populate this. Make all recommendations specific to the New England / Northeast market and relevant to the property type and price point of this home.
+
+Structure:
+{
+  "trend_year": ${currentYear},
+  "intro": "1-2 sentence framing paragraph for the agent to introduce this section to the client",
+  "kitchen_styles": [
+    {
+      "trend": "Trend name (e.g. 'Warm Minimalism')",
+      "description": "2 sentences on what this looks like and why it's popular",
+      "roi_estimate": "e.g. '70-80% ROI on mid-range kitchen remodel'",
+      "cost_range": "e.g. '$18,000 – $45,000'",
+      "relevance_to_subject": "1 sentence on how relevant this is to THIS property"
+    }
+  ],
+  "paint_colors": [
+    {
+      "color_name": "Color name (e.g. 'Sherwin-Williams Alabaster')",
+      "brand_swatch": "Brand and collection (e.g. 'Sherwin-Williams 2025 Color of the Year')",
+      "hex_approx": "#hex value approximation",
+      "mood": "e.g. 'Warm, inviting, photogenic for listings'",
+      "best_for": "e.g. 'Living rooms, open-plan kitchens'",
+      "why_now": "1 sentence on why this color is trending in ${currentYear}"
+    }
+  ],
+  "popular_renovations": [
+    {
+      "renovation": "Renovation name",
+      "avg_cost": "e.g. '$8,000 – $20,000'",
+      "avg_roi": "e.g. '80%'",
+      "time_to_complete": "e.g. '2-4 weeks'",
+      "impact": "listing_appeal|value_add|both",
+      "description": "2 sentences on the renovation and its market impact in the Northeast",
+      "priority": "high|medium|low",
+      "relevant_to_subject": true
+    }
+  ],
+  "staging_tips": [
+    "Tip 1 specific to this property type and price point",
+    "Tip 2",
+    "Tip 3",
+    "Tip 4"
+  ],
+  "agent_talking_points": [
+    "Key talking point 1 the agent can use with this client about renovating vs. selling as-is",
+    "Key talking point 2"
+  ]
+}
+
+Include 2-3 kitchen styles, 4-6 paint colors, and 5-7 renovations ranked by ROI for this property type.
+Sort renovations by priority (high first). Mark relevant_to_subject=false for renovations that don't apply (e.g. deck addition for a condo).`;
+  }
+
   // ── LISTING PHOTO ANALYSIS (vision) ─────────────────────────────────────
     const listingPhotos = analysis.listing_photos || analysis.intake_data?.listing_photos || [];
     const conditionOverride = analysis.condition_override || analysis.intake_data?.condition_override || null;

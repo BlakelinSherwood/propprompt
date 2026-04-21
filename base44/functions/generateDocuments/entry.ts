@@ -155,9 +155,17 @@ async function generatePdf(base44, analysis, branding) {
     } else if (analysis.assessment_type === 'client_portfolio') {
       await renderClientPortfolioPdf(doc, analysis.output_json, branding);
     } else if (analysis.assessment_type === 'investment_analysis') {
-      await renderInvestmentPdf(doc, analysis.output_json, branding);
+      const extRes = await base44.functions.invoke('generateDocsExtra', { analysisId, subFormat: 'investment', branding });
+      const extUrl = extRes?.data?.url;
+      if (!extUrl) throw new Error('Investment PDF generation failed');
+      await base44.asServiceRole.entities.Analysis.update(analysisId, { last_exported_at: now, last_export_format: format, output_pdf_url: extUrl });
+      return Response.json({ url: extUrl, format });
     } else if (analysis.assessment_type === 'rental_analysis') {
-      await renderRentalMarketPdf(doc, analysis.output_json, branding);
+      const extRes2 = await base44.functions.invoke('generateDocsExtra', { analysisId, subFormat: 'rental', branding });
+      const extUrl2 = extRes2?.data?.url;
+      if (!extUrl2) throw new Error('Rental PDF generation failed');
+      await base44.asServiceRole.entities.Analysis.update(analysisId, { last_exported_at: now, last_export_format: format, output_pdf_url: extUrl2 });
+      return Response.json({ url: extUrl2, format });
     } else {
       await renderFallbackTextPdf(doc, analysis, branding);
     }
@@ -1787,11 +1795,77 @@ async function renderClientPortfolioPdf(doc, data, branding) {
     }
   }
 
-  // SECTION 04: Market Context
+  // SECTION 04: Design & Renovation Trends
+  const dt = data.design_trends || {};
+  if (dt.kitchen_styles?.length || dt.paint_colors?.length || dt.popular_renovations?.length) {
+    doc.addPage();
+    drawSectionDivider(doc, branding, 4, `${dt.trend_year || new Date().getFullYear()} Design &\nRenovation Trends`, 'Kitchen styles · paint colors · top renovations by ROI');
+    doc.addPage();
+    await drawPageFrame(doc, branding, 'Section 04 · Design Trends', 'Design & Renovation Intelligence');
+    y = 90;
+    if (dt.intro) { const il=doc.splitTextToSize(dt.intro,contentWidth); doc.setFontSize(10); doc.setFont('helvetica','italic'); doc.setTextColor(80,80,80); doc.text(il,margin,y); y+=il.length*14+14; }
+    if (dt.kitchen_styles?.length) {
+      doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(primary.r,primary.g,primary.b); doc.text('Kitchen Styles Trending Now',margin,y); y+=12;
+      doc.setDrawColor(accent.r,accent.g,accent.b); doc.setLineWidth(1.5); doc.line(margin,y,margin+180,y); y+=12;
+      for (const [ki,ks] of dt.kitchen_styles.entries()) {
+        const dl=doc.splitTextToSize(ks.description||'',contentWidth-22); const rl=ks.relevance_to_subject?doc.splitTextToSize(`Relevance: ${ks.relevance_to_subject}`,contentWidth-22):[]; const ch=Math.max(68,28+dl.length*13+rl.length*11+16);
+        if(y+ch>BOTTOM){doc.addPage();await drawPageFrame(doc,branding,'Section 04 · Design Trends','Kitchen Styles (cont.)');y=90;}
+        doc.setFillColor(ki%2===0?248:255,ki%2===0?245:255,240); doc.roundedRect(margin,y,contentWidth,ch,3,3,'F');
+        doc.setFillColor(accent.r,accent.g,accent.b); doc.roundedRect(margin,y,4,ch,2,2,'F');
+        doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(primary.r,primary.g,primary.b); doc.text(ks.trend||'',margin+14,y+16);
+        if(ks.cost_range){doc.setFontSize(8);doc.setFont('helvetica','normal');doc.setTextColor(100,100,100);doc.text(ks.cost_range,margin+14,y+27);}
+        if(ks.roi_estimate){const rW=90;doc.setFillColor(primary.r,primary.g,primary.b);doc.roundedRect(margin+contentWidth-rW-4,y+8,rW,16,2,2,'F');doc.setFontSize(7);doc.setFont('helvetica','bold');doc.setTextColor(accent.r,accent.g,accent.b);doc.text(ks.roi_estimate,margin+contentWidth-rW/2-4,y+18,{align:'center',maxWidth:rW-4});}
+        doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(50,50,50); doc.text(dl,margin+14,y+38);
+        if(rl.length){doc.setFontSize(8);doc.setFont('helvetica','italic');doc.setTextColor(accent.r,accent.g,accent.b);doc.text(rl,margin+14,y+38+dl.length*13+4);}
+        y+=ch+8;
+      }
+    }
+    if (dt.paint_colors?.length) {
+      if(y+90>BOTTOM){doc.addPage();await drawPageFrame(doc,branding,'Section 04 · Design Trends','Popular Paint Colors');y=90;}
+      doc.setFontSize(11);doc.setFont('helvetica','bold');doc.setTextColor(primary.r,primary.g,primary.b);doc.text('Popular Paint Colors',margin,y);y+=12;
+      doc.setDrawColor(accent.r,accent.g,accent.b);doc.setLineWidth(1.5);doc.line(margin,y,margin+150,y);y+=12;
+      const sH=52;const sW=(contentWidth-16)/3;let sx=margin;let rowY=y;
+      dt.paint_colors.slice(0,6).forEach((pc,pi)=>{
+        if(pi>0&&pi%3===0){sx=margin;rowY+=sH+36;if(rowY+sH+36>BOTTOM){doc.addPage();drawPageFrame(doc,branding,'Section 04 · Design Trends','Paint Colors (cont.)');rowY=90;}}
+        const rgb=hexToRgb(pc.hex_approx||'#CCCCCC');doc.setFillColor(rgb.r,rgb.g,rgb.b);doc.roundedRect(sx,rowY,sW,sH,4,4,'F');
+        const lum=(0.299*rgb.r+0.587*rgb.g+0.114*rgb.b)/255;const tc2=lum>0.5?{r:30,g:30,b:30}:{r:255,g:255,b:255};
+        doc.setFontSize(8.5);doc.setFont('helvetica','bold');doc.setTextColor(tc2.r,tc2.g,tc2.b);doc.text(pc.color_name||'',sx+sW/2,rowY+20,{align:'center',maxWidth:sW-8});
+        doc.setFontSize(7);doc.setFont('helvetica','normal');doc.text(pc.brand_swatch||'',sx+sW/2,rowY+32,{align:'center',maxWidth:sW-8});
+        doc.setFontSize(7.5);doc.setFont('helvetica','italic');doc.setTextColor(80,80,80);doc.text(pc.mood||'',sx+sW/2,rowY+sH+10,{align:'center',maxWidth:sW});
+        doc.setFontSize(7);doc.setFont('helvetica','normal');doc.setTextColor(110,110,110);doc.text(pc.best_for||'',sx+sW/2,rowY+sH+20,{align:'center',maxWidth:sW});
+        sx+=sW+8;
+      });
+      y=rowY+sH+44;
+    }
+    if (dt.popular_renovations?.length) {
+      if(y+80>BOTTOM){doc.addPage();await drawPageFrame(doc,branding,'Section 04 · Design Trends','Top Renovations by ROI');y=90;}
+      doc.setFontSize(11);doc.setFont('helvetica','bold');doc.setTextColor(primary.r,primary.g,primary.b);doc.text('Top Renovations by ROI',margin,y);y+=12;
+      doc.setDrawColor(accent.r,accent.g,accent.b);doc.setLineWidth(1.5);doc.line(margin,y,margin+170,y);y+=12;
+      const renR=dt.popular_renovations.filter(r=>r.relevant_to_subject!==false).map(r=>[r.renovation||'',r.avg_cost||'—',r.avg_roi||'—',r.time_to_complete||'—',r.priority?r.priority.charAt(0).toUpperCase()+r.priority.slice(1):'—']);
+      if(renR.length){y=drawTable(doc,margin,y,['Renovation','Est. Cost','Avg ROI','Timeline','Priority'],renR,[175,90,65,80,contentWidth-418],{headerFill:branding.primary_color||'#1A3226',headerTextColor:'#FFFFFF',fontSize:8.5,rowHeight:26,branding});y+=12;}
+      for(const ren of dt.popular_renovations.filter(r=>r.priority==='high'&&r.relevant_to_subject!==false&&r.description)){
+        if(y+30>BOTTOM){doc.addPage();await drawPageFrame(doc,branding,'Section 04 · Design Trends','Renovation Details');y=90;}
+        doc.setFontSize(8.5);doc.setFont('helvetica','bold');doc.setTextColor(primary.r,primary.g,primary.b);doc.text(`${ren.renovation}:`,margin,y);
+        doc.setFont('helvetica','normal');doc.setTextColor(60,60,60);const dl=doc.splitTextToSize(ren.description,contentWidth-6);doc.text(dl,margin,y+11);y+=11+dl.length*12+8;
+      }
+    }
+    if(dt.staging_tips?.length){
+      if(y+60>BOTTOM){doc.addPage();await drawPageFrame(doc,branding,'Section 04 · Design Trends','Staging Tips');y=90;}
+      y+=6;doc.setFontSize(10);doc.setFont('helvetica','bold');doc.setTextColor(primary.r,primary.g,primary.b);doc.text('Staging Tips for This Property',margin,y);y+=14;
+      for(const tip of dt.staging_tips){doc.setFillColor(accent.r,accent.g,accent.b);doc.circle(margin+5,y-3,3,'F');doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(50,50,50);const tl=doc.splitTextToSize(tip,contentWidth-18);doc.text(tl,margin+14,y);y+=tl.length*13+5;}
+    }
+    if(dt.agent_talking_points?.length){
+      if(y+50>BOTTOM){doc.addPage();await drawPageFrame(doc,branding,'Section 04 · Design Trends','Agent Talking Points');y=90;}
+      y+=8;doc.setFillColor(primary.r,primary.g,primary.b);doc.roundedRect(margin,y,contentWidth,22,3,3,'F');doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(accent.r,accent.g,accent.b);doc.text('AGENT TALKING POINTS — USE WITH CLIENT',margin+10,y+15);y+=28;
+      for(const tp of dt.agent_talking_points){doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(50,50,50);const tpl=doc.splitTextToSize(`"${tp}"`,contentWidth-14);doc.text(tpl,margin+8,y);y+=tpl.length*13+8;}
+    }
+  }
+
+  // SECTION 05: Market Context
   doc.addPage();
-  drawSectionDivider(doc, branding, 4, 'Market Context &\nWhat to Watch', 'ADU development option · market conditions · value drivers');
+  drawSectionDivider(doc, branding, 5, 'Market Context &\nWhat to Watch', 'ADU development option · market conditions · value drivers');
   doc.addPage();
-  await drawPageFrame(doc, branding, 'Section 04 · Market Context', 'Market Conditions & Value Drivers');
+  await drawPageFrame(doc, branding, 'Section 05 · Market Context', 'Market Conditions & Value Drivers');
   y = 90;
   const mc = data.market_context || {};
   if (mc.narrative) {
@@ -1815,7 +1889,7 @@ async function renderClientPortfolioPdf(doc, data, branding) {
   // ADU analysis if present
   if (data.adu_analysis?.narrative) {
     doc.addPage();
-    await drawPageFrame(doc, branding, 'Section 04 · Market Context', 'ADU Development Option');
+    await drawPageFrame(doc, branding, 'Section 05 · Market Context', 'ADU Development Option');
     y = 90;
     doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b);
     doc.text('ADU Development Option', margin, y); y += 18;
@@ -1829,159 +1903,6 @@ async function renderClientPortfolioPdf(doc, data, branding) {
     ['Strategic Options Analyzed', String((data.portfolio_options || []).length)],
     ['Market Characterization', mc.market_characterization || 'N/A'],
     ['Avg Days on Market', mc.avg_days_on_market ? `${mc.avg_days_on_market} days` : 'N/A'],
-    ['Prepared By', branding.agent_name || ''],
-    ['Report Date', new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })],
-  ]);
-  await addDisclaimerPage(doc, branding);
-}
-
-async function renderInvestmentPdf(doc, data, branding) {
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const margin = 40;
-  const contentWidth = pageWidth - 2 * margin;
-  const primary = hexToRgb(branding.primary_color || '#1A3226');
-  const accent = hexToRgb(branding.accent_color || '#B8982F');
-  const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : 'N/A';
-  const fmtPct = (n) => n != null ? `${Number(n).toFixed(1)}%` : 'N/A';
-  const v = data.valuation || {};
-  const mc = data.market_context || {};
-
-  await drawBrandedCover(doc, branding, 'Investment Analysis', data.property_address, [
-    `Confidence: ${v.confidence_level || 'Medium'}`,
-    `Market: ${mc.market_characterization || 'See Report'}`,
-  ]);
-
-  doc.addPage();
-  drawSectionDivider(doc, branding, 1, 'Property &\nMarket Overview', 'Subject property · market conditions · investment context');
-  doc.addPage();
-  await drawPageFrame(doc, branding, 'Section 01 · Market Overview', 'Property & Market Overview');
-  let y = 90;
-  if (data.executive_summary) {
-    doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(50, 50, 50);
-    const lines = doc.splitTextToSize(data.executive_summary, contentWidth);
-    doc.text(lines.slice(0, 16), margin, y); y += Math.min(lines.length, 16) * 13 + 14;
-  }
-  const mRows = [
-    ['Median Sale Price', mc.median_sale_price ? fmt(mc.median_sale_price) : 'N/A'],
-    ['YoY Appreciation', mc.yoy_appreciation ? fmtPct(mc.yoy_appreciation) : 'N/A'],
-    ['Avg Days on Market', mc.avg_days_on_market ? `${mc.avg_days_on_market} days` : 'N/A'],
-    ['Months of Inventory', mc.months_inventory ? `${mc.months_inventory}` : 'N/A'],
-  ];
-  if (y + 120 < 710) drawTable(doc, margin, y, ['Indicator', 'Value'], mRows, [contentWidth - 130, 130], { headerFill: branding.primary_color || '#1A3226', headerTextColor: '#FFFFFF', fontSize: 9, rowHeight: 26, branding });
-
-  doc.addPage();
-  drawSectionDivider(doc, branding, 2, 'Income Approach\nAnalysis', 'Cap rate · GRM · cash-on-cash return · rent comps');
-  if (data.tiered_comps?.tiers) {
-    doc.addPage();
-    await drawPageFrame(doc, branding, 'Section 02 · Income Approach', 'Comparable Sales Analysis');
-    y = 90;
-    for (const tier of data.tiered_comps.tiers) {
-      if (y + 60 > 710) { doc.addPage(); await drawPageFrame(doc, branding, 'Section 02 · Income Approach', 'Comparable Sales (cont.)'); y = 90; }
-      const tColor = tier.tier_id === 'A' ? primary : tier.tier_id === 'B' ? accent : hexToRgb('#888888');
-      doc.setFillColor(tColor.r, tColor.g, tColor.b); doc.roundedRect(margin, y, contentWidth, 22, 3, 3, 'F');
-      doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
-      doc.text(tier.tier_label || 'Tier ' + tier.tier_id, margin + 8, y + 15); y += 26;
-      if (tier.comps?.length) {
-        const rows = tier.comps.map(c => [c.address || '', c.sale_date || '', c.sale_price ? fmt(c.sale_price) : '', c.adjusted_ppsf ? `$${c.adjusted_ppsf}` : '', c.condition_vs_subject || '']);
-        y = drawTable(doc, margin, y, ['Address', 'Date', 'Price', 'Adj $/SF', 'Condition'], rows, [155, 55, 75, 65, contentWidth - 358], { headerFill: branding.primary_color || '#1A3226', headerTextColor: '#FFFFFF', fontSize: 7.5, rowHeight: 22, branding }); y += 10;
-      }
-    }
-  }
-
-  doc.addPage();
-  drawSectionDivider(doc, branding, 3, 'Financial\nProjections', 'Five-year model · appreciation · cash flow scenarios');
-  if (data.pricing_scenarios?.length) {
-    doc.addPage();
-    await drawPageFrame(doc, branding, 'Section 03 · Financial Projections', 'Pricing Scenarios');
-    y = 90;
-    const sRows = data.pricing_scenarios.map(s => [s.label || '', fmt(s.price), s.expected_dom || '', s.rationale || '']);
-    drawTable(doc, margin, y, ['Scenario', 'Price', 'Est. DOM', 'Rationale'], sRows, [140, 72, 65, contentWidth - 285], { headerFill: branding.primary_color || '#1A3226', headerTextColor: '#FFFFFF', fontSize: 8.5, rowHeight: 26, branding });
-  }
-
-  doc.addPage();
-  drawSectionDivider(doc, branding, 4, 'Risk Assessment &\nRecommendation', 'Vacancy risk · market headwinds · investment thesis');
-  doc.addPage();
-  await drawPageFrame(doc, branding, 'Section 04 · Risk Assessment', 'Risk Assessment & Recommendation');
-  y = 90;
-  if (v.narrative) {
-    doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(50, 50, 50);
-    const vLines = doc.splitTextToSize(v.narrative, contentWidth);
-    doc.text(vLines.slice(0, 22), margin, y);
-  }
-
-  const ivr = data.tiered_comps?.implied_value_range || {};
-  await addClosingSummaryPage(doc, branding, 'Investment Analysis Summary', [
-    ['Property Address', data.property_address || ''],
-    ['Value Range', ivr.low && ivr.high ? `${fmt(ivr.low)} – ${fmt(ivr.high)}` : 'See Report'],
-    ['Confidence Level', v.confidence_level || 'Medium'],
-    ['Market Characterization', mc.market_characterization || 'N/A'],
-    ['YoY Appreciation', mc.yoy_appreciation ? fmtPct(mc.yoy_appreciation) : 'N/A'],
-    ['Months of Inventory', mc.months_inventory ? `${mc.months_inventory}` : 'N/A'],
-    ['Prepared By', branding.agent_name || ''],
-    ['Report Date', new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })],
-  ]);
-  await addDisclaimerPage(doc, branding);
-}
-
-async function renderRentalMarketPdf(doc, data, branding) {
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const margin = 40;
-  const contentWidth = pageWidth - 2 * margin;
-  const primary = hexToRgb(branding.primary_color || '#1A3226');
-  const accent = hexToRgb(branding.accent_color || '#B8982F');
-  const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : 'N/A';
-  const mc = data.market_context || {};
-
-  await drawBrandedCover(doc, branding, 'Rental Market Analysis', data.property_address, [
-    `Market: ${mc.market_characterization || 'See Report'}`,
-    `Analysis Year: ${new Date().getFullYear()}`,
-  ]);
-
-  doc.addPage();
-  drawSectionDivider(doc, branding, 1, 'Property &\nRental Context', 'Subject property · rental market conditions · tenant demand');
-  doc.addPage();
-  await drawPageFrame(doc, branding, 'Section 01 · Rental Context', 'Property & Rental Market Overview');
-  let y = 90;
-  if (data.executive_summary) {
-    doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(50, 50, 50);
-    const lines = doc.splitTextToSize(data.executive_summary, contentWidth);
-    doc.text(lines.slice(0, 22), margin, y); y += Math.min(lines.length, 22) * 13 + 14;
-  }
-
-  doc.addPage();
-  drawSectionDivider(doc, branding, 2, 'Rent Range &\nComparables', 'Comparable rentals · achievable rent · positioning');
-  doc.addPage();
-  await drawPageFrame(doc, branding, 'Section 02 · Rent Comparables', 'Rent Range & Comparable Rentals');
-  y = 90;
-  if (mc.narrative) {
-    doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(50, 50, 50);
-    const mcLines = doc.splitTextToSize(mc.narrative, contentWidth);
-    doc.text(mcLines.slice(0, 20), margin, y); y += Math.min(mcLines.length, 20) * 13 + 14;
-  }
-  const mcStats = [
-    ['Avg Days on Market', mc.avg_days_on_market ? `${mc.avg_days_on_market} days` : 'N/A'],
-    ['Months of Inventory', mc.months_inventory ? `${mc.months_inventory}` : 'N/A'],
-    ['Market Characterization', mc.market_characterization || 'N/A'],
-  ];
-  if (y + 90 < 710) drawTable(doc, margin, y, ['Indicator', 'Value'], mcStats, [contentWidth - 130, 130], { headerFill: branding.primary_color || '#1A3226', headerTextColor: '#FFFFFF', fontSize: 9, rowHeight: 26, branding });
-
-  doc.addPage();
-  drawSectionDivider(doc, branding, 3, 'Landlord Economics\n& Risk Profile', 'Cash flow · vacancy risk · rent control exposure · recommendations');
-  doc.addPage();
-  await drawPageFrame(doc, branding, 'Section 03 · Landlord Economics', 'Cash Flow & Risk Profile');
-  y = 90;
-  const v = data.valuation || {};
-  if (v.narrative) {
-    doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(50, 50, 50);
-    const vLines = doc.splitTextToSize(v.narrative, contentWidth);
-    doc.text(vLines.slice(0, 22), margin, y);
-  }
-
-  await addClosingSummaryPage(doc, branding, 'Rental Analysis Summary', [
-    ['Property Address', data.property_address || ''],
-    ['Market Characterization', mc.market_characterization || 'N/A'],
-    ['Avg Days on Market', mc.avg_days_on_market ? `${mc.avg_days_on_market} days` : 'N/A'],
-    ['Months of Inventory', mc.months_inventory ? `${mc.months_inventory}` : 'N/A'],
     ['Prepared By', branding.agent_name || ''],
     ['Report Date', new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })],
   ]);
