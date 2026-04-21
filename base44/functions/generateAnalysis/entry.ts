@@ -1065,6 +1065,113 @@ CRITICAL: Determine which micro-neighborhood the subject property at ${analysis.
       }
     }
 
+    // ── WALKABILITY / FLOOD ZONE / SCHOOLS — parallel Perplexity lookups ────
+    const isLocationContextType = ['listing_pricing', 'cma', 'client_portfolio', 'buyer_intelligence', 'investment_analysis'].includes(analysis.assessment_type);
+    if (isLocationContextType && analysis.intake_data?.address) {
+      try {
+        const { perpKey } = await resolveAvmKeys();
+        if (perpKey) {
+          const addr = analysis.intake_data.address;
+          console.log('[generateAnalysis] Fetching walkability/flood/schools for:', addr);
+
+          const [walkRes, floodRes, schoolsRes] = await Promise.allSettled([
+            // Walk Score + transit + bike
+            fetch('https://api.perplexity.ai/chat/completions', {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${perpKey}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                model: 'sonar-pro',
+                messages: [{ role: 'user', content: `What is the Walk Score, Transit Score, and Bike Score for ${addr}? Search walkscore.com or any reliable source. Return ONLY valid JSON: {"walk_score": 72, "walk_label": "Very Walkable", "transit_score": 45, "transit_label": "Some Transit", "bike_score": 55, "bike_label": "Bikeable", "source": "Walk Score", "notes": "brief context"}` }],
+                search_context_size: 'low',
+              }),
+            }).then(r => r.json()),
+
+            // FEMA flood zone
+            fetch('https://api.perplexity.ai/chat/completions', {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${perpKey}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                model: 'sonar-pro',
+                messages: [{ role: 'user', content: `What is the FEMA flood zone designation for ${addr}? Search FEMA Flood Map Service Center (msc.fema.gov) or the local floodplain maps. Return ONLY valid JSON: {"flood_zone": "X", "flood_zone_description": "Minimal Flood Hazard", "panel_number": "25021C0234H", "effective_date": "2014-07-17", "insurance_required": false, "risk_level": "low", "notes": "brief context or caveats"}` }],
+                search_context_size: 'low',
+              }),
+            }).then(r => r.json()),
+
+            // Nearby schools
+            fetch('https://api.perplexity.ai/chat/completions', {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${perpKey}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                model: 'sonar-pro',
+                messages: [{ role: 'user', content: `What are the assigned public schools (elementary, middle, high school) for a property at ${addr}? Also list any nearby highly-rated private or charter schools within 3 miles. Include GreatSchools ratings where available. Return ONLY valid JSON: {"assigned_schools": [{"name": "Lincoln Elementary", "type": "elementary", "grades": "K-5", "distance_miles": 0.4, "rating": 8, "rating_source": "GreatSchools"}], "nearby_notable": [{"name": "Brookline High", "type": "high", "grades": "9-12", "distance_miles": 1.2, "rating": 9, "rating_source": "GreatSchools", "public_private": "public"}]}` }],
+                search_context_size: 'medium',
+              }),
+            }).then(r => r.json()),
+          ]);
+
+          // Parse walk score
+          if (walkRes.status === 'fulfilled') {
+            const wText = (walkRes.value?.choices?.[0]?.message?.content || '').trim();
+            try {
+              const wMatch = wText.match(/\{[\s\S]*\}/);
+              const wJson = wMatch ? JSON.parse(wMatch[0]) : null;
+              if (wJson?.walk_score != null) {
+                prompt += `\n\nWALKABILITY SCORES (Walk Score research):
+Walk Score: ${wJson.walk_score}/100 — ${wJson.walk_label || ''}
+Transit Score: ${wJson.transit_score != null ? wJson.transit_score + '/100' : 'N/A'} — ${wJson.transit_label || ''}
+Bike Score: ${wJson.bike_score != null ? wJson.bike_score + '/100' : 'N/A'} — ${wJson.bike_label || ''}
+${wJson.notes ? 'Notes: ' + wJson.notes : ''}
+Include these scores in the property_context section of the output JSON as "walkability": {...}. Reference them in buyer archetype language when relevant (e.g. walkability matters to urban downsizers; transit score matters to commuters).`;
+                console.log('[generateAnalysis] Walk Score injected:', wJson.walk_score);
+              }
+            } catch (e) { console.warn('[generateAnalysis] Walk Score parse failed:', e.message); }
+          }
+
+          // Parse flood zone
+          if (floodRes.status === 'fulfilled') {
+            const fText = (floodRes.value?.choices?.[0]?.message?.content || '').trim();
+            try {
+              const fMatch = fText.match(/\{[\s\S]*\}/);
+              const fJson = fMatch ? JSON.parse(fMatch[0]) : null;
+              if (fJson?.flood_zone) {
+                prompt += `\n\nFEMA FLOOD ZONE DATA:
+Zone: ${fJson.flood_zone} — ${fJson.flood_zone_description || ''}
+Risk Level: ${fJson.risk_level || 'unknown'}
+Flood Insurance Required: ${fJson.insurance_required ? 'YES — mandatory for federally-backed mortgages' : 'No (standard zone)'}
+FIRM Panel: ${fJson.panel_number || 'unknown'} | Effective: ${fJson.effective_date || 'unknown'}
+${fJson.notes ? 'Notes: ' + fJson.notes : ''}
+Include this in the property_context.flood_zone field of the output JSON. If insurance_required is true, flag this as a risk factor in Section 04d and include an estimated annual premium range in the net proceeds section.`;
+                console.log('[generateAnalysis] Flood zone injected:', fJson.flood_zone);
+              }
+            } catch (e) { console.warn('[generateAnalysis] Flood zone parse failed:', e.message); }
+          }
+
+          // Parse schools
+          if (schoolsRes.status === 'fulfilled') {
+            const sText = (schoolsRes.value?.choices?.[0]?.message?.content || '').trim();
+            try {
+              const sMatch = sText.match(/\{[\s\S]*\}/);
+              const sJson = sMatch ? JSON.parse(sMatch[0]) : null;
+              const assigned = sJson?.assigned_schools || [];
+              const notable = sJson?.nearby_notable || [];
+              if (assigned.length > 0 || notable.length > 0) {
+                const schoolLines = [
+                  ...assigned.map(s => `  [ASSIGNED] ${s.name} (${s.type}, ${s.grades}) — ${s.distance_miles} mi${s.rating ? ' | GreatSchools: ' + s.rating + '/10' : ''}`),
+                  ...notable.map(s => `  [NEARBY] ${s.name} (${s.public_private || s.type}, ${s.grades}) — ${s.distance_miles} mi${s.rating ? ' | GreatSchools: ' + s.rating + '/10' : ''}`),
+                ];
+                prompt += `\n\nSCHOOL DISTRICT & NEARBY SCHOOLS:
+${schoolLines.join('\n')}
+Include this as "schools" in property_context in the output JSON. Reference top-rated schools in buyer archetype language for family-oriented buyers. If any assigned school has a GreatSchools rating ≥ 8, call it out as a key selling point in the executive summary.`;
+                console.log('[generateAnalysis] Schools injected:', assigned.length, 'assigned,', notable.length, 'notable');
+              }
+            } catch (e) { console.warn('[generateAnalysis] Schools parse failed:', e.message); }
+          }
+        }
+      } catch (locErr) {
+        console.warn('[generateAnalysis] Walk/Flood/Schools fetch failed (non-fatal):', locErr.message);
+      }
+    }
+
     // AVM lookup via Perplexity + GPT-4o in parallel for listing_pricing and cma (all tiers)
     if (['listing_pricing', 'cma'].includes(analysis.assessment_type)) {
       const address = analysis.intake_data?.address || '';
