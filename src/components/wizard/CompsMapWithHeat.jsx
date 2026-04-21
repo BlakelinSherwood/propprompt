@@ -78,30 +78,30 @@ export default function CompsMapWithHeat({ subjectAddress, comps, selected, onTo
 
     // Defer one frame so the container is fully painted before Mapbox measures it
     const raf = requestAnimationFrame(() => {
-    if (!containerRef.current || mapRef.current) return;
+      if (!containerRef.current || mapRef.current) return;
 
-    const map = new mapboxgl.Map({
-      container: containerRef.current,
-      style: "mapbox://styles/mapbox/light-v11",
-      center: [subjectCoords.lng, subjectCoords.lat],
-      zoom: 13,
+      const map = new mapboxgl.Map({
+        container: containerRef.current,
+        style: "mapbox://styles/mapbox/light-v11",
+        center: [subjectCoords.lng, subjectCoords.lat],
+        zoom: 13,
+      });
+      mapRef.current = map;
+      map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
+
+      // Force resize so Mapbox canvas fills the container correctly
+      map.on('load', () => { map.resize(); });
+
+      // Also resize whenever the container changes size (e.g. panel expand)
+      const observer = new ResizeObserver(() => { map.resize(); });
+      observer.observe(containerRef.current);
+
+      return () => {
+        observer.disconnect();
+        map.remove();
+        mapRef.current = null;
+      };
     });
-    mapRef.current = map;
-    map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
-
-    // Force resize so Mapbox canvas fills the container correctly
-    map.on('load', () => { map.resize(); });
-
-    // Also resize whenever the container changes size (e.g. panel expand)
-    const observer = new ResizeObserver(() => { map.resize(); });
-    observer.observe(containerRef.current);
-
-    return () => {
-      observer.disconnect();
-      map.remove();
-      mapRef.current = null;
-    };
-    }); // end rAF
 
     return () => { cancelAnimationFrame(raf); if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; } };
   }, [subjectCoords, mapToken]);
