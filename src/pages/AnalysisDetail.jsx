@@ -33,7 +33,7 @@ export default function AnalysisDetail() {
 
   useEffect(() => {
     async function load() {
-      const records = await base44.entities.Analysis.filter({ id });
+      const records = await base44.entities.Analysis.filter({ id: id });
       const rec = records[0];
       setAnalysis(rec || null);
 
