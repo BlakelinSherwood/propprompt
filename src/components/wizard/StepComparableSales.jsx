@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Search, RefreshCw, ExternalLink, Plus, X, Loader2, Info, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { base44 } from "@/api/base44Client";
+import CompsMap from "./CompsMap";
 
 const CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
 const CONDITIONS = ["Superior", "Similar", "Inferior"];
@@ -347,6 +348,16 @@ export default function StepComparableSales({ intake, update, onNext, onBack }) 
           Review and confirm the comps to use in your analysis.
           {searchMeta.tier && <span className="text-xs text-[#1A3226]/35 ml-1">(Tier {searchMeta.tier}{searchMeta.radius ? `, ${searchMeta.radius}mi` : ""})</span>}
         </p>
+      )}
+
+      {/* Map */}
+      {allComps.length > 0 && (
+        <CompsMap
+          subjectAddress={intake.address}
+          comps={allComps}
+          selected={selected}
+          onToggle={toggleComp}
+        />
       )}
 
       {/* Comp table */}
