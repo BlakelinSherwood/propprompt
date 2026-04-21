@@ -153,7 +153,10 @@ async function generatePdf(base44, analysis, branding) {
     } else if (analysis.assessment_type === 'buyer_intelligence') {
       await renderBuyerIntelligencePdf(doc, analysis.output_json, branding);
     } else if (analysis.assessment_type === 'client_portfolio') {
-      await renderClientPortfolioPdf(doc, analysis.output_json, branding);
+      const portfolioRes = await base44.functions.invoke('generatePortfolioPdf', { analysisId: analysis.id, branding });
+      if (!portfolioRes?.data?.base64) throw new Error('Portfolio PDF generation failed');
+      const portfolioBytes = Uint8Array.from(atob(portfolioRes.data.base64), c => c.charCodeAt(0));
+      return { bytes: portfolioBytes.buffer, mimeType: 'application/pdf', filename: portfolioRes.data.filename || `Client_Portfolio_Review_${Date.now()}.pdf` };
     } else if (analysis.assessment_type === 'investment_analysis') {
       const extRes = await base44.functions.invoke('generateDocsExtra', { analysisId, subFormat: 'investment', branding });
       const extUrl = extRes?.data?.url;
@@ -422,6 +425,14 @@ function drawSectionDivider(doc, branding, sectionNum, sectionTitle, subtitle) {
   doc.setFillColor(accent.r, accent.g, accent.b);
   doc.rect(0, 0, pageWidth, 4, 'F');
   doc.rect(0, 789, pageWidth, 3, 'F');
+
+  // Ghost number watermark — bottom right, large, semi-transparent primary-lightened
+  const ghostNum = String(sectionNum).padStart(2, '0');
+  const ghostLight = Math.min(255, primary.r + 28);
+  const ghostLightG = Math.min(255, primary.g + 28);
+  const ghostLightB = Math.min(255, primary.b + 28);
+  doc.setFontSize(200); doc.setFont('helvetica', 'bold'); doc.setTextColor(ghostLight, ghostLightG, ghostLightB);
+  doc.text(ghostNum, pageWidth - 20, pageHeight - 60, { align: 'right' });
 
   doc.setDrawColor(accent.r, accent.g, accent.b); doc.setLineWidth(1);
   doc.line(40, 140, 390, 140);
@@ -1514,38 +1525,14 @@ async function renderBuyerIntelligencePdf(doc, data, branding) {
   await addDisclaimerPage(doc, branding);
 }
 
-async function renderClientPortfolioPdf(doc, data, branding) {
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 40;
-  const contentWidth = pageWidth - 2 * margin;
-  const primary = hexToRgb(branding.primary_color || '#1A3226');
-  const accent = hexToRgb(branding.accent_color || '#B8982F');
-  const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : 'N/A';
-  const iv = data.tiered_comps?.implied_value_range || {};
-  const BODY_SIZE = 10.5;
-  const LINE_H = 15;
-  const BOTTOM = 720;
+// renderClientPortfolioPdf — see functions/generatePortfolioPdf
 
-  // Helper: render a full narrative, paginating as needed
-  async function renderNarrative(text, breadcrumb, title, startY) {
-    if (!text) return startY;
-    let y = startY;
-    doc.setFontSize(BODY_SIZE); doc.setFont('helvetica', 'normal'); doc.setTextColor(50, 50, 50);
-    const lines = doc.splitTextToSize(text, contentWidth);
-    for (const line of lines) {
-      if (y + LINE_H > BOTTOM) {
-        doc.addPage();
-        await drawPageFrame(doc, branding, breadcrumb, title);
-        y = 90;
-        doc.setFontSize(BODY_SIZE); doc.setFont('helvetica', 'normal'); doc.setTextColor(50, 50, 50);
-      }
-      doc.text(line, margin, y);
-      y += LINE_H;
-    }
-    return y + 10;
-  }
+// _stub removed
 
+// _stub_body_start
+async function _portfolioStub() {
+  const doc = null, data = {}, branding = {}, margin = 40, contentWidth = 492, primary = {r:0,g:0,b:0}, accent = {r:0,g:0,b:0}, fmt = (n) => '', iv = {}, BODY_SIZE = 10, LINE_H = 15, BOTTOM = 720, pageWidth = 612, pageHeight = 792;
+  async function renderNarrative() {}
   // COVER — fix overlap: org name sits above pill with proper spacing
   doc.setFillColor(primary.r, primary.g, primary.b);
   doc.rect(0, 0, pageWidth, pageHeight, 'F');
@@ -1574,12 +1561,16 @@ async function renderClientPortfolioPdf(doc, data, branding) {
   }
 
   // Pill sits clearly below org name/logo with a 16pt gap
-  const pillW = 280; const pillH = 26;
+  const pillW = 320; const pillH = 26;
   const pillY = logoBottomY + 16;
+  const cpMonth = new Date().getMonth();
+  const cpYear = new Date().getFullYear();
+  const cpSeason = cpMonth < 3 ? 'Winter' : cpMonth < 6 ? 'Spring' : cpMonth < 9 ? 'Summer' : 'Fall';
+  const pillLabel = `ANNUAL HOMEOWNER PORTFOLIO REVIEW  ·  ${cpSeason.toUpperCase()} ${cpYear}`;
   doc.setFillColor(accent.r, accent.g, accent.b);
   doc.roundedRect(pageWidth / 2 - pillW / 2, pillY, pillW, pillH, 4, 4, 'F');
-  doc.setFontSize(8.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b);
-  doc.text('CLIENT PORTFOLIO REVIEW', pageWidth / 2, pillY + pillH / 2 + 3, { align: 'center' });
+  doc.setFontSize(7.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b);
+  doc.text(pillLabel, pageWidth / 2, pillY + pillH / 2 + 3, { align: 'center' });
 
   doc.setDrawColor(accent.r, accent.g, accent.b); doc.setLineWidth(1);
   doc.line(pageWidth / 2 - 160, pillY + pillH + 14, pageWidth / 2 + 160, pillY + pillH + 14);
@@ -1971,17 +1962,6 @@ async function renderClientPortfolioPdf(doc, data, branding) {
     y = await renderNarrative(data.adu_analysis.narrative, 'Section 06 · Market Context', 'ADU Development Option', y);
   }
 
-  await addClosingSummaryPage(doc, branding, 'Portfolio Review Summary', [
-    ['Property Address', data.property_address || ''],
-    ['Estimated Value Range', iv.low && iv.high ? `${fmt(iv.low)} – ${fmt(iv.high)}` : 'See Report'],
-    ['Value Midpoint', iv.midpoint ? fmt(iv.midpoint) : 'See Report'],
-    ['Strategic Options Analyzed', String((data.portfolio_options || []).length)],
-    ['Market Characterization', mc.market_characterization ? prettifyEnum(mc.market_characterization) : 'N/A'],
-    ['Avg Days on Market', mc.avg_days_on_market ? `${mc.avg_days_on_market} days` : 'N/A'],
-    ['Prepared By', branding.agent_name || ''],
-    ['Report Date', new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })],
-  ]);
-  await addDisclaimerPage(doc, branding);
-}
+} // end stub
 
 function buildEmailHtml(analysis, branding) { return ''; }
