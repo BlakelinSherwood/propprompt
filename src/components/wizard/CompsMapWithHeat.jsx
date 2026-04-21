@@ -4,7 +4,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import { base44 } from "@/api/base44Client";
 import { Loader2, Layers, X } from "lucide-react";
 
-const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
 
 // Set token globally on module load if available
 if (MAPBOX_TOKEN) {
