@@ -76,10 +76,7 @@ export default function CompsMapWithHeat({ subjectAddress, comps, selected, onTo
   useEffect(() => {
     if (!subjectCoords || !containerRef.current || mapRef.current || !mapToken) return;
 
-    // Defer one frame so the container is fully painted before Mapbox measures it
-    const raf = requestAnimationFrame(() => {
-      if (!containerRef.current || mapRef.current) return;
-
+    try {
       const map = new mapboxgl.Map({
         container: containerRef.current,
         style: "mapbox://styles/mapbox/light-v11",
@@ -89,21 +86,23 @@ export default function CompsMapWithHeat({ subjectAddress, comps, selected, onTo
       mapRef.current = map;
       map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
 
-      // Force resize so Mapbox canvas fills the container correctly
-      map.on('load', () => { map.resize(); });
+      // Force resize on load
+      map.on('load', () => { setTimeout(() => map.resize(), 100); });
 
-      // Also resize whenever the container changes size (e.g. panel expand)
+      // Also resize whenever the container changes size
       const observer = new ResizeObserver(() => { map.resize(); });
       observer.observe(containerRef.current);
-    });
 
-    return () => { 
-      cancelAnimationFrame(raf); 
-      if (mapRef.current) { 
-        mapRef.current.remove(); 
-        mapRef.current = null; 
-      } 
-    };
+      return () => {
+        observer.disconnect();
+        if (mapRef.current) {
+          mapRef.current.remove();
+          mapRef.current = null;
+        }
+      };
+    } catch (err) {
+      console.error('[CompsMapWithHeat] Map init error:', err);
+    }
   }, [subjectCoords, mapToken]);
 
   // Add/update markers
