@@ -76,6 +76,10 @@ export default function CompsMapWithHeat({ subjectAddress, comps, selected, onTo
   useEffect(() => {
     if (!subjectCoords || !containerRef.current || mapRef.current || !mapToken) return;
 
+    // Defer one frame so the container is fully painted before Mapbox measures it
+    const raf = requestAnimationFrame(() => {
+    if (!containerRef.current || mapRef.current) return;
+
     const map = new mapboxgl.Map({
       container: containerRef.current,
       style: "mapbox://styles/mapbox/light-v11",
@@ -85,10 +89,21 @@ export default function CompsMapWithHeat({ subjectAddress, comps, selected, onTo
     mapRef.current = map;
     map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
 
-    // Force resize after mount so Mapbox sees actual container dimensions
+    // Force resize so Mapbox canvas fills the container correctly
     map.on('load', () => { map.resize(); });
 
-    return () => { map.remove(); mapRef.current = null; };
+    // Also resize whenever the container changes size (e.g. panel expand)
+    const observer = new ResizeObserver(() => { map.resize(); });
+    observer.observe(containerRef.current);
+
+    return () => {
+      observer.disconnect();
+      map.remove();
+      mapRef.current = null;
+    };
+    }); // end rAF
+
+    return () => { cancelAnimationFrame(raf); if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; } };
   }, [subjectCoords, mapToken]);
 
   // Add/update markers
@@ -193,7 +208,7 @@ Return ONLY JSON:
   return (
     <div className="space-y-2">
       <div className="relative rounded-xl overflow-hidden border border-[#1A3226]/10" style={{ height: 320 }}>
-        <div ref={containerRef} style={{ width: "100%", height: "320px", position: "absolute", top: 0, left: 0 }} />
+        <div ref={containerRef} style={{ width: "100%", height: "100%", position: "absolute", inset: 0 }} />
 
         {/* Controls */}
         <div className="absolute top-3 left-3 flex flex-col gap-2">
