@@ -6,6 +6,11 @@ import { Loader2, Layers, X } from "lucide-react";
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 
+// Set token globally on module load if available
+if (MAPBOX_TOKEN) {
+  mapboxgl.accessToken = MAPBOX_TOKEN;
+}
+
 // Color scale for PPSF heat (low=blue → mid=yellow → high=red)
 function ppsfToColor(ppsf, min, max) {
   if (!ppsf || ppsf === 0) return "#94a3b8";
