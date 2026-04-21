@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { Loader2, CheckCircle2, AlertCircle, RefreshCw, ChevronRight } from "lucide-react";
+import { Loader2, CheckCircle2, AlertCircle, RefreshCw, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import WizardNav from "./WizardNav";
@@ -19,6 +19,8 @@ export default function StepPublicRecords({ intake, update, onNext, onBack }) {
   const [status, setStatus] = useState("idle"); // idle | loading | found | partial | not_found | error
   const [record, setRecord] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
+  const [mortgageSearching, setMortgageSearching] = useState(false);
+  const isPortfolio = intake.assessment_type === "client_portfolio";
 
   // Editable overrides for property attributes
   const [beds, setBeds] = useState(intake.bedrooms || "");
@@ -46,6 +48,7 @@ export default function StepPublicRecords({ intake, update, onNext, onBack }) {
     }
 
     setStatus("loading");
+    setMortgageSearching(isPortfolio);
     setErrorMsg(null);
 
     try {
@@ -53,15 +56,16 @@ export default function StepPublicRecords({ intake, update, onNext, onBack }) {
         address: intake.address,
         state,
         force_refresh: forceRefresh,
+        include_mortgage_search: isPortfolio,
       });
 
       const rec = res.data?.record;
       if (!rec) throw new Error("No record returned");
 
       setRecord(rec);
+      setMortgageSearching(false);
       setStatus(rec.search_status === "found" ? "found" : rec.search_status === "partial" ? "partial" : "not_found");
 
-      // Pre-fill attribute fields from public record (only if not already set by user)
       const newBeds = rec.bedrooms ?? intake.bedrooms ?? "";
       const newBaths = rec.bathrooms ?? intake.bathrooms ?? "";
       const newSqft = rec.sqft ?? intake.sqft ?? "";
@@ -72,7 +76,6 @@ export default function StepPublicRecords({ intake, update, onNext, onBack }) {
       setSqft(newSqft);
       setYearBuilt(newYearBuilt);
 
-      // Push financial data into intake for use in other steps
       update({
         bedrooms: newBeds || null,
         bathrooms: newBaths || null,
@@ -81,8 +84,12 @@ export default function StepPublicRecords({ intake, update, onNext, onBack }) {
         prior_sale_price: rec.last_sale_price ?? intake.prior_sale_price ?? null,
         prior_sale_year: rec.last_sale_date ? new Date(rec.last_sale_date).getFullYear() : intake.prior_sale_year ?? null,
         public_record_id: rec.id,
+        // Mortgage data for portfolio equity calc
+        ...(rec.estimated_mortgage_payoff ? { seller_mortgage_payoff: rec.estimated_mortgage_payoff, seller_mortgage_known: false } : {}),
+        ...(rec.estimated_total_debt ? { estimated_total_debt: rec.estimated_total_debt } : {}),
       });
     } catch (e) {
+      setMortgageSearching(false);
       setStatus("error");
       setErrorMsg(e.message || "Search failed");
     }
@@ -122,7 +129,11 @@ export default function StepPublicRecords({ intake, update, onNext, onBack }) {
           <Loader2 className="w-5 h-5 text-[#1A3226] animate-spin flex-shrink-0" />
           <div>
             <p className="text-sm font-medium text-[#1A3226]">Searching public records…</p>
-            <p className="text-xs text-[#1A3226]/50">Checking assessor database, deed history, and mortgage records</p>
+            <p className="text-xs text-[#1A3226]/50">
+              {isPortfolio
+                ? "Checking assessor database, deed history, mortgage recordings, refinances & liens — this takes 20–40 seconds"
+                : "Checking assessor database, deed history, and mortgage records"}
+            </p>
           </div>
         </div>
       )}
@@ -229,57 +240,126 @@ export default function StepPublicRecords({ intake, update, onNext, onBack }) {
         )}
       </div>
 
-      {/* Financial Snapshot (if record found) */}
+      {/* Financial Snapshot */}
       {record && (record.last_sale_price || record.assessed_value || record.original_mortgage_amount) && (
-        <div className="border border-[#1A3226]/10 rounded-xl p-4 mb-6 space-y-2.5">
-          <p className="text-xs font-semibold text-[#1A3226]/60 uppercase tracking-wider mb-1">Financial Data Found</p>
+        <div className="border border-[#1A3226]/10 rounded-xl p-4 mb-5 space-y-2.5">
+          <p className="text-xs font-semibold text-[#1A3226]/60 uppercase tracking-wider mb-1">Public Record — Financial Data</p>
 
           {record.last_sale_price && (
             <div className="flex justify-between text-sm">
               <span className="text-[#1A3226]/60">Last Sale</span>
               <span className="font-semibold text-[#1A3226]">
-                {fmt(record.last_sale_price)} {record.last_sale_date && <span className="font-normal text-[#1A3226]/50">({fmtDate(record.last_sale_date)})</span>}
+                {fmt(record.last_sale_price)}{record.last_sale_date && <span className="font-normal text-[#1A3226]/50 ml-1">({fmtDate(record.last_sale_date)})</span>}
               </span>
             </div>
           )}
-
           {record.assessed_value && (
             <div className="flex justify-between text-sm">
               <span className="text-[#1A3226]/60">Assessed Value</span>
-              <span className="font-semibold text-[#1A3226]">
-                {fmt(record.assessed_value)} <span className="font-normal text-[#1A3226]/50">({record.assessed_year})</span>
-              </span>
+              <span className="font-semibold text-[#1A3226]">{fmt(record.assessed_value)}<span className="font-normal text-[#1A3226]/50 ml-1">({record.assessed_year})</span></span>
             </div>
           )}
-
           {record.annual_property_tax && (
             <div className="flex justify-between text-sm">
               <span className="text-[#1A3226]/60">Annual Tax</span>
               <span className="font-semibold text-[#1A3226]">{fmt(record.annual_property_tax)}</span>
             </div>
           )}
-
           {record.original_mortgage_amount && (
             <div className="flex justify-between text-sm">
-              <span className="text-[#1A3226]/60">Recorded Mortgage</span>
+              <span className="text-[#1A3226]/60">Original Recorded Mortgage</span>
               <span className="font-semibold text-[#1A3226]">
                 {fmt(record.original_mortgage_amount)}
                 {record.original_mortgage_lender && <span className="font-normal text-[#1A3226]/50 ml-1">— {record.original_mortgage_lender}</span>}
+                {record.original_mortgage_date && <span className="font-normal text-[#1A3226]/50 ml-1">({fmtDate(record.original_mortgage_date)})</span>}
               </span>
             </div>
           )}
-
+          {record.most_recent_mortgage_amount && record.most_recent_mortgage_amount !== record.original_mortgage_amount && (
+            <div className="flex justify-between text-sm">
+              <span className="text-[#1A3226]/60">Most Recent Mortgage / Refi</span>
+              <span className="font-semibold text-[#1A3226]">
+                {fmt(record.most_recent_mortgage_amount)}
+                {record.most_recent_mortgage_lender && <span className="font-normal text-[#1A3226]/50 ml-1">— {record.most_recent_mortgage_lender}</span>}
+              </span>
+            </div>
+          )}
           {record.owner_of_record && (
             <div className="flex justify-between text-sm">
               <span className="text-[#1A3226]/60">Owner of Record</span>
               <span className="font-semibold text-[#1A3226]">{record.owner_of_record}</span>
             </div>
           )}
+          {record.mortgage_discharged && (
+            <div className="flex justify-between text-sm">
+              <span className="text-[#1A3226]/60">Mortgage Status</span>
+              <span className="text-emerald-700 font-semibold">✓ Discharged / Paid Off</span>
+            </div>
+          )}
+          {record.liens_found && (
+            <div className="flex justify-between text-sm">
+              <span className="text-[#1A3226]/60">Additional Liens</span>
+              <span className="text-red-700 font-semibold">⚠ {record.lien_details || "Liens found — see notes"}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Mortgage Balance Estimate — Portfolio only */}
+      {isPortfolio && (
+        <div className="mb-5">
+          {mortgageSearching && status === "loading" && (
+            <div className="flex items-center gap-3 p-4 rounded-xl border border-[#B8982F]/30 bg-[#B8982F]/5">
+              <Loader2 className="w-4 h-4 text-[#B8982F] animate-spin flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-[#1A3226]">Deep mortgage search in progress…</p>
+                <p className="text-xs text-[#1A3226]/50">Searching registry of deeds for all recorded instruments, refinances & HELOCs via Perplexity AI</p>
+              </div>
+            </div>
+          )}
+
+          {record && (record.estimated_mortgage_payoff || record.heloc_amount) && (
+            <div className="rounded-xl border border-[#1A3226]/15 bg-[#1A3226] p-4 space-y-2.5">
+              <div className="flex items-center gap-2 mb-2">
+                <Building2 className="w-4 h-4 text-[#B8982F]" />
+                <p className="text-xs font-bold text-[#B8982F] uppercase tracking-wider">Estimated Mortgage Balance</p>
+                <span className="ml-auto text-[10px] text-white/40 italic">AI-estimated from public records · verify with lender</span>
+              </div>
+
+              {record.estimated_mortgage_payoff && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-white/70">Est. Primary Mortgage Payoff</span>
+                  <span className="font-bold text-white text-base">{fmt(record.estimated_mortgage_payoff)}</span>
+                </div>
+              )}
+              {record.heloc_amount && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-white/70">HELOC / 2nd Mortgage</span>
+                  <span className="font-semibold text-[#B8982F]">{fmt(record.heloc_amount)}{record.heloc_lender && <span className="font-normal text-white/50 ml-1">— {record.heloc_lender}</span>}</span>
+                </div>
+              )}
+              {record.estimated_total_debt && (
+                <div className="flex justify-between text-sm border-t border-white/10 pt-2 mt-1">
+                  <span className="text-white/70 font-medium">Total Est. Debt on Property</span>
+                  <span className="font-bold text-[#B8982F] text-base">{fmt(record.estimated_total_debt)}</span>
+                </div>
+              )}
+              {record.mortgage_search_notes && (
+                <p className="text-[10px] text-white/40 mt-1 italic">{record.mortgage_search_notes}</p>
+              )}
+            </div>
+          )}
+
+          {record && !record.estimated_mortgage_payoff && !mortgageSearching && (
+            <div className="border border-[#1A3226]/10 rounded-xl p-3 text-xs text-[#1A3226]/50">
+              <span className="font-medium text-[#1A3226]/70">Mortgage balance search:</span> No open mortgage instruments found in public records, or search returned insufficient data. The agent or seller can provide the current payoff amount directly.
+            </div>
+          )}
         </div>
       )}
 
       <p className="text-xs text-[#1A3226]/40 mb-6">
-        Data sourced from public assessor and registry of deeds records. Confirm or correct any values before proceeding.
+        Data sourced from public assessor and registry of deeds records via AI web search. Mortgage balance estimates are calculated from recorded instruments and are approximations only — always verify with the lender before sharing with clients.
       </p>
 
       <WizardNav step={3.5} onNext={() => { applyOverrides(); onNext(); }} onBack={onBack} canNext={canNext} nextLabel="Confirm & Continue" />

@@ -155,6 +155,55 @@
     "searched_at": {
       "type": "string",
       "format": "date-time"
+    },
+    "heloc_amount": {
+      "type": "number",
+      "description": "HELOC / home equity line amount recorded in registry"
+    },
+    "heloc_lender": {
+      "type": "string",
+      "maxLength": 200,
+      "description": "HELOC lender name"
+    },
+    "heloc_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date HELOC was recorded"
+    },
+    "heloc_outstanding_balance": {
+      "type": "number",
+      "description": "Estimated outstanding HELOC balance"
+    },
+    "estimated_mortgage_payoff": {
+      "type": "number",
+      "description": "AI-estimated current primary mortgage payoff balance, calculated from amortization using recorded instruments"
+    },
+    "estimated_total_debt": {
+      "type": "number",
+      "description": "Estimated total debt on property (primary + HELOC/2nd liens)"
+    },
+    "mortgage_search_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the Perplexity mortgage deep search was last run"
+    },
+    "mortgage_search_status": {
+      "type": "string",
+      "enum": [
+        "found",
+        "partial",
+        "not_found",
+        "error"
+      ],
+      "description": "Result status of the mortgage deep search"
+    },
+    "mortgage_search_notes": {
+      "type": "string",
+      "description": "Notes from Perplexity mortgage search \u2014 assumptions, caveats, sources"
+    },
+    "mortgage_search_result": {
+      "type": "string",
+      "description": "Raw JSON response from Perplexity mortgage deep search (truncated to 2000 chars)"
     }
   },
   "required": [
