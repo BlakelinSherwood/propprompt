@@ -39,8 +39,9 @@ export default function CompsMapWithHeat({ subjectAddress, comps, selected, onTo
   const [loadingNeighborhood, setLoadingNeighborhood] = useState(false);
   const [geocodedComps, setGeocodedComps] = useState([]);
   const [subjectCoords, setSubjectCoords] = useState(null);
+  const [mapToken, setMapToken] = useState(null);
 
-  // Geocode subject + comps
+  // Geocode subject + comps — also resolves and stores the token
   useEffect(() => {
     if (!subjectAddress) return;
     let cancelled = false;
@@ -50,6 +51,7 @@ export default function CompsMapWithHeat({ subjectAddress, comps, selected, onTo
       const token = MAPBOX_TOKEN || await base44.functions.invoke("getMapboxToken", {}).then(r => r.data?.token).catch(() => null);
       if (!token) { setLoading(false); return; }
       mapboxgl.accessToken = token;
+      if (!cancelled) setMapToken(token);
 
       const subj = await geocodeAddress(subjectAddress);
       if (cancelled) return;
@@ -63,18 +65,16 @@ export default function CompsMapWithHeat({ subjectAddress, comps, selected, onTo
         })
       );
       if (!cancelled) setGeocodedComps(withCoords);
-      setLoading(false);
+      if (!cancelled) setLoading(false);
     }
 
     geocodeAll();
     return () => { cancelled = true; };
   }, [subjectAddress, comps?.length]);
 
-  // Initialize map
+  // Initialize map — only after token + coords + container are ready
   useEffect(() => {
-    if (!subjectCoords || !containerRef.current || mapRef.current) return;
-    const token = mapboxgl.accessToken;
-    if (!token) return;
+    if (!subjectCoords || !containerRef.current || mapRef.current || !mapToken) return;
 
     const map = new mapboxgl.Map({
       container: containerRef.current,
@@ -85,8 +85,11 @@ export default function CompsMapWithHeat({ subjectAddress, comps, selected, onTo
     mapRef.current = map;
     map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
 
+    // Force resize after mount so Mapbox sees actual container dimensions
+    map.on('load', () => { map.resize(); });
+
     return () => { map.remove(); mapRef.current = null; };
-  }, [subjectCoords]);
+  }, [subjectCoords, mapToken]);
 
   // Add/update markers
   useEffect(() => {
@@ -190,7 +193,7 @@ Return ONLY JSON:
   return (
     <div className="space-y-2">
       <div className="relative rounded-xl overflow-hidden border border-[#1A3226]/10" style={{ height: 320 }}>
-        <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
+        <div ref={containerRef} style={{ width: "100%", height: "320px", position: "absolute", top: 0, left: 0 }} />
 
         {/* Controls */}
         <div className="absolute top-3 left-3 flex flex-col gap-2">
