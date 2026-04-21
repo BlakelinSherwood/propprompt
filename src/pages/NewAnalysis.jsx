@@ -14,9 +14,10 @@ import StepBuyerIntelligence from "../components/wizard/StepBuyerIntelligence";
 import StepReportEnhancements from "../components/wizard/StepReportEnhancements";
 import StepPublicRecords from "../components/wizard/StepPublicRecords";
 import StepComparableSales from "../components/wizard/StepComparableSales";
+import StepPropertyPhotos from "../components/wizard/StepPropertyPhotos";
 
 function getStepLabels(assessmentType) {
-  const base = ["Assessment", "Client Role", "Property", "Public Records", "Comparables"];
+  const base = ["Assessment", "Client Role", "Property", "Public Records", "Comparables", "Photos"];
   const afterProperty = [];
   if (assessmentType === "listing_pricing") afterProperty.push("Buyer Context");
   else if (assessmentType === "client_portfolio") afterProperty.push("Financial Context");
@@ -224,6 +225,8 @@ export default function NewAnalysis() {
         large_property_flag: intake.large_property_flag ?? false,
         prior_sale_price: intake.prior_sale_price ?? null,
         prior_sale_year: intake.prior_sale_year ?? null,
+        listing_photos: intake.listing_photos || [],
+        condition_override: intake.condition_override || null,
         seller_mortgage_payoff: intake.seller_mortgage_payoff ?? null,
         seller_mortgage_known: intake.seller_mortgage_known ?? false,
         seller_commission_rate: intake.seller_commission_rate ?? null,
@@ -261,8 +264,9 @@ export default function NewAnalysis() {
     if (step === 3) return <Step4PropertyDetails {...stepProps} />;
     if (step === 4) return <StepPublicRecords {...stepProps} />;
     if (step === 5) return <StepComparableSales {...stepProps} />;
+    if (step === 6) return <StepPropertyPhotos {...stepProps} />;
 
-    let nextStep = 6;
+    let nextStep = 7;
 
     if (hasContextStep) {
       if (step === nextStep) {
@@ -272,6 +276,7 @@ export default function NewAnalysis() {
       }
       nextStep++;
     }
+
 
     if (step === nextStep) return <Step5OutputFormat {...stepProps} />;
     nextStep++;

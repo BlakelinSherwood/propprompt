@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Search, RefreshCw, ExternalLink, Plus, X, Loader2, Info, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { base44 } from "@/api/base44Client";
-import CompsMap from "./CompsMap";
+import CompsMapWithHeat from "./CompsMapWithHeat";
 
 const CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
 const CONDITIONS = ["Superior", "Similar", "Inferior"];
@@ -352,7 +352,7 @@ export default function StepComparableSales({ intake, update, onNext, onBack }) 
 
       {/* Map */}
       {allComps.length > 0 && (
-        <CompsMap
+        <CompsMapWithHeat
           subjectAddress={intake.address}
           comps={allComps}
           selected={selected}

@@ -950,6 +950,121 @@ Deno.serve(async (req) => {
       prompt += `\n\nPRIOR SALE HISTORY:\n  Last known sale price: ${analysis.prior_sale_price ? '$' + analysis.prior_sale_price.toLocaleString() : 'unknown'}\n  Year of last sale: ${analysis.prior_sale_year || 'unknown'}\nUse this to cross-check valuation and flag anomalies.`;
     }
 
+    // ── LISTING PHOTO ANALYSIS (vision) ─────────────────────────────────────
+    const listingPhotos = analysis.listing_photos || analysis.intake_data?.listing_photos || [];
+    const conditionOverride = analysis.condition_override || analysis.intake_data?.condition_override || null;
+    if (listingPhotos.length > 0) {
+      console.log(`[generateAnalysis] Analyzing ${listingPhotos.length} listing photo(s) for condition scoring`);
+      try {
+        const photoAnalysis = await base44.integrations.Core.InvokeLLM({
+          prompt: `You are a professional real estate appraiser reviewing listing photos for ${analysis.intake_data?.address || 'this property'}.
+Analyze these listing photos and provide a condition assessment. Return ONLY valid JSON:
+{
+  "overall_condition": "excellent|good|average|below_average|poor",
+  "condition_vs_market": "superior|similar|inferior",
+  "renovation_level": "fully_renovated|updated|original_good|needs_updating|needs_work",
+  "finish_quality": "luxury|above_average|standard|below_standard",
+  "key_positives": ["list", "of", "positive", "features", "visible"],
+  "key_concerns": ["any", "visible", "issues"],
+  "ppsf_adjustment_recommendation": "A number between -15 and +20 representing the % adjustment vs a standard 'Similar' comp based on condition alone. E.g. 12 means this property likely commands 12% more per SF than average.",
+  "confidence": "high|medium|low",
+  "notes": "Brief summary for the agent"
+}`,
+          file_urls: listingPhotos.slice(0, 6),
+          model: 'claude_sonnet_4_6',
+          response_json_schema: {
+            type: "object",
+            properties: {
+              overall_condition: { type: "string" },
+              condition_vs_market: { type: "string" },
+              renovation_level: { type: "string" },
+              finish_quality: { type: "string" },
+              key_positives: { type: "array", items: { type: "string" } },
+              key_concerns: { type: "array", items: { type: "string" } },
+              ppsf_adjustment_recommendation: { type: "number" },
+              confidence: { type: "string" },
+              notes: { type: "string" }
+            }
+          }
+        });
+        if (photoAnalysis?.overall_condition) {
+          prompt += `\n\nLISTING PHOTO ANALYSIS (AI Vision — ${listingPhotos.length} photos analyzed):
+Condition: ${photoAnalysis.overall_condition} | vs Market: ${photoAnalysis.condition_vs_market} | Renovation: ${photoAnalysis.renovation_level} | Finish: ${photoAnalysis.finish_quality}
+Positives: ${(photoAnalysis.key_positives || []).join(', ')}
+Concerns: ${(photoAnalysis.key_concerns || []).join(', ') || 'None noted'}
+PPSF Adjustment Recommendation: ${photoAnalysis.ppsf_adjustment_recommendation > 0 ? '+' : ''}${photoAnalysis.ppsf_adjustment_recommendation}% vs similar comps
+Notes: ${photoAnalysis.notes}
+
+CRITICAL: Use this photo analysis to weight comparable sales. If condition_vs_market is 'superior', anchor toward the higher-PPSF comps and apply the recommended PPSF adjustment. If 'inferior', anchor toward lower-PPSF comps. Do not default all comps to 'Similar' — use the photo-derived condition assessment above.`;
+          console.log('[generateAnalysis] Photo analysis complete:', photoAnalysis.condition_vs_market, 'adj:', photoAnalysis.ppsf_adjustment_recommendation);
+        }
+      } catch (photoErr) {
+        console.warn('[generateAnalysis] Photo analysis failed (non-fatal):', photoErr.message);
+      }
+    } else if (conditionOverride) {
+      const conditionMap = {
+        fully_renovated: { label: 'Fully Renovated', adjustment: '+15%', comp_weight: 'Weight toward superior comps' },
+        updated: { label: 'Updated / Improved', adjustment: '+8%', comp_weight: 'Weight toward upper-middle comps' },
+        original_good: { label: 'Original — Good Condition', adjustment: '0%', comp_weight: 'Weight toward similar comps' },
+        needs_work: { label: 'Needs Work', adjustment: '-10%', comp_weight: 'Weight toward inferior comps' },
+      };
+      const cm = conditionMap[conditionOverride] || {};
+      prompt += `\n\nAGENT CONDITION OVERRIDE (no photos provided):
+Condition: ${cm.label || conditionOverride}
+Recommended PPSF adjustment: ${cm.adjustment || 'neutral'}
+Instruction: ${cm.comp_weight || 'Use agent-provided condition to weight comps appropriately.'}
+Apply this condition assessment when weighting comparable sales and setting implied value range.`;
+    }
+
+    // ── MICRO-NEIGHBORHOOD SCORING via Perplexity ────────────────────────────
+    const isNeighborhoodType = ['listing_pricing', 'cma', 'client_portfolio', 'buyer_intelligence'].includes(analysis.assessment_type);
+    if (isNeighborhoodType && analysis.intake_data?.address) {
+      const town = (analysis.intake_data.address.split(',')[1] || '').trim();
+      if (town) {
+        try {
+          const { perpKey } = await resolveAvmKeys();
+          if (perpKey) {
+            console.log('[generateAnalysis] Fetching micro-neighborhood data for:', town);
+            const neighborhoodRes = await fetch('https://api.perplexity.ai/chat/completions', {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${perpKey}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                model: 'sonar-pro',
+                messages: [{
+                  role: 'user',
+                  content: `For ${town}, Massachusetts real estate: What are the premium vs. average/below-average micro-neighborhoods, streets, or zones that affect single-family home values?
+Consider: MBTA/commuter rail proximity, school attendance zones within the town, historically desirable streets, commercial/highway noise zones, flood zones.
+Return ONLY valid JSON:
+{"median_ppsf": 625, "neighborhoods": [{"name": "area name", "premium_pct": 15, "tier": "premium", "reason": "brief reason"}, ...]}`
+                }],
+                search_context_size: 'medium',
+              }),
+            });
+            if (neighborhoodRes.ok) {
+              const nData = await neighborhoodRes.json();
+              const nText = (nData.choices?.[0]?.message?.content || '').trim();
+              let nJson = null;
+              try {
+                const match = nText.match(/\{[\s\S]*\}/);
+                if (match) nJson = JSON.parse(match[0]);
+              } catch (e) {}
+              if (nJson?.neighborhoods?.length > 0) {
+                prompt += `\n\nMICRO-NEIGHBORHOOD INTELLIGENCE FOR ${town.toUpperCase()} (Perplexity research):
+Town median PPSF: ~$${nJson.median_ppsf || 'unknown'}/SF
+Neighborhood tiers:
+${nJson.neighborhoods.map(n => `  • ${n.name}: ${n.premium_pct > 0 ? '+' : ''}${n.premium_pct}% (${n.tier}) — ${n.reason}`).join('\n')}
+
+CRITICAL: Determine which micro-neighborhood the subject property at ${analysis.intake_data.address} is in. Apply the appropriate premium or discount to the PPSF when computing the implied value range. Also apply micro-neighborhood adjustments to Tier C comps from adjacent towns. State the neighborhood tier determination in the valuation narrative.`;
+                console.log('[generateAnalysis] Micro-neighborhood data injected:', nJson.neighborhoods.length, 'zones');
+              }
+            }
+          }
+        } catch (nbErr) {
+          console.warn('[generateAnalysis] Micro-neighborhood fetch failed (non-fatal):', nbErr.message);
+        }
+      }
+    }
+
     // AVM lookup via Perplexity + GPT-4o in parallel for listing_pricing and cma (all tiers)
     if (['listing_pricing', 'cma'].includes(analysis.assessment_type)) {
       const address = analysis.intake_data?.address || '';

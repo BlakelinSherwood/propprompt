@@ -4,16 +4,13 @@
   "description": "One record per AI analysis run. Contains all intake data and output references.",
   "properties": {
     "org_id": {
-      "type": "string",
-      "description": "Organization this analysis belongs to"
+      "type": "string"
     },
     "run_by_email": {
-      "type": "string",
-      "description": "Email of the user who triggered the analysis"
+      "type": "string"
     },
     "on_behalf_of_email": {
-      "type": "string",
-      "description": "If run by an assistant on behalf of an agent, the agent's email. Null if self-run."
+      "type": "string"
     },
     "assessment_type": {
       "type": "string",
@@ -26,8 +23,7 @@
         "client_portfolio",
         "price_reduction_review",
         "custom"
-      ],
-      "description": "Type of analysis run"
+      ]
     },
     "property_type": {
       "type": "string",
@@ -36,8 +32,7 @@
         "condo",
         "multi_family",
         "land"
-      ],
-      "description": "Property type for this analysis"
+      ]
     },
     "location_class": {
       "type": "string",
@@ -47,8 +42,7 @@
         "outer_suburb",
         "coastal",
         "rural"
-      ],
-      "description": "Location class (drives framework selection)"
+      ]
     },
     "ai_platform": {
       "type": "string",
@@ -58,12 +52,10 @@
         "gemini",
         "perplexity",
         "grok"
-      ],
-      "description": "AI platform used for this analysis"
+      ]
     },
     "ai_model": {
-      "type": "string",
-      "description": "Specific model version used"
+      "type": "string"
     },
     "output_format": {
       "type": "string",
@@ -71,8 +63,7 @@
         "narrative",
         "structured",
         "bullets"
-      ],
-      "description": "Output format requested"
+      ]
     },
     "status": {
       "type": "string",
@@ -85,16 +76,14 @@
         "archived",
         "anomaly_flagged"
       ],
-      "default": "draft",
-      "description": "Lifecycle status"
+      "default": "draft"
     },
     "is_private": {
       "type": "boolean",
       "default": false
     },
     "collection_id": {
-      "type": "string",
-      "description": "Optional reference to AnalysisCollection for organization"
+      "type": "string"
     },
     "intake_data": {
       "type": "object"
@@ -291,57 +280,46 @@
         "mixed",
         "none"
       ],
-      "default": "none",
-      "description": "How comps were sourced."
+      "default": "none"
     },
     "raw_batchdata_comps": {
       "type": "array",
-      "description": "Full unfiltered BatchData response before agent review. Stored for audit trail. Never passed directly to AI.",
       "items": {
         "type": "object"
       }
     },
     "raw_perplexity_enrichment": {
       "type": "array",
-      "description": "Perplexity cross-reference data keyed by address. Stored for audit trail. Never passed directly to AI.",
       "items": {
         "type": "object"
       }
     },
     "comps_fetched_at": {
       "type": "string",
-      "format": "date-time",
-      "description": "Timestamp of the BatchData + Perplexity fetch, for staleness checks."
+      "format": "date-time"
     },
     "comps_search_tier": {
-      "type": "string",
-      "description": "The tier level that produced the final comp set. Values: 1-4, multi_tier, agent_deep_search."
+      "type": "string"
     },
     "comps_search_radius": {
-      "type": "number",
-      "description": "The radius in miles used for the successful fetch."
+      "type": "number"
     },
     "large_property_flag": {
       "type": "boolean",
-      "default": false,
-      "description": "True when subject_sqft >= 4000. Disables bedroom/bathroom constraints."
+      "default": false
     },
     "comps_researcher_note": {
-      "type": "string",
-      "description": "Note from Perplexity deep search agent explaining why volume was limited. Shown as info banner in review UI."
+      "type": "string"
     },
     "comps_fetch_triggered": {
       "type": "boolean",
-      "default": false,
-      "description": "Whether the agent has clicked Find Comparable Sales at least once."
+      "default": false
     },
     "comps_cache_key": {
-      "type": "string",
-      "description": "Hash of search parameters for cache invalidation."
+      "type": "string"
     },
     "valuation_anomaly": {
-      "type": "object",
-      "description": "Stored result from validateValuation when an anomaly is detected."
+      "type": "object"
     },
     "override_acknowledged": {
       "type": "boolean",
@@ -375,12 +353,31 @@
     },
     "low_comp_acknowledged": {
       "type": "boolean",
-      "default": false,
-      "description": "True when agent checked the acknowledgment box and submitted with fewer than 3 comps."
+      "default": false
     },
     "low_comp_count": {
-      "type": "integer",
-      "description": "The number of comps confirmed when low_comp_acknowledged is true."
+      "type": "integer"
+    },
+    "listing_photos": {
+      "type": "array",
+      "description": "URLs of uploaded or AI-fetched listing photos. Used for vision-based condition scoring.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "condition_override": {
+      "type": "string",
+      "enum": [
+        "fully_renovated",
+        "updated",
+        "original_good",
+        "needs_work"
+      ],
+      "description": "Agent-specified condition level used when no photos are provided."
+    },
+    "photo_condition_analysis": {
+      "type": "object",
+      "description": "AI vision analysis result from listing photos \u2014 condition, finish level, PPSF adjustment recommendation."
     }
   },
   "required": [
