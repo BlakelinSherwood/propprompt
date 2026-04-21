@@ -950,7 +950,46 @@ Deno.serve(async (req) => {
       prompt += `\n\nPRIOR SALE HISTORY:\n  Last known sale price: ${analysis.prior_sale_price ? '$' + analysis.prior_sale_price.toLocaleString() : 'unknown'}\n  Year of last sale: ${analysis.prior_sale_year || 'unknown'}\nUse this to cross-check valuation and flag anomalies.`;
     }
 
-    // ── LISTING PHOTO ANALYSIS (vision) ─────────────────────────────────────
+    // ── EQUITY OPTIONS INJECTION (client_portfolio only) ─────────────────────
+  if (analysis.assessment_type === 'client_portfolio') {
+    const d = analysis.intake_data || {};
+    prompt += `\n\nEQUITY OPTIONS ANALYSIS — REQUIRED FOR CLIENT PORTFOLIO:
+You MUST include an "equity_options" array in your output JSON with EXACTLY these 5 options, each customized to this property and seller's situation. Use the intake data (estimated value, mortgage balance, years owned, etc.) to make each option financially specific.
+
+Structure each option as:
+{
+  "id": "move_up|downsize|heloc|refinance|renovate",
+  "title": "Human-readable title",
+  "tagline": "One sentence hook",
+  "estimated_equity": <number or null>,
+  "option_summary": "2-3 sentence explanation of this path for this specific client",
+  "financial_snapshot": {
+    "estimated_home_value": <number or null>,
+    "estimated_mortgage_balance": <number or null>,
+    "estimated_gross_equity": <number or null>,
+    "closing_costs_estimate": <number or null>,
+    "net_equity_available": <number or null>,
+    "notes": "brief note on assumptions"
+  },
+  "pros": ["Pro 1", "Pro 2", "Pro 3"],
+  "cons": ["Con 1", "Con 2"],
+  "ideal_if": "One sentence describing the client profile for whom this is the best fit",
+  "market_timing": "favorable|neutral|unfavorable",
+  "market_timing_reason": "One sentence on why now is or isn't a good time for this option"
+}
+
+Option guidance:
+- move_up: "Move Up / Upgrade" — use equity as down payment on a larger/better home. Calculate purchasing power.
+- downsize: "Downsize & Cash Out" — sell, take equity, reduce housing costs. Quantify monthly savings potential.
+- heloc: "HELOC / Home Equity Line" — access equity without selling. Estimate available credit line at 80% LTV.
+- refinance: "Cash-Out Refinance" — pull equity via refi. Note current rate environment impact. Flag if rates are unfavorable.
+- renovate: "Renovate & Hold" — invest equity in improvements to increase value. Suggest highest-ROI projects for this property type and market.
+
+Set "market_timing" based on the current rate environment and local market conditions you've analyzed.
+Address ${d.address || 'this property'} specifically in each option narrative.`;
+  }
+
+  // ── LISTING PHOTO ANALYSIS (vision) ─────────────────────────────────────
     const listingPhotos = analysis.listing_photos || analysis.intake_data?.listing_photos || [];
     const conditionOverride = analysis.condition_override || analysis.intake_data?.condition_override || null;
     if (listingPhotos.length > 0) {

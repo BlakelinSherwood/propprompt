@@ -1648,34 +1648,142 @@ async function renderClientPortfolioPdf(doc, data, branding) {
     }
   }
 
-  // SECTION 03: Financial Options
-  if (data.portfolio_options?.length) {
+  // SECTION 03: Equity Options (What Can You Do With Your Equity?)
+  const equityOptions = data.equity_options || [];
+  const portfolioOptions = data.portfolio_options || [];
+  if (equityOptions.length || portfolioOptions.length) {
     doc.addPage();
-    drawSectionDivider(doc, branding, 3, 'Your Financial\nOptions', 'Strategic paths for putting your equity to work');
-    doc.addPage();
-    await drawPageFrame(doc, branding, 'Section 03 · Financial Options', 'Strategic Portfolio Options');
-    y = 90;
-    for (const [idx, opt] of data.portfolio_options.entries()) {
-      const desc = opt.description || opt.narrative || '';
-      const descLines = doc.splitTextToSize(desc, contentWidth - 22);
-      const cardH = Math.max(80, 36 + descLines.length * 13 + (opt.estimated_net_proceeds ? 20 : 4));
+    drawSectionDivider(doc, branding, 3, 'What Can You Do\nWith Your Equity?', 'Move up · downsize · HELOC · refinance · renovate');
+
+    // ── Equity Summary Banner ──
+    const firstOpt = equityOptions[0];
+    const grossEquity = firstOpt?.financial_snapshot?.estimated_gross_equity ?? null;
+    const netEquity = firstOpt?.financial_snapshot?.net_equity_available ?? null;
+    if (grossEquity || netEquity) {
+      doc.addPage();
+      await drawPageFrame(doc, branding, 'Section 03 · Equity Options', 'Your Equity Position');
+      y = 90;
+
+      // Large equity callout
+      doc.setFillColor(primary.r, primary.g, primary.b);
+      doc.roundedRect(margin, y, contentWidth, 64, 4, 4, 'F');
+      doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(accent.r, accent.g, accent.b);
+      doc.text('ESTIMATED GROSS EQUITY', margin + 14, y + 16);
+      doc.setFontSize(26); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
+      doc.text(grossEquity ? fmt(grossEquity) : '—', margin + 14, y + 44);
+      if (netEquity) {
+        doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(accent.r, accent.g, accent.b);
+        doc.text(`Est. Net After Costs: ${fmt(netEquity)}`, margin + contentWidth * 0.5, y + 44);
+      }
+      y += 76;
+
+      if (firstOpt?.financial_snapshot?.notes) {
+        doc.setFontSize(7.5); doc.setFont('helvetica', 'italic'); doc.setTextColor(120, 120, 120);
+        doc.text(firstOpt.financial_snapshot.notes, margin, y, { maxWidth: contentWidth }); y += 18;
+      }
+      y += 8;
+    } else {
+      doc.addPage();
+      await drawPageFrame(doc, branding, 'Section 03 · Equity Options', 'Your Equity Position');
+      y = 90;
+    }
+
+    // ── Per-option cards ──
+    const TIMING_COLORS = { favorable: { r: 22, g: 101, b: 52 }, neutral: { r: 101, g: 85, b: 22 }, unfavorable: { r: 153, g: 27, b: 27 } };
+    const OPTION_ICONS = { move_up: '↑', downsize: '↓', heloc: '⬡', refinance: '↺', renovate: '✦' };
+
+    for (const [idx, opt] of equityOptions.entries()) {
+      const summaryLines = doc.splitTextToSize(opt.option_summary || '', contentWidth - 80);
+      const prosLines = (opt.pros || []).slice(0, 3);
+      const consLines = (opt.cons || []).slice(0, 2);
+      const cardH = Math.max(110, 44 + summaryLines.length * 13 + (prosLines.length + consLines.length) * 13 + 22);
+
       if (y + cardH > BOTTOM) {
         doc.addPage();
-        await drawPageFrame(doc, branding, 'Section 03 · Financial Options', 'Portfolio Options (cont.)');
+        await drawPageFrame(doc, branding, 'Section 03 · Equity Options', 'Equity Options (cont.)');
         y = 90;
       }
-      doc.setFillColor(idx % 2 === 0 ? 247 : 252, idx % 2 === 0 ? 247 : 252, 244);
-      doc.roundedRect(margin, y, contentWidth, cardH, 3, 3, 'F');
-      doc.setFillColor(accent.r, accent.g, accent.b); doc.roundedRect(margin, y, 4, cardH, 2, 2, 'F');
+
+      // Card background
+      doc.setFillColor(idx % 2 === 0 ? 247 : 253, idx % 2 === 0 ? 247 : 253, 244);
+      doc.roundedRect(margin, y, contentWidth, cardH, 4, 4, 'F');
+
+      // Left accent bar in primary color
+      doc.setFillColor(primary.r, primary.g, primary.b);
+      doc.roundedRect(margin, y, 5, cardH, 2, 2, 'F');
+
+      // Icon circle
+      doc.setFillColor(accent.r, accent.g, accent.b);
+      doc.circle(margin + 28, y + 20, 12, 'F');
       doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b);
-      doc.text(opt.label || opt.title || `Option ${idx + 1}`, margin + 12, y + 18);
-      doc.setFontSize(BODY_SIZE); doc.setFont('helvetica', 'normal'); doc.setTextColor(50, 50, 50);
-      doc.text(descLines, margin + 12, y + 34);
-      if (opt.estimated_net_proceeds) {
-        doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(accent.r, accent.g, accent.b);
-        doc.text(`Est. Net Proceeds: ${fmt(opt.estimated_net_proceeds)}`, margin + 12, y + cardH - 10);
+      doc.text(OPTION_ICONS[opt.id] || '→', margin + 28, y + 24, { align: 'center' });
+
+      // Title + tagline
+      doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b);
+      doc.text(opt.title || '', margin + 46, y + 16);
+      doc.setFontSize(8.5); doc.setFont('helvetica', 'italic'); doc.setTextColor(accent.r, accent.g, accent.b);
+      doc.text(opt.tagline || '', margin + 46, y + 28);
+
+      // Market timing badge
+      const tc = TIMING_COLORS[opt.market_timing] || TIMING_COLORS.neutral;
+      const timingLabel = (opt.market_timing || 'neutral').toUpperCase();
+      const timingW = 70;
+      doc.setFillColor(tc.r, tc.g, tc.b);
+      doc.roundedRect(margin + contentWidth - timingW - 5, y + 8, timingW, 18, 3, 3, 'F');
+      doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
+      doc.text(timingLabel, margin + contentWidth - timingW / 2 - 5, y + 20, { align: 'center' });
+
+      let cy = y + 44;
+
+      // Summary
+      doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(50, 50, 50);
+      doc.text(summaryLines, margin + 14, cy);
+      cy += summaryLines.length * 13 + 8;
+
+      // Pros & Cons side by side
+      if (prosLines.length) {
+        doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(22, 101, 52);
+        doc.text('✓ PROS', margin + 14, cy);
+        doc.setFont('helvetica', 'normal');
+        prosLines.forEach((p, pi) => { doc.setTextColor(40, 40, 40); doc.text(`• ${p}`, margin + 14, cy + 11 + pi * 12); });
       }
-      y += cardH + 8;
+      if (consLines.length) {
+        doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(153, 27, 27);
+        doc.text('✗ CONS', margin + contentWidth / 2, cy);
+        doc.setFont('helvetica', 'normal');
+        consLines.forEach((c, ci) => { doc.setTextColor(40, 40, 40); doc.text(`• ${c}`, margin + contentWidth / 2, cy + 11 + ci * 12); });
+      }
+      cy += Math.max(prosLines.length, consLines.length) * 12 + 18;
+
+      // Ideal if
+      if (opt.ideal_if) {
+        doc.setFontSize(7.5); doc.setFont('helvetica', 'italic'); doc.setTextColor(100, 100, 100);
+        doc.text(`Ideal if: ${opt.ideal_if}`, margin + 14, cy, { maxWidth: contentWidth - 20 });
+      }
+
+      y += cardH + 10;
+    }
+
+    // Fallback: render portfolio_options if no equity_options
+    if (!equityOptions.length && portfolioOptions.length) {
+      for (const [idx, opt] of portfolioOptions.entries()) {
+        const desc = opt.description || opt.narrative || '';
+        const descLines = doc.splitTextToSize(desc, contentWidth - 22);
+        const cardH = Math.max(80, 36 + descLines.length * 13 + (opt.estimated_net_proceeds ? 20 : 4));
+        if (y + cardH > BOTTOM) { doc.addPage(); await drawPageFrame(doc, branding, 'Section 03 · Equity Options', 'Portfolio Options (cont.)'); y = 90; }
+        doc.setFillColor(idx % 2 === 0 ? 247 : 252, 247, 244);
+        doc.roundedRect(margin, y, contentWidth, cardH, 3, 3, 'F');
+        doc.setFillColor(accent.r, accent.g, accent.b); doc.roundedRect(margin, y, 4, cardH, 2, 2, 'F');
+        doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b);
+        doc.text(opt.label || opt.title || `Option ${idx + 1}`, margin + 12, y + 18);
+        doc.setFontSize(BODY_SIZE); doc.setFont('helvetica', 'normal'); doc.setTextColor(50, 50, 50);
+        doc.text(descLines, margin + 12, y + 34);
+        if (opt.estimated_net_proceeds) {
+          doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(accent.r, accent.g, accent.b);
+          doc.text(`Est. Net Proceeds: ${fmt(opt.estimated_net_proceeds)}`, margin + 12, y + cardH - 10);
+        }
+        y += cardH + 8;
+      }
     }
   }
 
