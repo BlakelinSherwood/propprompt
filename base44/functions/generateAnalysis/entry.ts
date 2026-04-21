@@ -542,7 +542,7 @@ async function callClaudeOnce(apiKey, prompt, keySource) {
     },
     body: JSON.stringify({
       model,
-      max_tokens: 8000,
+      max_tokens: 16000,
       messages: [{ role: "user", content: prompt }],
       system: systemPrompt,
     }),
@@ -1501,9 +1501,23 @@ Include this in the output JSON as: "property_context": { ..., "schools": { "ass
         }
       }
 
+      // Upload large pipeline output as file if needed
+      let pipelineOutputText = finalOutput;
+      if (finalOutput && finalOutput.length > 15000) {
+        try {
+          const blob = new Blob([finalOutput], { type: 'text/plain' });
+          const file = new File([blob], `analysis_${analysisId}_pipeline.txt`, { type: 'text/plain' });
+          const uploadRes = await base44.asServiceRole.integrations.Core.UploadFile({ file });
+          pipelineOutputText = uploadRes?.file_url || finalOutput.slice(0, 15000);
+          console.log('[generateAnalysis] pipeline output_text uploaded as file:', pipelineOutputText);
+        } catch (uploadErr) {
+          console.warn('[generateAnalysis] pipeline output_text upload failed, truncating:', uploadErr.message);
+          pipelineOutputText = finalOutput.slice(0, 15000);
+        }
+      }
       const pipelineSaveData = {
         status: 'complete',
-        output_text: finalOutput,
+        output_text: pipelineOutputText,
         completed_at: new Date().toISOString(),
         ai_model: `pipeline-${tier}`,
         assembly_status: 'complete',
@@ -1626,10 +1640,23 @@ Include this in the output JSON as: "property_context": { ..., "schools": { "ass
       }
     }
 
-    // Persist output
+    // Persist output — upload large output_text as file to avoid 400 field size limit
+    let outputTextToSave = cleanText;
+    if (cleanText && cleanText.length > 15000) {
+      try {
+        const blob = new Blob([cleanText], { type: 'text/plain' });
+        const file = new File([blob], `analysis_${analysisId}.txt`, { type: 'text/plain' });
+        const uploadRes = await base44.asServiceRole.integrations.Core.UploadFile({ file });
+        outputTextToSave = uploadRes?.file_url || cleanText.slice(0, 15000);
+        console.log('[generateAnalysis] output_text uploaded as file:', outputTextToSave);
+      } catch (uploadErr) {
+        console.warn('[generateAnalysis] output_text upload failed, truncating:', uploadErr.message);
+        outputTextToSave = cleanText.slice(0, 15000);
+      }
+    }
     const saveData = {
       status: "complete",
-      output_text: cleanText,
+      output_text: outputTextToSave,
       completed_at: new Date().toISOString(),
       ai_model: result.model,
     };
