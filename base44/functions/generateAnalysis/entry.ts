@@ -1121,7 +1121,7 @@ Walk Score: ${wJson.walk_score}/100 — ${wJson.walk_label || ''}
 Transit Score: ${wJson.transit_score != null ? wJson.transit_score + '/100' : 'N/A'} — ${wJson.transit_label || ''}
 Bike Score: ${wJson.bike_score != null ? wJson.bike_score + '/100' : 'N/A'} — ${wJson.bike_label || ''}
 ${wJson.notes ? 'Notes: ' + wJson.notes : ''}
-Include these scores in the property_context section of the output JSON as "walkability": {...}. Reference them in buyer archetype language when relevant (e.g. walkability matters to urban downsizers; transit score matters to commuters).`;
+Include these scores in the output JSON as: "property_context": { "walkability": { "walk_score": N, "walk_label": "...", "transit_score": N, "transit_label": "...", "bike_score": N, "bike_label": "...", "notes": "..." } }. Reference them in buyer archetype language when relevant (e.g. walkability matters to urban downsizers; transit score matters to commuters).`;
                 console.log('[generateAnalysis] Walk Score injected:', wJson.walk_score);
               }
             } catch (e) { console.warn('[generateAnalysis] Walk Score parse failed:', e.message); }
@@ -1140,7 +1140,7 @@ Risk Level: ${fJson.risk_level || 'unknown'}
 Flood Insurance Required: ${fJson.insurance_required ? 'YES — mandatory for federally-backed mortgages' : 'No (standard zone)'}
 FIRM Panel: ${fJson.panel_number || 'unknown'} | Effective: ${fJson.effective_date || 'unknown'}
 ${fJson.notes ? 'Notes: ' + fJson.notes : ''}
-Include this in the property_context.flood_zone field of the output JSON. If insurance_required is true, flag this as a risk factor in Section 04d and include an estimated annual premium range in the net proceeds section.`;
+Include this in the output JSON as: "property_context": { ..., "flood_zone": { "flood_zone": "X", "flood_zone_description": "...", "risk_level": "low|moderate|high", "insurance_required": false, "panel_number": "...", "effective_date": "...", "notes": "..." } }. If insurance_required is true, flag this as a risk factor and include an estimated annual premium range in the net proceeds section.`;
                 console.log('[generateAnalysis] Flood zone injected:', fJson.flood_zone);
               }
             } catch (e) { console.warn('[generateAnalysis] Flood zone parse failed:', e.message); }
@@ -1161,7 +1161,7 @@ Include this in the property_context.flood_zone field of the output JSON. If ins
                 ];
                 prompt += `\n\nSCHOOL DISTRICT & NEARBY SCHOOLS:
 ${schoolLines.join('\n')}
-Include this as "schools" in property_context in the output JSON. Reference top-rated schools in buyer archetype language for family-oriented buyers. If any assigned school has a GreatSchools rating ≥ 8, call it out as a key selling point in the executive summary.`;
+Include this in the output JSON as: "property_context": { ..., "schools": { "assigned_schools": [...], "nearby_notable": [...] } }. Reference top-rated schools in buyer archetype language for family-oriented buyers. If any assigned school has a GreatSchools rating ≥ 8, call it out as a key selling point in the executive summary.`;
                 console.log('[generateAnalysis] Schools injected:', assigned.length, 'assigned,', notable.length, 'notable');
               }
             } catch (e) { console.warn('[generateAnalysis] Schools parse failed:', e.message); }

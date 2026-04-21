@@ -713,6 +713,62 @@ async function renderCMAPdf(doc, data, branding) {
   drawTable(doc, margin, y, ['Market Indicator', 'Value'], mRows, [contentWidth - 130, 130],
     { headerFill: branding.primary_color || '#1A3226', headerTextColor: '#FFFFFF', fontSize: 9, rowHeight: 26, branding });
 
+  // PROPERTY CONTEXT (Walk Score / Flood Zone / Schools) — CMA
+  const pcCma = data.property_context || {};
+  if (pcCma.walkability || pcCma.flood_zone || pcCma.schools) {
+    doc.addPage();
+    await drawPageFrame(doc, branding, 'Section 01 · Subject Property', 'Property Context');
+    y = 90;
+
+    if (pcCma.walkability) {
+      const w = pcCma.walkability;
+      doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b);
+      doc.text('Walkability & Transit', margin, y); y += 14;
+      const scoreBoxes = [
+        { label: 'WALK SCORE', value: w.walk_score != null ? `${w.walk_score}/100` : 'N/A', sub: w.walk_label || '' },
+        { label: 'TRANSIT SCORE', value: w.transit_score != null ? `${w.transit_score}/100` : 'N/A', sub: w.transit_label || '' },
+        { label: 'BIKE SCORE', value: w.bike_score != null ? `${w.bike_score}/100` : 'N/A', sub: w.bike_label || '' },
+      ];
+      const sbW = (contentWidth - 12) / 3;
+      scoreBoxes.forEach((sb, i) => {
+        const bx = margin + i * (sbW + 6);
+        doc.setFillColor(primary.r, primary.g, primary.b); doc.roundedRect(bx, y, sbW, 54, 3, 3, 'F');
+        doc.setFontSize(6.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(accent.r, accent.g, accent.b);
+        doc.text(sb.label, bx + sbW / 2, y + 12, { align: 'center' });
+        doc.setFontSize(16); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
+        doc.text(sb.value, bx + sbW / 2, y + 34, { align: 'center' });
+        doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(accent.r, accent.g, accent.b);
+        doc.text(sb.sub, bx + sbW / 2, y + 47, { align: 'center', maxWidth: sbW - 8 });
+      });
+      y += 64;
+    }
+
+    if (pcCma.flood_zone) {
+      const fz = pcCma.flood_zone;
+      doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b);
+      doc.text('FEMA Flood Zone', margin, y); y += 12;
+      const floodColor = fz.insurance_required ? { r: 180, g: 40, b: 40 } : { r: 22, g: 101, b: 52 };
+      doc.setFillColor(floodColor.r, floodColor.g, floodColor.b); doc.roundedRect(margin, y, contentWidth, 42, 3, 3, 'F');
+      doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
+      doc.text(`Zone ${fz.flood_zone || 'Unknown'} — ${fz.flood_zone_description || ''}`, margin + 12, y + 16);
+      doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+      doc.text(fz.insurance_required ? '⚠ Flood insurance required' : '✓ Standard zone — not required', margin + 12, y + 32);
+      y += 54;
+    }
+
+    if (pcCma.schools) {
+      const assigned = pcCma.schools.assigned_schools || [];
+      if (assigned.length) {
+        doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b);
+        doc.text('Assigned Schools', margin, y); y += 12;
+        const schoolRows = assigned.map(s => [s.name || '', s.type || '', s.grades || '', s.distance_miles != null ? `${s.distance_miles} mi` : '', s.rating != null ? `${s.rating}/10` : '—']);
+        y = drawTable(doc, margin, y, ['School', 'Type', 'Grades', 'Distance', 'Rating'], schoolRows,
+          [200, 70, 60, 65, 55], { headerFill: branding.primary_color || '#1A3226', headerTextColor: '#FFFFFF', fontSize: 8.5, rowHeight: 24, branding });
+        y += 8;
+      }
+    }
+  }
+
   doc.addPage();
   drawSectionDivider(doc, branding, 2, 'Comparable Sales\nAnalysis', 'Tiered comparables · adjustments · PPSF range');
   doc.addPage();
@@ -929,6 +985,114 @@ async function renderListingPricingPdf(doc, data, branding, netProceedsJson = nu
   if (y + mRows.length * 28 + 40 > BOTTOM) { doc.addPage(); await drawPageFrame(doc, branding, 'Section 01 · Property & Market Context', 'Market Indicators'); y = 90; }
   drawTable(doc, margin, y, ['Market Indicator', 'Value'], mRows, [contentWidth - 140, 140],
     { headerFill: branding.primary_color || '#1A3226', headerTextColor: '#FFFFFF', fontSize: 10, rowHeight: 28, branding });
+
+  // PROPERTY CONTEXT PAGE (Walk Score / Flood Zone / Schools)
+  const pc = data.property_context || {};
+  const hasPropertyContext = pc.walkability || pc.flood_zone || pc.schools;
+  if (hasPropertyContext) {
+    if (y + 40 > BOTTOM) { doc.addPage(); await drawPageFrame(doc, branding, 'Section 01 · Property & Market Context', 'Property Context'); y = 90; } else { doc.addPage(); await drawPageFrame(doc, branding, 'Section 01 · Property & Market Context', 'Property Context'); y = 90; }
+
+    // Walk / Transit / Bike scores
+    if (pc.walkability) {
+      const w = pc.walkability;
+      doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b);
+      doc.text('Walkability & Transit', margin, y); y += 14;
+
+      const scoreBoxes = [
+        { label: 'WALK SCORE', value: w.walk_score != null ? `${w.walk_score}/100` : 'N/A', sub: w.walk_label || '' },
+        { label: 'TRANSIT SCORE', value: w.transit_score != null ? `${w.transit_score}/100` : 'N/A', sub: w.transit_label || '' },
+        { label: 'BIKE SCORE', value: w.bike_score != null ? `${w.bike_score}/100` : 'N/A', sub: w.bike_label || '' },
+      ];
+      const sbW = (contentWidth - 12) / 3;
+      scoreBoxes.forEach((sb, i) => {
+        const bx = margin + i * (sbW + 6);
+        doc.setFillColor(primary.r, primary.g, primary.b);
+        doc.roundedRect(bx, y, sbW, 54, 3, 3, 'F');
+        doc.setFontSize(6.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(accent.r, accent.g, accent.b);
+        doc.text(sb.label, bx + sbW / 2, y + 12, { align: 'center' });
+        doc.setFontSize(16); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
+        doc.text(sb.value, bx + sbW / 2, y + 34, { align: 'center' });
+        doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(accent.r, accent.g, accent.b);
+        doc.text(sb.sub, bx + sbW / 2, y + 47, { align: 'center', maxWidth: sbW - 8 });
+      });
+      y += 64;
+      if (w.notes) {
+        doc.setFontSize(8); doc.setFont('helvetica', 'italic'); doc.setTextColor(90, 90, 90);
+        doc.text(w.notes, margin, y, { maxWidth: contentWidth }); y += 16;
+      }
+      y += 6;
+    }
+
+    // FEMA Flood Zone
+    if (pc.flood_zone) {
+      const fz = pc.flood_zone;
+      if (y + 54 > BOTTOM) { doc.addPage(); await drawPageFrame(doc, branding, 'Section 01 · Property & Market Context', 'Property Context (cont.)'); y = 90; }
+      doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b);
+      doc.text('FEMA Flood Zone', margin, y); y += 12;
+
+      const floodColor = fz.insurance_required ? { r: 180, g: 40, b: 40 } : { r: 22, g: 101, b: 52 };
+      doc.setFillColor(floodColor.r, floodColor.g, floodColor.b);
+      doc.roundedRect(margin, y, contentWidth, 42, 3, 3, 'F');
+      doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
+      doc.text(`Zone ${fz.flood_zone || 'Unknown'} — ${fz.flood_zone_description || ''}`, margin + 12, y + 16);
+      doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(255, 255, 255);
+      const insuranceLine = fz.insurance_required ? '⚠ Flood insurance required (federally-backed mortgages)' : '✓ Standard zone — flood insurance not required';
+      doc.text(`${insuranceLine}  ·  Risk: ${fz.risk_level || 'N/A'}`, margin + 12, y + 32);
+      y += 50;
+
+      if (fz.notes) {
+        doc.setFontSize(8); doc.setFont('helvetica', 'italic'); doc.setTextColor(90, 90, 90);
+        doc.text(fz.notes, margin, y, { maxWidth: contentWidth }); y += 14;
+      }
+      if (fz.panel_number) {
+        doc.setFontSize(7.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(130, 130, 130);
+        doc.text(`FIRM Panel: ${fz.panel_number}  ·  Effective: ${fz.effective_date || 'N/A'}  ·  Source: FEMA Flood Map Service Center`, margin, y); y += 14;
+      }
+      y += 6;
+    }
+
+    // Schools
+    if (pc.schools) {
+      const schools = pc.schools;
+      const assigned = schools.assigned_schools || [];
+      const notable = schools.nearby_notable || [];
+      if (assigned.length || notable.length) {
+        if (y + 60 > BOTTOM) { doc.addPage(); await drawPageFrame(doc, branding, 'Section 01 · Property & Market Context', 'Property Context (cont.)'); y = 90; }
+        doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b);
+        doc.text('School District & Nearby Schools', margin, y); y += 14;
+
+        if (assigned.length) {
+          const schoolRows = assigned.map(s => [
+            s.name || '',
+            s.type ? s.type.charAt(0).toUpperCase() + s.type.slice(1) : '',
+            s.grades || '',
+            s.distance_miles != null ? `${s.distance_miles} mi` : '',
+            s.rating != null ? `${s.rating}/10` : '—',
+          ]);
+          y = drawTable(doc, margin, y, ['Assigned School', 'Type', 'Grades', 'Distance', 'Rating'], schoolRows,
+            [200, 70, 60, 65, 55], { headerFill: branding.primary_color || '#1A3226', headerTextColor: '#FFFFFF', fontSize: 8.5, rowHeight: 24, branding });
+          y += 8;
+        }
+
+        if (notable.length) {
+          doc.setFontSize(8.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b);
+          doc.text('Nearby Notable Schools', margin, y); y += 10;
+          const notableRows = notable.map(s => [
+            s.name || '',
+            s.public_private ? s.public_private.charAt(0).toUpperCase() + s.public_private.slice(1) : '',
+            s.grades || '',
+            s.distance_miles != null ? `${s.distance_miles} mi` : '',
+            s.rating != null ? `${s.rating}/10` : '—',
+          ]);
+          y = drawTable(doc, margin, y, ['School', 'Type', 'Grades', 'Distance', 'Rating'], notableRows,
+            [200, 70, 60, 65, 55], { headerFill: branding.primary_color || '#1A3226', headerTextColor: '#FFFFFF', fontSize: 8.5, rowHeight: 24, branding });
+          y += 6;
+        }
+        doc.setFontSize(7); doc.setFont('helvetica', 'italic'); doc.setTextColor(140, 140, 140);
+        doc.text('Ratings sourced from GreatSchools.org. Verify current attendance zones with the school district.', margin, y); y += 14;
+      }
+    }
+  }
 
   // SECTION 02: Valuation Analysis
   doc.addPage();
