@@ -228,7 +228,7 @@ export default function AnalysisRun() {
       const today = new Date().toISOString().slice(0, 10);
       const filename = `${analysisId}.pdf`;
       const file = new File([pdfBlob], filename, { type: 'application/pdf' });
-      const uploadRes = await base44.asServiceRole.integrations.Core.UploadFile({ file });
+      const uploadRes = await base44.integrations.Core.UploadFile({ file });
       const publicUrl = uploadRes?.file_url;
       if (!publicUrl) throw new Error('File upload failed');
 
