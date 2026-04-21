@@ -928,7 +928,13 @@ Deno.serve(async (req) => {
     }
 
     // Inject data quality flag based on comp count
-    const valuationConsistencyRule = `\n\nVALUATION CONSISTENCY RULE — CRITICAL:\nThe implied_value_range MUST be derived ONLY from Tier A (same-town) comps using their adjusted PPSF × subject square footage, with recency weighting applied. Tier C (adjacent town) comps are REFERENCE ONLY and must NEVER pull the implied_value_range low. Do NOT apply additional blanket discounts for property age, vintage, or assessment-type context. The valuation range for this property should be consistent regardless of report type (listing_pricing, client_portfolio, cma). A portfolio review should produce the same value range as a listing pricing analysis for the same property and comp set.`;
+    const valuationConsistencyRule = `\n\nVALUATION ACCURACY RULES — CRITICAL — READ CAREFULLY:
+1. IMPLIED VALUE RANGE: Must be derived ONLY from Tier A (same-town) comps using their adjusted PPSF × subject square footage, with recency weighting applied. Tier C comps are REFERENCE ONLY — they must NEVER pull the implied_value_range down.
+2. DO NOT DISCOUNT FOR REPORT TYPE: A portfolio review MUST produce the same value range as a listing pricing analysis for the same property and comp set. Never apply a "conservative" or "ownership" discount just because this is a portfolio review.
+3. DO NOT INVENT DOWNWARD ADJUSTMENTS: Do not apply blanket discounts for age, vintage, or subjective condition without a specific comp-supported reason. The comps provided are the ground truth.
+4. AVM AS SANITY CHECK: If AVM data is provided, use it as a reasonableness check. If your implied_value_range is more than 10% below ALL available AVM estimates with no specific data-supported reason, you are undervaluing. Recalibrate.
+5. RECENCY ANCHOR: If there are Tier A comps from the last 6 months, the implied_value_range LOW must not be below the lowest recent Tier A comp's adjusted PPSF × subject sqft. Recent sales set the floor.
+6. STATED VALUE: If the agent has provided an "estimated_current_value" or "client_estimate" in the intake data, this is their professional opinion — treat it as a data point alongside the comps, not something to discount.`;
     let dataQualityBlock = '';
     if (agentComps.length >= 3) {
       dataQualityBlock = `\n\nDATA QUALITY: green\nCOMPARABLE SALES SOURCE: Perplexity AI research (verified)\nCOMP COUNT: ${agentComps.length}\nSet data_quality_flag to 'green' in the output JSON.${valuationConsistencyRule}`;
@@ -1161,16 +1167,17 @@ CRITICAL: Determine which micro-neighborhood the subject property at ${analysis.
       }
     }
 
-    // ── WALKABILITY / FLOOD ZONE / SCHOOLS — parallel Perplexity lookups ────
+    // ── WALKABILITY / FLOOD ZONE / SCHOOLS / TOWN INTELLIGENCE — parallel Perplexity lookups ────
     const isLocationContextType = ['listing_pricing', 'cma', 'client_portfolio', 'buyer_intelligence', 'investment_analysis'].includes(analysis.assessment_type);
     if (isLocationContextType && analysis.intake_data?.address) {
       try {
         const { perpKey } = await resolveAvmKeys();
         if (perpKey) {
           const addr = analysis.intake_data.address;
-          console.log('[generateAnalysis] Fetching walkability/flood/schools for:', addr);
+          const town = (addr.split(',')[1] || '').trim() || addr;
+          console.log('[generateAnalysis] Fetching walkability/flood/schools/town-intelligence for:', addr);
 
-          const [walkRes, floodRes, schoolsRes] = await Promise.allSettled([
+          const [walkRes, floodRes, schoolsRes, townIntelRes] = await Promise.allSettled([
             // Walk Score + transit + bike
             fetch('https://api.perplexity.ai/chat/completions', {
               method: 'POST',
@@ -1203,7 +1210,95 @@ CRITICAL: Determine which micro-neighborhood the subject property at ${analysis.
                 search_context_size: 'medium',
               }),
             }).then(r => r.json()),
+
+            // Town development & MA housing policy intelligence (client_portfolio only)
+            analysis.assessment_type === 'client_portfolio'
+              ? fetch('https://api.perplexity.ai/chat/completions', {
+                  method: 'POST',
+                  headers: { 'Authorization': `Bearer ${perpKey}`, 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    model: 'sonar-pro',
+                    messages: [{ role: 'user', content: `Research the following for ${town}, Massachusetts and Massachusetts statewide housing policy as of ${new Date().getFullYear()}:
+
+1. TOWN DEVELOPMENTS: What major development projects, infrastructure improvements, rezoning efforts, or town planning initiatives are recently approved, under construction, or proposed in ${town}, MA? Include projects like new commercial developments, transit improvements, school construction, park improvements, downtown revitalization, or major employer relocations. Note whether each is likely to positively or negatively affect residential home values and in what timeframe.
+
+2. MA HOUSING POLICY: What recent or upcoming Massachusetts state housing laws, policies, or mandates are affecting residential property owners and values? Include things like: the MBTA Communities Act/zoning mandates, short-term rental regulations, property tax relief programs, climate/energy compliance requirements, ADU legislation, foreclosure moratoriums, or any new assessor valuation rules.
+
+Return ONLY valid JSON:
+{
+  "town_developments": [
+    {
+      "project": "project name",
+      "type": "infrastructure|commercial|rezoning|school|transit|park|employer|other",
+      "status": "approved|under_construction|proposed|completed",
+      "description": "2 sentence description of the project",
+      "value_impact": "positive|negative|neutral|mixed",
+      "impact_reason": "1 sentence on why this affects home values",
+      "timeline": "e.g. 'Completion expected 2026'",
+      "impact_magnitude": "high|medium|low"
+    }
+  ],
+  "ma_housing_policies": [
+    {
+      "policy": "policy name",
+      "category": "zoning|tax|rental|energy|adu|foreclosure|assessment|other",
+      "status": "enacted|pending|proposed",
+      "effective_date": "e.g. 'January 2025' or null",
+      "description": "2 sentence plain-English explanation for a homeowner",
+      "owner_impact": "positive|negative|neutral|mixed",
+      "impact_reason": "1 sentence on how this affects this homeowner specifically",
+      "action_required": true or false,
+      "action_note": "What action the homeowner may need to take, or null"
+    }
+  ],
+  "overall_outlook": "bullish|cautious|neutral",
+  "outlook_summary": "2-3 sentence summary of the combined development and policy environment for ${town} homeowners right now"
+}` }],
+                    search_context_size: 'high',
+                  }),
+                }).then(r => r.json())
+              : Promise.resolve(null),
           ]);
+
+          // Parse town intelligence (client_portfolio only)
+          if (townIntelRes && townIntelRes.status === 'fulfilled' && townIntelRes.value) {
+            const tiText = (townIntelRes.value?.choices?.[0]?.message?.content || '').trim();
+            try {
+              const tiMatch = tiText.match(/\{[\s\S]*\}/);
+              const tiJson = tiMatch ? JSON.parse(tiMatch[0]) : null;
+              if (tiJson && (tiJson.town_developments?.length > 0 || tiJson.ma_housing_policies?.length > 0)) {
+                const devLines = (tiJson.town_developments || []).map(d =>
+                  `  [${d.status?.toUpperCase() || 'PROJECT'}] ${d.project} (${d.type}) — ${d.value_impact?.toUpperCase()} impact (${d.impact_magnitude}) — ${d.impact_reason} | Timeline: ${d.timeline || 'unknown'}`
+                );
+                const policyLines = (tiJson.ma_housing_policies || []).map(p =>
+                  `  [${p.status?.toUpperCase() || 'POLICY'}] ${p.policy} (${p.category}) — ${p.owner_impact?.toUpperCase()} impact — ${p.impact_reason}${p.action_required ? ' ⚠ ACTION REQUIRED: ' + p.action_note : ''}`
+                );
+                prompt += `\n\nTOWN DEVELOPMENT & MA HOUSING POLICY INTELLIGENCE (Perplexity live research for ${town}):
+
+ACTIVE & UPCOMING TOWN DEVELOPMENTS:
+${devLines.length ? devLines.join('\n') : '  No major developments found'}
+
+MASSACHUSETTS HOUSING POLICIES AFFECTING THIS OWNER:
+${policyLines.length ? policyLines.join('\n') : '  No major new policies found'}
+
+OVERALL OUTLOOK: ${tiJson.overall_outlook?.toUpperCase() || 'NEUTRAL'} — ${tiJson.outlook_summary || ''}
+
+CRITICAL INSTRUCTION: You MUST include a "local_impact" object in the output JSON with this exact structure:
+{
+  "local_impact": {
+    "town": "${town}",
+    "overall_outlook": "${tiJson.overall_outlook || 'neutral'}",
+    "outlook_summary": "...",
+    "town_developments": [ ...same array from research above... ],
+    "ma_housing_policies": [ ...same array from research above... ],
+    "agent_briefing": "3-4 sentence briefing the agent can read aloud to the client summarizing what's happening in ${town} and statewide that directly affects this home's value trajectory"
+  }
+}
+This section should feel like a local market intelligence briefing — specific, current, and actionable. Reference actual project names and policy names. Do NOT genericize.`;
+                console.log('[generateAnalysis] Town intelligence injected:', tiJson.town_developments?.length, 'developments,', tiJson.ma_housing_policies?.length, 'policies');
+              }
+            } catch (e) { console.warn('[generateAnalysis] Town intelligence parse failed:', e.message); }
+          }
 
           // Parse walk score
           if (walkRes.status === 'fulfilled') {
@@ -1268,8 +1363,8 @@ Include this in the output JSON as: "property_context": { ..., "schools": { "ass
       }
     }
 
-    // AVM lookup via Perplexity + GPT-4o in parallel for listing_pricing and cma (all tiers)
-    if (['listing_pricing', 'cma'].includes(analysis.assessment_type)) {
+    // AVM lookup via Perplexity + GPT-4o in parallel for listing_pricing, cma, and client_portfolio
+    if (['listing_pricing', 'cma', 'client_portfolio'].includes(analysis.assessment_type)) {
       const address = analysis.intake_data?.address || '';
       let avmResult = null;
       try {

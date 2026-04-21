@@ -1861,15 +1861,85 @@ async function renderClientPortfolioPdf(doc, data, branding) {
     }
   }
 
-  // SECTION 05: Market Context
+  // SECTION 05: Local Impact — Town Developments & MA Housing Policy
+  const li = data.local_impact || {};
+  if (li.town_developments?.length || li.ma_housing_policies?.length) {
+    doc.addPage();
+    drawSectionDivider(doc, branding, 5, 'Local Impact &\nPolicy Watch', `What's happening in ${li.town || 'your town'} · MA housing policy · value trajectory`);
+    doc.addPage();
+    await drawPageFrame(doc, branding, 'Section 05 · Local Impact', 'Town Developments & Policy Intelligence');
+    y = 90;
+    if (li.agent_briefing) {
+      const bLines = doc.splitTextToSize(li.agent_briefing, contentWidth - 24);
+      const bH = Math.max(54, bLines.length * 13 + 20);
+      doc.setFillColor(primary.r, primary.g, primary.b); doc.roundedRect(margin, y, contentWidth, bH, 4, 4, 'F');
+      doc.setFontSize(6.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(accent.r, accent.g, accent.b); doc.text('AGENT BRIEFING', margin + 12, y + 13);
+      doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(255, 255, 255); doc.text(bLines, margin + 12, y + 24);
+      y += bH + 14;
+    }
+    const outlookColor = li.overall_outlook === 'bullish' ? { r: 22, g: 101, b: 52 } : li.overall_outlook === 'cautious' ? { r: 153, g: 100, b: 27 } : { r: 60, g: 80, b: 100 };
+    if (li.overall_outlook) {
+      doc.setFillColor(outlookColor.r, outlookColor.g, outlookColor.b); doc.roundedRect(margin, y, 110, 22, 3, 3, 'F');
+      doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
+      doc.text(`OUTLOOK: ${(li.overall_outlook || '').toUpperCase()}`, margin + 8, y + 15);
+      if (li.outlook_summary) { const osL = doc.splitTextToSize(li.outlook_summary, contentWidth - 126); doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60); doc.text(osL[0] || '', margin + 120, y + 15); }
+      y += 32;
+    }
+    if (li.town_developments?.length) {
+      if (y + 40 > BOTTOM) { doc.addPage(); await drawPageFrame(doc, branding, 'Section 05 · Local Impact', 'Town Developments'); y = 90; }
+      doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b); doc.text('Active & Upcoming Town Developments', margin, y); y += 10;
+      doc.setDrawColor(accent.r, accent.g, accent.b); doc.setLineWidth(1.5); doc.line(margin, y, margin + 240, y); y += 12;
+      for (const dev of li.town_developments) {
+        const dL = doc.splitTextToSize(dev.description || '', contentWidth - 120);
+        const iL = doc.splitTextToSize(dev.impact_reason || '', contentWidth - 120);
+        const cH = Math.max(52, 30 + (dL.length + iL.length) * 12);
+        if (y + cH > BOTTOM) { doc.addPage(); await drawPageFrame(doc, branding, 'Section 05 · Local Impact', 'Town Developments (cont.)'); y = 90; }
+        const ic = dev.value_impact === 'positive' ? { r: 22, g: 101, b: 52 } : dev.value_impact === 'negative' ? { r: 153, g: 27, b: 27 } : { r: 100, g: 100, b: 100 };
+        doc.setFillColor(248, 247, 244); doc.roundedRect(margin, y, contentWidth, cH, 3, 3, 'F');
+        doc.setFillColor(ic.r, ic.g, ic.b); doc.roundedRect(margin, y, 5, cH, 2, 2, 'F');
+        doc.setFillColor(ic.r, ic.g, ic.b); doc.roundedRect(margin + contentWidth - 84, y + 6, 80, 16, 2, 2, 'F');
+        doc.setFontSize(6.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255); doc.text((dev.status || '').toUpperCase(), margin + contentWidth - 44, y + 17, { align: 'center' });
+        doc.setFontSize(9.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b); doc.text(dev.project || '', margin + 14, y + 14, { maxWidth: contentWidth - 100 });
+        if (dev.timeline) { doc.setFontSize(7.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(90, 90, 90); doc.text(`Timeline: ${dev.timeline}`, margin + 14, y + 24); }
+        doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(50, 50, 50); doc.text(dL, margin + 14, y + 34);
+        if (iL.length) { doc.setFontSize(8); doc.setFont('helvetica', 'italic'); doc.setTextColor(ic.r, ic.g, ic.b); doc.text(iL, margin + 14, y + 34 + dL.length * 12); }
+        y += cH + 6;
+      }
+      y += 6;
+    }
+    if (li.ma_housing_policies?.length) {
+      if (y + 50 > BOTTOM) { doc.addPage(); await drawPageFrame(doc, branding, 'Section 05 · Local Impact', 'MA Housing Policy'); y = 90; }
+      doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b); doc.text('Massachusetts Housing Policies Affecting This Property', margin, y); y += 10;
+      doc.setDrawColor(accent.r, accent.g, accent.b); doc.setLineWidth(1.5); doc.line(margin, y, margin + 280, y); y += 12;
+      for (const pol of li.ma_housing_policies) {
+        const dL2 = doc.splitTextToSize(pol.description || '', contentWidth - 22);
+        const iL2 = pol.impact_reason ? doc.splitTextToSize(pol.impact_reason, contentWidth - 22) : [];
+        const aL = pol.action_required && pol.action_note ? doc.splitTextToSize(`⚠ Action: ${pol.action_note}`, contentWidth - 22) : [];
+        const cH2 = Math.max(52, 30 + (dL2.length + iL2.length + aL.length) * 12);
+        if (y + cH2 > BOTTOM) { doc.addPage(); await drawPageFrame(doc, branding, 'Section 05 · Local Impact', 'MA Policy (cont.)'); y = 90; }
+        const pc = pol.owner_impact === 'positive' ? { r: 22, g: 101, b: 52 } : pol.owner_impact === 'negative' ? { r: 153, g: 27, b: 27 } : { r: 60, g: 80, b: 100 };
+        doc.setFillColor(245, 245, 250); doc.roundedRect(margin, y, contentWidth, cH2, 3, 3, 'F');
+        doc.setFillColor(pc.r, pc.g, pc.b); doc.roundedRect(margin, y, 5, cH2, 2, 2, 'F');
+        doc.setFontSize(9.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b); doc.text(pol.policy || '', margin + 14, y + 14, { maxWidth: contentWidth - 100 });
+        if (pol.effective_date) { doc.setFontSize(7.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(110, 110, 110); doc.text(`Effective: ${pol.effective_date}`, margin + 14, y + 24); }
+        let cy3 = y + 34;
+        doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(50, 50, 50); doc.text(dL2, margin + 14, cy3); cy3 += dL2.length * 12;
+        if (iL2.length) { doc.setFontSize(8); doc.setFont('helvetica', 'italic'); doc.setTextColor(pc.r, pc.g, pc.b); doc.text(iL2, margin + 14, cy3); cy3 += iL2.length * 12; }
+        if (aL.length) { doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(153, 27, 27); doc.text(aL, margin + 14, cy3); }
+        y += cH2 + 6;
+      }
+    }
+  }
+
+  // SECTION 06: Market Context
   doc.addPage();
-  drawSectionDivider(doc, branding, 5, 'Market Context &\nWhat to Watch', 'ADU development option · market conditions · value drivers');
+  drawSectionDivider(doc, branding, 6, 'Market Context &\nWhat to Watch', 'ADU development option · market conditions · value drivers');
   doc.addPage();
-  await drawPageFrame(doc, branding, 'Section 05 · Market Context', 'Market Conditions & Value Drivers');
+  await drawPageFrame(doc, branding, 'Section 06 · Market Context', 'Market Conditions & Value Drivers');
   y = 90;
   const mc = data.market_context || {};
   if (mc.narrative) {
-    y = await renderNarrative(mc.narrative, 'Section 04 · Market Context', 'Market Conditions & Value Drivers', y);
+    y = await renderNarrative(mc.narrative, 'Section 06 · Market Context', 'Market Conditions & Value Drivers', y);
   }
   // Market stats table
   const fmtPct = (n) => n != null ? `${Number(n).toFixed(1)}%` : 'N/A';
@@ -1889,11 +1959,11 @@ async function renderClientPortfolioPdf(doc, data, branding) {
   // ADU analysis if present
   if (data.adu_analysis?.narrative) {
     doc.addPage();
-    await drawPageFrame(doc, branding, 'Section 05 · Market Context', 'ADU Development Option');
+    await drawPageFrame(doc, branding, 'Section 06 · Market Context', 'ADU Development Option');
     y = 90;
     doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b);
     doc.text('ADU Development Option', margin, y); y += 18;
-    y = await renderNarrative(data.adu_analysis.narrative, 'Section 04 · Market Context', 'ADU Development Option', y);
+    y = await renderNarrative(data.adu_analysis.narrative, 'Section 06 · Market Context', 'ADU Development Option', y);
   }
 
   await addClosingSummaryPage(doc, branding, 'Portfolio Review Summary', [
