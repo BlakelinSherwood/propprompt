@@ -95,15 +95,15 @@ export default function CompsMapWithHeat({ subjectAddress, comps, selected, onTo
       // Also resize whenever the container changes size (e.g. panel expand)
       const observer = new ResizeObserver(() => { map.resize(); });
       observer.observe(containerRef.current);
-
-      return () => {
-        observer.disconnect();
-        map.remove();
-        mapRef.current = null;
-      };
     });
 
-    return () => { cancelAnimationFrame(raf); if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; } };
+    return () => { 
+      cancelAnimationFrame(raf); 
+      if (mapRef.current) { 
+        mapRef.current.remove(); 
+        mapRef.current = null; 
+      } 
+    };
   }, [subjectCoords, mapToken]);
 
   // Add/update markers
