@@ -215,39 +215,9 @@ export default function AnalysisRun() {
 
     setFlipbookGenerating(true);
     try {
-      // Ensure PDF exists — generate if needed
-      let pdfUrl = analysis?.output_pdf_url;
-      if (!pdfUrl) {
-        const pdfRes = await base44.functions.invoke('generateDocuments', { analysisId, format: 'pdf' });
-        pdfUrl = pdfRes?.data?.url;
-        if (!pdfUrl) throw new Error('PDF generation failed');
-      }
-
-      // Fetch PDF bytes and re-upload to flipbooks/ path
-      const pdfBlob = await fetch(pdfUrl).then(r => r.blob());
-      const today = new Date().toISOString().slice(0, 10);
-      const filename = `${analysisId}.pdf`;
-      const file = new File([pdfBlob], filename, { type: 'application/pdf' });
-      const uploadRes = await base44.integrations.Core.UploadFile({ file });
-      const publicUrl = uploadRes?.file_url;
-      if (!publicUrl) throw new Error('File upload failed');
-
-      const token = crypto.randomUUID();
-      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-      const me = await base44.auth.me();
-
-      const record = await base44.entities.FlipbookLink.create({
-        analysis_id: analysisId,
-        created_by: me?.email || '',
-        pdf_storage_path: `flipbooks/${today}/${filename}`,
-        pdf_public_url: publicUrl,
-        share_token: token,
-        expires_at: expiresAt,
-        is_expired: false,
-        view_count: 0,
-      });
-
-      setFlipbookLink(record);
+      const res = await base44.functions.invoke('createFlipbook', { analysisId });
+      if (!res.data?.record) throw new Error(res.data?.error || 'Flipbook creation failed');
+      setFlipbookLink(res.data.record);
     } catch (err) {
       console.error('[flipbook] error:', err);
       alert('Couldn\'t generate flipbook link — please try again.');
