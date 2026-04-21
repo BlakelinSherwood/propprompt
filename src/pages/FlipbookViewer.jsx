@@ -32,7 +32,6 @@ export default function FlipbookViewer() {
   const [flipbook, setFlipbook] = useState(null);
   const [branding, setBranding] = useState({ primary_color: '#1A3226', accent_color: '#B8982F', org_logo_url: null, agent_name: '' });
   const [pdfReady, setPdfReady] = useState(false);
-  const [useFallback, setUseFallback] = useState(false);
 
   const containerRef = useRef(null); // unused but kept for safety
 
@@ -60,10 +59,9 @@ export default function FlipbookViewer() {
     init();
   }, [token]);
 
-  // ── 2. Use iframe immediately — reliable and fast ───────────────────────────
+  // ── 2. Set ready immediately ─────────────────────────────────────────────────
   useEffect(() => {
     if (status !== 'ready' || !flipbook?.pdf_public_url) return;
-    setUseFallback(true);
     setPdfReady(true);
   }, [status, flipbook]);
 
@@ -115,11 +113,11 @@ export default function FlipbookViewer() {
           </div>
         )}
 
-        {/* PDF iframe */}
+        {/* PDF Viewer — uses Google Docs viewer to bypass iframe restrictions */}
         {pdfReady && (
           <>
             <iframe
-              src={flipbook.pdf_public_url}
+              src={`https://docs.google.com/viewer?url=${encodeURIComponent(flipbook.pdf_public_url)}&embedded=true`}
               className="w-full rounded-xl shadow-2xl border border-gray-200"
               style={{ maxWidth: 960, height: '80vh' }}
               title="Report PDF"
@@ -127,14 +125,13 @@ export default function FlipbookViewer() {
             <div className="flex items-center gap-4 mt-4">
               <a
                 href={flipbook.pdf_public_url}
-                download
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{ backgroundColor: accent }}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-medium hover:opacity-90 transition"
               >
                 <Download className="w-4 h-4" />
-                Download PDF
+                Download / Open PDF
               </a>
             </div>
           </>
