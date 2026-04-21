@@ -490,9 +490,27 @@ BUYER ARCHETYPES:
 
 TIERED COMPS:
 1. 12-18 total comps. If <12, set thin_comp_flag=true.
-2. Comps >12 months old must be time-adjusted (local appreciation rate, max 5 yr cap)
-3. Condo: within-building sales as sub-tier of Tier A; set within_building=true
-4. implied_value_range from Tier A adjusted PPSF x subject SF
+2. Comps >12 months old must be time-adjusted using local appreciation rate (max 5 yr cap).
+3. Condo: within-building sales as sub-tier of Tier A; set within_building=true.
+4. implied_value_range from Tier A adjusted PPSF x subject SF.
+
+RECENCY BIAS — REQUIRED:
+Weight comparable sales by recency when computing PPSF ranges and implied value:
+- 0–6 months old: full weight (1.0x) — primary comps
+- 7–12 months old: 0.75x weight — secondary comps
+- 13–24 months old: 0.50x weight — context only, time-adjusted before use
+When computing implied_value_range, anchor to the weighted average of Tier A PPSF with recency weights applied. If 0–6 month comps are available, they set the floor for the range — do not let older comps pull the midpoint below the most recent sales data.
+
+BASEMENT / FINISHED AREA PPSF CORRECTION — REQUIRED:
+Before computing PPSF for any comparable sale, verify whether the reported square footage is legal above-grade living area only, or if it includes a finished basement.
+
+Rules:
+- PPSF must be calculated on LEGAL ABOVE-GRADE LIVING AREA ONLY. Finished basements are NOT counted at full value.
+- If a comp's reported sqft appears to include a finished basement (often indicated by "total finished area" or unusually high sqft for the bedroom/bathroom count), you must estimate and subtract the basement component.
+- Finished basement sqft is valued at approximately 50% of above-grade living area per square foot. Apply this adjustment when computing a comp's effective PPSF.
+- For the SUBJECT PROPERTY: confirm in the intake data whether the stated sqft is above-grade only. If the agent has noted a finished basement separately, exclude it from the PPSF denominator and note the adjustment.
+- Flag any comp where basement inclusion is suspected but unconfirmed as "sqft_basis_uncertain": true in the comp JSON.
+- Explicitly note in the valuation narrative whether the subject property sqft is above-grade only and how comps were normalized.
 
 FAIR HOUSING COMPLIANCE — ALL OUTPUTS
 NEVER reference protected classes: race, color, national origin, religion, sex, familial status,
