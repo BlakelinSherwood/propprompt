@@ -51,7 +51,7 @@ function FitBounds({ positions }) {
     } else if (positions.length === 1) {
       map.setView(positions[0], 14);
     }
-  }, [positions.length]);
+  }, [JSON.stringify(positions)]);
   return null;
 }
 
@@ -105,16 +105,24 @@ export default function CompsMap({ subjectAddress, comps, selected, onToggle }) 
   if (loading && allPositions.length === 0) {
     return (
       <div className="rounded-xl border border-[#1A3226]/10 bg-[#FAF8F4] h-48 flex items-center justify-center text-xs text-[#1A3226]/40">
-        Loading map…
+        Geocoding addresses…
       </div>
     );
   }
 
-  const center = subjectCoord || allPositions[0] || [42.55, -70.88];
+  if (allPositions.length === 0) {
+    return (
+      <div className="rounded-xl border border-[#1A3226]/10 bg-[#FAF8F4] h-48 flex items-center justify-center text-xs text-[#1A3226]/40">
+        Map unavailable — addresses could not be geocoded
+      </div>
+    );
+  }
+
+  const center = subjectCoord || allPositions[0];
 
   return (
     <div className="rounded-xl overflow-hidden border border-[#1A3226]/10" style={{ height: 280 }}>
-      <MapContainer center={center} zoom={14} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false}>
+      <MapContainer center={center} zoom={13} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false}>
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='© <a href="https://openstreetmap.org">OpenStreetMap</a>'
