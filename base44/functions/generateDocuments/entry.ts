@@ -715,7 +715,7 @@ async function renderCMAPdf(doc, data, branding) {
     ['YoY Appreciation', mc.yoy_appreciation ? fmtPct(mc.yoy_appreciation) : 'N/A'],
     ['Avg Days on Market', mc.avg_days_on_market ? `${mc.avg_days_on_market} days` : 'N/A'],
     ['Sale-to-List Ratio', mc.sale_to_list_ratio ? fmtPct(mc.sale_to_list_ratio * 100) : 'N/A'],
-    ['Months of Inventory', mc.months_inventory ? `${mc.months_inventory}` : 'N/A'],
+    ['Months of Inventory', mc.months_inventory ? `${mc.months_inventory} months` : 'N/A'],
     ['Market Characterization', mc.market_characterization || 'N/A'],
   ];
   drawTable(doc, margin, y, ['Market Indicator', 'Value'], mRows, [contentWidth - 130, 130],
@@ -987,7 +987,7 @@ async function renderListingPricingPdf(doc, data, branding, netProceedsJson = nu
     ['YoY Appreciation', mc.yoy_appreciation ? fmtPct(mc.yoy_appreciation) : 'N/A'],
     ['Avg Days on Market', mc.avg_days_on_market ? `${mc.avg_days_on_market} days` : 'N/A'],
     ['Sale-to-List Ratio', mc.sale_to_list_ratio ? fmtPct(mc.sale_to_list_ratio * 100) : 'N/A'],
-    ['Months of Inventory', mc.months_inventory ? `${mc.months_inventory}` : 'N/A'],
+    ['Months of Inventory', mc.months_inventory ? `${mc.months_inventory} months` : 'N/A'],
     ['Market Characterization', mc.market_characterization || 'N/A'],
   ];
   if (y + mRows.length * 28 + 40 > BOTTOM) { doc.addPage(); await drawPageFrame(doc, branding, 'Section 01 · Property & Market Context', 'Market Indicators'); y = 90; }
@@ -1444,7 +1444,7 @@ async function renderBuyerIntelligencePdf(doc, data, branding) {
     ['Median Sale Price', mc.median_sale_price ? fmt(mc.median_sale_price) : 'N/A'],
     ['Avg Days on Market', mc.avg_days_on_market ? `${mc.avg_days_on_market} days` : 'N/A'],
     ['Sale-to-List Ratio', mc.sale_to_list_ratio ? `${(mc.sale_to_list_ratio * 100).toFixed(1)}%` : 'N/A'],
-    ['Months of Inventory', mc.months_inventory ? `${mc.months_inventory}` : 'N/A'],
+    ['Months of Inventory', mc.months_inventory ? `${mc.months_inventory} months` : 'N/A'],
   ];
   drawTable(doc, margin, y, ['Market Indicator', 'Value'], mcRows, [contentWidth - 130, 130], { headerFill: branding.primary_color || '#1A3226', headerTextColor: '#FFFFFF', fontSize: 9, rowHeight: 26, branding });
 
@@ -1582,7 +1582,7 @@ async function renderClientPortfolioPdf(doc, data, branding) {
   const addrParts = (data.property_address || '').split(',');
   const street = addrParts[0]?.trim() || '';
   const cityState = addrParts.slice(1).join(',').trim();
-  const addrY = pillY + pillH + 38;
+  const addrY = pillY + pillH + 56;
   doc.setFontSize(28); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
   doc.text(street, pageWidth / 2, addrY, { align: 'center', maxWidth: 460 });
   if (cityState) {
@@ -1948,7 +1948,7 @@ async function renderClientPortfolioPdf(doc, data, branding) {
     ['YoY Appreciation', mc.yoy_appreciation ? fmtPct(mc.yoy_appreciation) : 'N/A'],
     ['Avg Days on Market', mc.avg_days_on_market ? `${mc.avg_days_on_market} days` : 'N/A'],
     ['Sale-to-List Ratio', mc.sale_to_list_ratio ? fmtPct(mc.sale_to_list_ratio * 100) : 'N/A'],
-    ['Months of Inventory', mc.months_inventory ? `${mc.months_inventory}` : 'N/A'],
+    ['Months of Inventory', mc.months_inventory ? `${mc.months_inventory} months` : 'N/A'],
     ['Market Characterization', mc.market_characterization || 'N/A'],
   ].filter(r => r[1] !== 'N/A');
   if (mcRows.length && y + mcRows.length * 26 + 40 < BOTTOM) {
