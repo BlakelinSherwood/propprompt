@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { DollarSign, Home } from "lucide-react";
+import { DollarSign, Search, CheckCircle2, AlertTriangle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
 import WizardShell from "./WizardShell";
+import { base44 } from "@/api/base44Client";
 
 const CLIENT_INTERESTS = [
   "Considering a HELOC",
@@ -18,8 +20,50 @@ const CLIENT_INTERESTS = [
 
 export default function StepClientFinancial({ intake, update, onNext, onBack }) {
   const [mortgageSource, setMortgageSource] = useState(intake.mortgage_source || "approximate");
+  const [fetchStatus, setFetchStatus] = useState("idle"); // idle | loading | found | error
+  const [fetchNote, setFetchNote] = useState(null);
 
   const canNext = true; // All fields optional for portfolio analysis
+
+  async function fetchMortgageData() {
+    if (!intake.address) return;
+    setFetchStatus("loading");
+    setFetchNote(null);
+    try {
+      const res = await base44.functions.invoke("searchPublicRecords", {
+        address: intake.address,
+        runMortgageSearch: true,
+        forceRefresh: false,
+      });
+      const d = res.data;
+      if (!d || d.search_status === "error") {
+        setFetchStatus("error");
+        setFetchNote(d?.search_notes || "Could not retrieve mortgage data for this address.");
+        return;
+      }
+
+      const updates = {};
+      // Estimated mortgage payoff → mortgage balance
+      if (d.estimated_mortgage_payoff && !intake.mortgage_balance) {
+        updates.mortgage_balance = d.estimated_mortgage_payoff;
+        updates.mortgage_source = "approximate";
+        setMortgageSource("approximate");
+      }
+      // HELOC
+      if (d.heloc_amount && !intake.heloc_info) {
+        const helocLine = `HELOC $${Number(d.heloc_amount).toLocaleString()}${d.heloc_lender ? ` with ${d.heloc_lender}` : ""}${d.heloc_date ? ` (${d.heloc_date.slice(0,7)})` : ""}`;
+        updates.heloc_info = helocLine;
+      }
+
+      if (Object.keys(updates).length > 0) update(updates);
+
+      setFetchStatus("found");
+      setFetchNote(d.mortgage_search_notes || d.search_notes || "Mortgage data loaded from public registry records.");
+    } catch (err) {
+      setFetchStatus("error");
+      setFetchNote("Unable to search mortgage records. Enter values manually.");
+    }
+  }
 
   const handleInterestToggle = (interest) => {
     const current = intake.client_interests || [];
@@ -39,6 +83,40 @@ export default function StepClientFinancial({ intake, update, onNext, onBack }) 
       canProceed={canNext}
     >
       <div className="space-y-6">
+
+        {/* Fetch mortgage data button */}
+        {intake.address && (
+          <div className="bg-[#FAF8F4] border border-[#1A3226]/10 rounded-xl p-4 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-[#1A3226]">Auto-fill from Public Mortgage Records</p>
+                <p className="text-xs text-[#1A3226]/50 mt-0.5">Search registry of deeds for recorded mortgages, refinances, and HELOCs.</p>
+              </div>
+              <Button
+                onClick={fetchMortgageData}
+                disabled={fetchStatus === "loading"}
+                size="sm"
+                className="flex-shrink-0 bg-[#1A3226] text-white hover:bg-[#1A3226]/90 gap-1.5"
+              >
+                <Search className="w-3.5 h-3.5" />
+                {fetchStatus === "loading" ? "Searching…" : "Find Mortgage Data"}
+              </Button>
+            </div>
+            {fetchStatus === "found" && (
+              <div className="flex items-start gap-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                <span>{fetchNote}</span>
+              </div>
+            )}
+            {fetchStatus === "error" && (
+              <div className="flex items-start gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                <span>{fetchNote}</span>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Mortgage Balance */}
         <div>
           <Label className="text-xs font-medium text-[#1A3226]/60 mb-2 block">
