@@ -74,6 +74,7 @@ export default function StepComparableSales({ intake, update, onNext, onBack }) 
   const [researcherNote, setResearcherNote] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
   const [cacheKey, setCacheKey] = useState(null);
+  const [compColorMap, setCompColorMap] = useState({});
   const deepTimerRef = useRef(null);
 
   const city = (intake.address || "").split(",")[1]?.trim() || "this area";
@@ -357,6 +358,7 @@ export default function StepComparableSales({ intake, update, onNext, onBack }) 
           comps={allComps}
           selected={selected}
           onToggle={toggleComp}
+          onColorMap={setCompColorMap}
         />
       )}
 
@@ -384,7 +386,14 @@ export default function StepComparableSales({ intake, update, onNext, onBack }) 
                   <td className="px-3 py-2.5">
                     <input type="checkbox" checked={selected.has(comp.address)} onChange={() => toggleComp(comp.address)} className="w-4 h-4 accent-[#1A3226] cursor-pointer" />
                   </td>
-                  <td className="px-3 py-2.5 font-medium text-[#1A3226] max-w-[160px] truncate" title={comp.address}>{comp.address}</td>
+                  <td className="px-3 py-2.5 font-medium text-[#1A3226] max-w-[160px] truncate" title={comp.address}>
+                    <div className="flex items-center gap-2">
+                      {compColorMap[comp.address] && (
+                        <div style={{ width: 10, height: 10, borderRadius: "50%", background: compColorMap[comp.address], flexShrink: 0, border: "1.5px solid white", boxShadow: "0 0 0 1px rgba(0,0,0,0.1)" }} />
+                      )}
+                      <span className="truncate">{comp.address}</span>
+                    </div>
+                  </td>
                   <td className="px-3 py-2.5 text-right text-[#1A3226]">{fmt(comp.sale_price)}</td>
                   <td className="px-3 py-2.5 text-center text-[#1A3226]/60">{comp.sale_date ? comp.sale_date.slice(0, 7) : "—"}</td>
                   <td className="px-3 py-2.5 text-center text-[#1A3226]/60">{comp.bedrooms || "—"}/{comp.bathrooms || "—"}/{comp.sqft?.toLocaleString() || "—"}</td>
