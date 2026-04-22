@@ -30,35 +30,39 @@ export default function StepClientFinancial({ intake, update, onNext, onBack }) 
     setFetchStatus("loading");
     setFetchNote(null);
     try {
-      const res = await base44.functions.invoke("searchPublicRecords", {
-        address: intake.address,
-        runMortgageSearch: true,
-        forceRefresh: false,
-      });
+      const res = await base44.functions.invoke("fetchMortgageData", { address: intake.address });
       const d = res.data;
-      if (!d || d.search_status === "error") {
+
+      if (!d?.success) {
         setFetchStatus("error");
-        setFetchNote(d?.search_notes || "Could not retrieve mortgage data for this address.");
+        setFetchNote(d?.message || "Could not retrieve mortgage data for this address.");
         return;
       }
 
       const updates = {};
-      // Estimated mortgage payoff → mortgage balance
-      if (d.estimated_mortgage_payoff && !intake.mortgage_balance) {
-        updates.mortgage_balance = d.estimated_mortgage_payoff;
+
+      // Pre-fill estimated payoff as mortgage balance (only if blank)
+      if (d.estimated_payoff && !intake.mortgage_balance) {
+        updates.mortgage_balance = d.estimated_payoff;
         updates.mortgage_source = "approximate";
         setMortgageSource("approximate");
       }
-      // HELOC
+
+      // Pre-fill mortgage rate if we have an assumed rate and field is blank
+      if (d.assumed_rate_pct && !intake.mortgage_rate) {
+        updates.mortgage_rate = d.assumed_rate_pct;
+      }
+
+      // Pre-fill HELOC if found and field is blank
       if (d.heloc_amount && !intake.heloc_info) {
-        const helocLine = `HELOC $${Number(d.heloc_amount).toLocaleString()}${d.heloc_lender ? ` with ${d.heloc_lender}` : ""}${d.heloc_date ? ` (${d.heloc_date.slice(0,7)})` : ""}`;
+        const helocLine = `HELOC $${Number(d.heloc_amount).toLocaleString()}${d.heloc_lender ? ` with ${d.heloc_lender}` : ""}${d.heloc_date ? ` (${d.heloc_date.slice(0, 7)})` : ""}`;
         updates.heloc_info = helocLine;
       }
 
       if (Object.keys(updates).length > 0) update(updates);
 
       setFetchStatus("found");
-      setFetchNote(d.mortgage_search_notes || d.search_notes || "Mortgage data loaded from public registry records.");
+      setFetchNote(d.notes || "Mortgage data loaded from ATTOM public property records.");
     } catch (err) {
       setFetchStatus("error");
       setFetchNote("Unable to search mortgage records. Enter values manually.");
