@@ -4,13 +4,6 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import { base44 } from "@/api/base44Client";
 import { Loader2, Layers, X } from "lucide-react";
 
-const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
-
-// Set token globally on module load if available
-if (MAPBOX_TOKEN) {
-  mapboxgl.accessToken = MAPBOX_TOKEN;
-}
-
 // Color scale for PPSF heat (low=blue → mid=yellow → high=red)
 function ppsfToColor(ppsf, min, max) {
   if (!ppsf || ppsf === 0) return "#94a3b8";
@@ -24,8 +17,7 @@ function ppsfToColor(ppsf, min, max) {
   }
 }
 
-async function geocodeAddress(address) {
-  const token = MAPBOX_TOKEN || (await base44.functions.invoke("getMapboxToken", {}).then(r => r.data?.token).catch(() => null));
+async function geocodeAddress(address, token) {
   if (!token) return null;
   const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(address)}.json?access_token=${token}&limit=1`;
   const res = await fetch(url);
@@ -46,31 +38,40 @@ export default function CompsMapWithHeat({ subjectAddress, comps, selected, onTo
   const [subjectCoords, setSubjectCoords] = useState(null);
   const [mapToken, setMapToken] = useState(null);
 
-  // Geocode subject + comps — also resolves and stores the token
+  // Fetch token once, then geocode everything
   useEffect(() => {
     if (!subjectAddress) return;
     let cancelled = false;
 
     async function geocodeAll() {
       setLoading(true);
-      const token = MAPBOX_TOKEN || await base44.functions.invoke("getMapboxToken", {}).then(r => r.data?.token).catch(() => null);
+
+      // Fetch token from backend
+      let token = null;
+      try {
+        const res = await base44.functions.invoke("getMapboxToken", {});
+        token = res.data?.token;
+      } catch (e) {
+        console.error("[CompsMapWithHeat] Failed to get token:", e);
+      }
+
       if (!token) { setLoading(false); return; }
+
+      // Set globally for mapbox-gl to use
       mapboxgl.accessToken = token;
       if (!cancelled) setMapToken(token);
 
-      const subj = await geocodeAddress(subjectAddress);
-      if (cancelled) return;
-      setSubjectCoords(subj);
+      // Geocode subject + all comps in parallel
+      const [subj, ...compCoords] = await Promise.all([
+        geocodeAddress(subjectAddress, token),
+        ...(comps || []).map(c => c.address ? geocodeAddress(c.address, token) : Promise.resolve(null))
+      ]);
 
-      const withCoords = await Promise.all(
-        (comps || []).map(async c => {
-          if (!c.address) return { ...c, coords: null };
-          const coords = await geocodeAddress(c.address);
-          return { ...c, coords };
-        })
-      );
-      if (!cancelled) setGeocodedComps(withCoords);
-      if (!cancelled) setLoading(false);
+      if (cancelled) return;
+
+      setSubjectCoords(subj);
+      setGeocodedComps((comps || []).map((c, i) => ({ ...c, coords: compCoords[i] })));
+      setLoading(false);
     }
 
     geocodeAll();
@@ -79,40 +80,48 @@ export default function CompsMapWithHeat({ subjectAddress, comps, selected, onTo
 
   // Initialize map — only after token + coords + container are ready
   useEffect(() => {
-    if (!subjectCoords || !containerRef.current || mapRef.current || !mapToken) return;
+    if (!subjectCoords || !mapToken || mapRef.current) return;
 
-    try {
+    // Wait a tick for the DOM to be visible with actual dimensions
+    const timer = setTimeout(() => {
+      if (!containerRef.current) return;
+
       const map = new mapboxgl.Map({
         container: containerRef.current,
         style: "mapbox://styles/mapbox/light-v11",
         center: [subjectCoords.lng, subjectCoords.lat],
         zoom: 13,
+        accessToken: mapToken,
       });
       mapRef.current = map;
       map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
 
-      // Force resize on load
-      map.on('load', () => { setTimeout(() => map.resize(), 100); });
+      map.on('load', () => map.resize());
 
-      // Also resize whenever the container changes size
-      const observer = new ResizeObserver(() => { map.resize(); });
+      const observer = new ResizeObserver(() => { if (mapRef.current) mapRef.current.resize(); });
       observer.observe(containerRef.current);
 
-      return () => {
+      // Store cleanup on the ref
+      mapRef.current._cleanup = () => {
         observer.disconnect();
-        if (mapRef.current) {
-          mapRef.current.remove();
-          mapRef.current = null;
-        }
+        map.remove();
+        mapRef.current = null;
       };
-    } catch (err) {
-      console.error('[CompsMapWithHeat] Map init error:', err);
-    }
+    }, 50);
+
+    return () => {
+      clearTimeout(timer);
+      if (mapRef.current?._cleanup) {
+        mapRef.current._cleanup();
+      }
+    };
   }, [subjectCoords, mapToken]);
 
-  // Add/update markers
+  // Add/update markers (wait for map to be loaded)
   useEffect(() => {
     if (!mapRef.current || !subjectCoords) return;
+
+    function addMarkers() {
     markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
 
@@ -150,6 +159,13 @@ export default function CompsMapWithHeat({ subjectAddress, comps, selected, onTo
 
       markersRef.current.push(new mapboxgl.Marker(el).setLngLat([comp.coords.lng, comp.coords.lat]).setPopup(popup).addTo(mapRef.current));
     });
+    }
+
+    if (mapRef.current.loaded()) {
+      addMarkers();
+    } else {
+      mapRef.current.once('load', addMarkers);
+    }
   }, [geocodedComps, selected, showHeat, subjectCoords]);
 
   // Load neighborhood tier data from Perplexity
