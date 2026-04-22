@@ -30,12 +30,23 @@ export default function StepPublicRecords({ intake, update, onNext, onBack }) {
 
   const hasFetched = useRef(false);
 
-  // Extract state from address
+  // Extract state from address (handles both abbrev and full state names from Mapbox)
   function extractState(address) {
-    const match = address.match(/,\s*([A-Z]{2})\s*\d{5}/);
-    if (match) return match[1];
-    const stateMatch = address.match(/\b(MA|ME|NH|VT)\b/i);
-    if (stateMatch) return stateMatch[1].toUpperCase();
+    // Try 2-letter abbreviation before ZIP
+    const abbrMatch = address.match(/,\s*([A-Z]{2})\s*\d{5}/);
+    if (abbrMatch) return abbrMatch[1];
+    // Try standalone 2-letter abbreviation
+    const shortMatch = address.match(/\b(MA|ME|NH|VT)\b/i);
+    if (shortMatch) return shortMatch[1].toUpperCase();
+    // Try full state names (Mapbox returns these)
+    const stateNames = {
+      "Massachusetts": "MA", "Maine": "ME", "New Hampshire": "NH", "Vermont": "VT"
+    };
+    for (const [name, abbr] of Object.entries(stateNames)) {
+      if (address.includes(name)) return abbr;
+    }
+    // Also check intake.address_state if available
+    if (intake.address_state) return intake.address_state.toUpperCase();
     return null;
   }
 
