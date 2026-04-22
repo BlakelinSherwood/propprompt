@@ -785,6 +785,15 @@ async function fetchAVMParallel(perpKey, openaiKey, address) {
   return merged;
 }
 
+// Wrap a promise with a timeout — rejects with a clear message if exceeded
+function withTimeout(promise, ms, label) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms / 1000}s`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -1177,7 +1186,7 @@ CRITICAL: Determine which micro-neighborhood the subject property at ${analysis.
           const town = (addr.split(',')[1] || '').trim() || addr;
           console.log('[generateAnalysis] Fetching walkability/flood/schools/town-intelligence for:', addr);
 
-          const [walkRes, floodRes, schoolsRes, townIntelRes] = await Promise.allSettled([
+          const locResults = await withTimeout(Promise.allSettled([
             // Walk Score + transit + bike
             fetch('https://api.perplexity.ai/chat/completions', {
               method: 'POST',
@@ -1217,7 +1226,7 @@ CRITICAL: Determine which micro-neighborhood the subject property at ${analysis.
                   method: 'POST',
                   headers: { 'Authorization': `Bearer ${perpKey}`, 'Content-Type': 'application/json' },
                   body: JSON.stringify({
-                    model: 'sonar-pro',
+                    model: 'sonar',
                     messages: [{ role: 'user', content: `Research the following for ${town}, Massachusetts and Massachusetts statewide housing policy as of ${new Date().getFullYear()}:
 
 1. TOWN DEVELOPMENTS: What major development projects, infrastructure improvements, rezoning efforts, or town planning initiatives are recently approved, under construction, or proposed in ${town}, MA? Include projects like new commercial developments, transit improvements, school construction, park improvements, downtown revitalization, or major employer relocations. Note whether each is likely to positively or negatively affect residential home values and in what timeframe.
@@ -1254,11 +1263,12 @@ Return ONLY valid JSON:
   "overall_outlook": "bullish|cautious|neutral",
   "outlook_summary": "2-3 sentence summary of the combined development and policy environment for ${town} homeowners right now"
 }` }],
-                    search_context_size: 'high',
+                    search_context_size: 'medium',
                   }),
                 }).then(r => r.json())
               : Promise.resolve(null),
-          ]);
+          ]), 15000, 'loc-enrichment').catch(() => null);
+          const [walkRes, floodRes, schoolsRes, townIntelRes] = locResults || [{status:'rejected'},{status:'rejected'},{status:'rejected'},{status:'rejected'}];
 
           // Parse town intelligence (client_portfolio only)
           if (townIntelRes && townIntelRes.status === 'fulfilled' && townIntelRes.value) {
@@ -1371,7 +1381,7 @@ Include this in the output JSON as: "property_context": { ..., "schools": { "ass
         const { perpKey, openaiKey } = await resolveAvmKeys();
         if (address && (perpKey || openaiKey)) {
           console.log('[generateAnalysis] Fetching AVM data (parallel Perplexity+GPT-4o) for:', address);
-          avmResult = await fetchAVMParallel(perpKey, openaiKey, address);
+          avmResult = await withTimeout(fetchAVMParallel(perpKey, openaiKey, address), 12000, 'AVM-parallel');
           console.log('[generateAnalysis] AVM merged result:', avmResult ? Object.keys(avmResult).join(',') : 'null');
         } else {
           console.warn('[generateAnalysis] No AVM keys available for lookup');
