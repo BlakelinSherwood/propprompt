@@ -15,6 +15,7 @@ const ASSESSMENT_LABELS = {
 export default function ExportPanel({ analysis, orgPlan }) {
   const { toast } = useToast();
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [abridgedLoading, setAbridgedLoading] = useState(false);
   const [pptxLoading, setPptxLoading] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
   const [emailTo, setEmailTo] = useState(analysis?.intake_data?.contact_email || "");
@@ -34,6 +35,17 @@ export default function ExportPanel({ analysis, orgPlan }) {
     if (url) {
       window.open(url, "_blank");
       toast({ title: "PDF ready — opening now.", description: res.data?.driveUrl ? "Also saved to your Google Drive." : undefined });
+    }
+  };
+
+  const handleAbridgedPdf = async () => {
+    setAbridgedLoading(true);
+    const res = await base44.functions.invoke("generateDocuments", { analysisId: analysis.id, format: "pdf", subFormat: "abridged" });
+    setAbridgedLoading(false);
+    const url = res.data?.url;
+    if (url) {
+      window.open(url, "_blank");
+      toast({ title: "Abridged PDF ready — opening now." });
     }
   };
 
@@ -84,6 +96,20 @@ export default function ExportPanel({ analysis, orgPlan }) {
             {pdfLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
             Download PDF
           </Button>
+
+          {/* Abridged PDF — portfolio only */}
+          {analysis?.assessment_type === "client_portfolio" && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleAbridgedPdf}
+              disabled={abridgedLoading}
+              className="gap-2 border-[#B8982F]/40 text-[#B8982F] hover:bg-[#B8982F]/5"
+            >
+              {abridgedLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              Abridged PDF (2–3 pg)
+            </Button>
+          )}
 
           {/* PPTX */}
           {isPro ? (

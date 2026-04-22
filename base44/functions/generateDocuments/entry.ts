@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { analysisId, format, email_to, email_subject } = await req.json();
+    const { analysisId, format, email_to, email_subject, subFormat } = await req.json();
     if (!analysisId) return Response.json({ error: 'analysisId required' }, { status: 400 });
     if (!['pdf', 'pptx', 'email'].includes(format)) {
       return Response.json({ error: 'format must be pdf, pptx, or email' }, { status: 400 });
@@ -92,14 +92,15 @@ Deno.serve(async (req) => {
     // Specialized renderers return a base64 PDF directly
     const DELEGATED_TYPES = ['client_portfolio', 'investment_analysis', 'rental_analysis'];
     if (DELEGATED_TYPES.includes(analysis.assessment_type)) {
-      let delegateFn, subFormat;
+      let delegateFn;
+      let delegatePayload = { analysisId, branding };
       if (analysis.assessment_type === 'client_portfolio') {
-        delegateFn = 'generatePortfolioPdf';
+        delegateFn = subFormat === 'abridged' ? 'generateAbridgedPortfolioPdf' : 'generatePortfolioPdf';
       } else {
         delegateFn = 'generateDocsExtra';
-        subFormat = analysis.assessment_type === 'investment_analysis' ? 'investment' : 'rental';
+        delegatePayload.subFormat = analysis.assessment_type === 'investment_analysis' ? 'investment' : 'rental';
       }
-      const res = await base44.functions.invoke(delegateFn, { analysisId, branding, ...(subFormat ? { subFormat } : {}) });
+      const res = await base44.functions.invoke(delegateFn, delegatePayload);
       const url = res?.data?.url || null;
       const b64 = res?.data?.base64 || null;
       if (url) {
