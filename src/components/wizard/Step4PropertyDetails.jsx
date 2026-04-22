@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { MapPin, AlertCircle } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { AlertCircle } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import WizardNav from "./WizardNav";
+import AddressAutocomplete from "./AddressAutocomplete";
 
 const PROPERTY_TYPES = [
   { id: "single_family", label: "Single-Family" },
@@ -53,9 +53,9 @@ function validateEasternMA(address) {
 }
 
 export default function Step4PropertyDetails({ intake, update, onNext, onBack }) {
-  const marketCheck = validateEasternMA(intake.address);
+  const marketCheck = validateEasternMA(intake.address || "");
 
-  const canNext = intake.address && intake.property_type && intake.location_class && marketCheck !== false;
+  const canNext = intake.address && intake.address.length > 5 && intake.property_type && intake.location_class && marketCheck !== false;
 
   return (
     <div className="p-6 lg:p-8">
@@ -71,26 +71,22 @@ export default function Step4PropertyDetails({ intake, update, onNext, onBack })
         <Label className="text-xs font-medium text-[#1A3226]/60 mb-1.5 block">
           Property Address <span className="text-red-400">*</span>
         </Label>
-        <div className="relative">
-          <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#1A3226]/30" />
-          <Input
-            placeholder="123 Ocean Ave, Marblehead, MA 01945"
-            value={intake.address}
-            onChange={(e) => update({ address: e.target.value })}
-            className="pl-10 border-[#1A3226]/15 focus-visible:ring-[#B8982F]/30 bg-white"
-          />
-        </div>
+        <AddressAutocomplete
+          value={intake.address}
+          placeholder="123 Ocean Ave, Marblehead, MA 01945"
+          onChange={(result) => update(result)}
+        />
         {marketCheck === "warn" && (
           <p className="mt-1.5 flex items-center gap-1 text-xs text-amber-600">
             <AlertCircle className="w-3.5 h-3.5" />
             Address not confirmed as Eastern Massachusetts — please verify before proceeding.
           </p>
         )}
-        {marketCheck === true && intake.address.length > 10 && (
+        {marketCheck === true && intake.address && intake.address.length > 10 && (
           <p className="mt-1.5 text-xs text-emerald-600">✓ Eastern Massachusetts market confirmed</p>
         )}
         <p className="mt-1 text-[10px] text-[#1A3226]/35">
-          Google Places autocomplete will be enabled when the API key is configured.
+          Start typing to see address suggestions — select to auto-fill city, state, ZIP, and coordinates.
         </p>
       </div>
 

@@ -52,6 +52,9 @@ export default function StepClientFinancial({ intake, update, onNext, onBack }) 
       if (d.assumed_rate_pct && !intake.mortgage_rate) {
         updates.mortgage_rate = d.assumed_rate_pct;
       }
+      if (d.loan_amount) updates.mortgage_loan_amount = d.loan_amount;
+      if (d.lender_name) updates.mortgage_lender = d.lender_name;
+      if (d.loan_date) updates.mortgage_loan_date = d.loan_date;
 
       // Pre-fill HELOC if found and field is blank
       if (d.heloc_amount && !intake.heloc_info) {
