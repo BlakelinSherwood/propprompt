@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { base44 } from "@/api/base44Client";
-import { Loader2, Layers, X } from "lucide-react";
+import { Loader2, Layers } from "lucide-react";
 
 // Color scale for PPSF heat (low=blue → mid=yellow → high=red)
 function ppsfToColor(ppsf, min, max) {
@@ -17,8 +17,8 @@ function ppsfToColor(ppsf, min, max) {
   }
 }
 
-async function geocodeAddress(address, token) {
-  if (!token) return null;
+// Geocode a single address via Mapbox
+async function geocode(address, token) {
   const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(address)}.json?access_token=${token}&limit=1`;
   const res = await fetch(url);
   const data = await res.json();
@@ -31,59 +31,72 @@ export default function CompsMapWithHeat({ subjectAddress, comps, selected, onTo
   const mapRef = useRef(null);
   const markersRef = useRef([]);
   const [showHeat, setShowHeat] = useState(false);
+  const [ready, setReady] = useState(false); // map initialized
   const [loading, setLoading] = useState(true);
   const [neighborhoodData, setNeighborhoodData] = useState(null);
   const [loadingNeighborhood, setLoadingNeighborhood] = useState(false);
-  const [geocodedComps, setGeocodedComps] = useState([]);
+  const [compsWithCoords, setCompsWithCoords] = useState([]);
   const [subjectCoords, setSubjectCoords] = useState(null);
-  const [mapToken, setMapToken] = useState(null);
 
-  // Fetch token once, then geocode everything
+  // Step 1: resolve coordinates — use lat/lng already on comps if available, fallback to geocoding
   useEffect(() => {
     if (!subjectAddress) return;
     let cancelled = false;
 
-    async function geocodeAll() {
+    async function resolveCoords() {
       setLoading(true);
 
-      // Fetch token from backend
+      // Get token from backend
       let token = null;
       try {
         const res = await base44.functions.invoke("getMapboxToken", {});
         token = res.data?.token;
       } catch (e) {
-        console.error("[CompsMapWithHeat] Failed to get token:", e);
+        console.error("[CompsMapWithHeat] token fetch failed:", e);
       }
+      if (!token || cancelled) { setLoading(false); return; }
 
-      if (!token) { setLoading(false); return; }
-
-      // Set globally for mapbox-gl to use
       mapboxgl.accessToken = token;
-      if (!cancelled) setMapToken(token);
 
-      // Geocode subject + all comps in parallel
-      const [subj, ...compCoords] = await Promise.all([
-        geocodeAddress(subjectAddress, token),
-        ...(comps || []).map(c => c.address ? geocodeAddress(c.address, token) : Promise.resolve(null))
-      ]);
+      // Try to extract subject coords from comps (RentCast returns subjectProperty lat/lng)
+      // Otherwise geocode the subject address
+      let subjCoords = null;
+      const firstCompWithCoords = comps?.find(c => c.latitude && c.longitude);
+      if (firstCompWithCoords) {
+        // Use a nearby comp's coords as rough center, then geocode subject
+      }
+      subjCoords = await geocode(subjectAddress, token);
 
       if (cancelled) return;
+      setSubjectCoords(subjCoords);
 
-      setSubjectCoords(subj);
-      setGeocodedComps((comps || []).map((c, i) => ({ ...c, coords: compCoords[i] })));
+      // For comps: use existing lat/lng if available (RentCast provides them), otherwise geocode
+      const resolved = await Promise.all(
+        (comps || []).map(async c => {
+          if (c.latitude && c.longitude) {
+            return { ...c, coords: { lat: c.latitude, lng: c.longitude } };
+          }
+          if (!c.address) return { ...c, coords: null };
+          const coords = await geocode(c.address, token);
+          return { ...c, coords };
+        })
+      );
+
+      if (cancelled) return;
+      setCompsWithCoords(resolved);
       setLoading(false);
     }
 
-    geocodeAll();
+    resolveCoords();
     return () => { cancelled = true; };
   }, [subjectAddress, comps?.length]);
 
-  // Initialize map — only after token + coords + container are ready
+  // Step 2: Initialize map once we have subject coords
   useEffect(() => {
-    if (!subjectCoords || !mapToken || mapRef.current) return;
+    if (!subjectCoords || mapRef.current) return;
 
-    // Wait a tick for the DOM to be visible with actual dimensions
-    const timer = setTimeout(() => {
+    // Small delay to ensure container has real dimensions in DOM
+    const t = setTimeout(() => {
       if (!containerRef.current) return;
 
       const map = new mapboxgl.Map({
@@ -91,57 +104,61 @@ export default function CompsMapWithHeat({ subjectAddress, comps, selected, onTo
         style: "mapbox://styles/mapbox/light-v11",
         center: [subjectCoords.lng, subjectCoords.lat],
         zoom: 13,
-        accessToken: mapToken,
       });
-      mapRef.current = map;
+
       map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
+      map.on("load", () => {
+        map.resize();
+        setReady(true);
+      });
 
-      map.on('load', () => map.resize());
+      const ro = new ResizeObserver(() => map.resize());
+      ro.observe(containerRef.current);
 
-      const observer = new ResizeObserver(() => { if (mapRef.current) mapRef.current.resize(); });
-      observer.observe(containerRef.current);
-
-      // Store cleanup on the ref
-      mapRef.current._cleanup = () => {
-        observer.disconnect();
-        map.remove();
-        mapRef.current = null;
-      };
-    }, 50);
+      mapRef.current = map;
+      mapRef.current._ro = ro;
+    }, 100);
 
     return () => {
-      clearTimeout(timer);
-      if (mapRef.current?._cleanup) {
-        mapRef.current._cleanup();
+      clearTimeout(t);
+      if (mapRef.current) {
+        mapRef.current._ro?.disconnect();
+        mapRef.current.remove();
+        mapRef.current = null;
+        setReady(false);
       }
     };
-  }, [subjectCoords, mapToken]);
+  }, [subjectCoords]);
 
-  // Add/update markers (wait for map to be loaded)
+  // Step 3: Add/update markers once map is ready
   useEffect(() => {
-    if (!mapRef.current || !subjectCoords) return;
+    if (!ready || !mapRef.current || !subjectCoords) return;
 
-    function addMarkers() {
     markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
 
     // Subject marker
     const subjectEl = document.createElement("div");
-    subjectEl.style.cssText = `width:16px;height:16px;background:#1A3226;border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.4);cursor:default;`;
-    markersRef.current.push(new mapboxgl.Marker(subjectEl).setLngLat([subjectCoords.lng, subjectCoords.lat]).setPopup(new mapboxgl.Popup({ offset: 10 }).setHTML(`<strong style="font-size:11px">Subject Property</strong><div style="font-size:10px;color:#666">${subjectAddress}</div>`)).addTo(mapRef.current));
+    subjectEl.style.cssText = `width:16px;height:16px;background:#1A3226;border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.4);`;
+    markersRef.current.push(
+      new mapboxgl.Marker(subjectEl)
+        .setLngLat([subjectCoords.lng, subjectCoords.lat])
+        .setPopup(new mapboxgl.Popup({ offset: 10 }).setHTML(`<strong style="font-size:11px">Subject Property</strong><div style="font-size:10px;color:#666">${subjectAddress}</div>`))
+        .addTo(mapRef.current)
+    );
 
-    const selectedComps = geocodedComps.filter(c => c.coords);
-    const ppsfValues = selectedComps.map(c => c.price_per_sqft).filter(Boolean);
-    const minPpsf = Math.min(...ppsfValues);
-    const maxPpsf = Math.max(...ppsfValues);
+    const visibleComps = compsWithCoords.filter(c => c.coords);
+    const ppsfValues = visibleComps.map(c => c.price_per_sqft).filter(Boolean);
+    const minPpsf = ppsfValues.length ? Math.min(...ppsfValues) : 0;
+    const maxPpsf = ppsfValues.length ? Math.max(...ppsfValues) : 1;
 
-    selectedComps.forEach((comp, i) => {
+    visibleComps.forEach((comp, i) => {
       const isSelected = selected.has(comp.address);
       const ppsf = comp.price_per_sqft;
       const color = showHeat && ppsf ? ppsfToColor(ppsf, minPpsf, maxPpsf) : (isSelected ? "#B8982F" : "#94a3b8");
 
       const el = document.createElement("div");
-      el.style.cssText = `width:22px;height:22px;background:${color};border:2px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:white;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.3);transition:all 0.2s;`;
+      el.style.cssText = `width:22px;height:22px;background:${color};border:2px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:white;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.3);`;
       el.textContent = i + 1;
       el.onclick = () => onToggle(comp.address);
 
@@ -151,24 +168,21 @@ export default function CompsMapWithHeat({ subjectAddress, comps, selected, onTo
           <div>Sale: $${Number(comp.sale_price || 0).toLocaleString()}</div>
           ${ppsf ? `<div>$/SF: <strong style="color:#1A3226">$${ppsf}</strong></div>` : ""}
           ${comp.sale_date ? `<div>Date: ${comp.sale_date.slice(0, 7)}</div>` : ""}
-          <div style="margin-top:4px;padding-top:4px;border-top:1px solid #eee">
+          <div style="margin-top:4px;border-top:1px solid #eee;padding-top:4px">
             ${isSelected ? '<span style="color:#16a34a">✓ Included</span>' : '<span style="color:#94a3b8">Excluded</span>'}
           </div>
         </div>
       `);
 
-      markersRef.current.push(new mapboxgl.Marker(el).setLngLat([comp.coords.lng, comp.coords.lat]).setPopup(popup).addTo(mapRef.current));
+      markersRef.current.push(
+        new mapboxgl.Marker(el)
+          .setLngLat([comp.coords.lng, comp.coords.lat])
+          .setPopup(popup)
+          .addTo(mapRef.current)
+      );
     });
-    }
+  }, [ready, compsWithCoords, selected, showHeat, subjectCoords]);
 
-    if (mapRef.current.loaded()) {
-      addMarkers();
-    } else {
-      mapRef.current.once('load', addMarkers);
-    }
-  }, [geocodedComps, selected, showHeat, subjectCoords]);
-
-  // Load neighborhood tier data from Perplexity
   async function loadNeighborhoodData() {
     if (neighborhoodData || loadingNeighborhood) return;
     setLoadingNeighborhood(true);
@@ -177,10 +191,7 @@ export default function CompsMapWithHeat({ subjectAddress, comps, selected, onTo
       const result = await base44.integrations.Core.InvokeLLM({
         prompt: `For ${town}, Massachusetts real estate market: What are the premium micro-neighborhoods vs. average/below-average micro-neighborhoods?
 List 5-8 specific neighborhoods, streets, or areas with their typical PPSF premium or discount vs. town median.
-Examples: "South End of [Town] — 15% premium", "Near train station — 10% premium", "Route 9 corridor — 5% discount"
-Focus on: proximity to MBTA, school districts within town, specific streets/areas known as desirable, commercial noise zones.
-Return ONLY JSON:
-{"town": "Needham", "median_ppsf": 625, "neighborhoods": [{"name": "Highland Avenue area", "premium_pct": 18, "tier": "premium", "reason": "Walk to commuter rail, top schools"}, ...]}`,
+Return ONLY JSON: {"town": "...", "median_ppsf": 625, "neighborhoods": [{"name": "...", "premium_pct": 18, "tier": "premium", "reason": "..."}]}`,
         add_context_from_internet: true,
         response_json_schema: {
           type: "object",
@@ -204,7 +215,7 @@ Return ONLY JSON:
       });
       setNeighborhoodData(result);
     } catch (e) {
-      console.warn("[CompsMapWithHeat] neighborhood data fetch failed:", e.message);
+      console.warn("[CompsMapWithHeat] neighborhood fetch failed:", e.message);
     } finally {
       setLoadingNeighborhood(false);
     }
@@ -221,17 +232,17 @@ Return ONLY JSON:
 
   if (!subjectCoords) return null;
 
-  const ppsfValues = geocodedComps.filter(c => c.coords && c.price_per_sqft).map(c => c.price_per_sqft);
-  const minPpsf = Math.min(...ppsfValues);
-  const maxPpsf = Math.max(...ppsfValues);
+  const ppsfValues = compsWithCoords.filter(c => c.coords && c.price_per_sqft).map(c => c.price_per_sqft);
+  const minPpsf = ppsfValues.length ? Math.min(...ppsfValues) : 0;
+  const maxPpsf = ppsfValues.length ? Math.max(...ppsfValues) : 1;
 
   return (
     <div className="space-y-2">
-      <div className="relative rounded-xl overflow-hidden border border-[#1A3226]/10" style={{ height: 320 }}>
+      <div className="relative rounded-xl border border-[#1A3226]/10" style={{ height: 320 }}>
         <div ref={containerRef} style={{ width: "100%", height: "100%", position: "absolute", inset: 0 }} />
 
         {/* Controls */}
-        <div className="absolute top-3 left-3 flex flex-col gap-2">
+        <div className="absolute top-3 left-3 z-10 flex flex-col gap-2">
           <button
             onClick={() => { setShowHeat(v => !v); if (!neighborhoodData) loadNeighborhoodData(); }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium shadow-md transition-all ${showHeat ? "bg-[#1A3226] text-white" : "bg-white text-[#1A3226] border border-[#1A3226]/20"}`}
@@ -243,7 +254,7 @@ Return ONLY JSON:
 
         {/* PPSF Legend */}
         {showHeat && ppsfValues.length > 1 && (
-          <div className="absolute bottom-3 left-3 bg-white/95 rounded-lg px-3 py-2 shadow text-xs">
+          <div className="absolute bottom-3 left-3 z-10 bg-white/95 rounded-lg px-3 py-2 shadow text-xs">
             <div className="font-medium text-[#1A3226] mb-1">$/SF Range</div>
             <div className="flex items-center gap-2">
               <div style={{ width: 60, height: 8, borderRadius: 4, background: "linear-gradient(to right, rgb(0,130,200), rgb(255,200,0), rgb(255,60,20))" }} />
@@ -279,9 +290,9 @@ Return ONLY JSON:
               </p>
             </div>
           ) : loadingNeighborhood ? (
-            <p className="text-xs text-[#1A3226]/50">Researching micro-neighborhood premiums for {subjectAddress?.split(",")[1]?.trim()}…</p>
+            <p className="text-xs text-[#1A3226]/50">Researching micro-neighborhood premiums…</p>
           ) : (
-            <p className="text-xs text-[#1A3226]/40">Enable PPSF Heat to load neighborhood intelligence.</p>
+            <p className="text-xs text-[#1A3226]/40">No neighborhood data loaded yet.</p>
           )}
         </div>
       )}
