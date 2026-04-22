@@ -11,11 +11,11 @@ export default function AddressAutocomplete({ value, onChange, placeholder, clas
   const debounceRef = useRef(null);
   const containerRef = useRef(null);
 
-  // Fetch Mapbox token once
+  // Fetch Mapbox token once on mount
   useEffect(() => {
-    base44.functions.invoke("getMapboxToken", {}).then(res => {
-      setToken(res.data?.token || null);
-    }).catch(() => {});
+    base44.functions.invoke("getMapboxToken", {})
+      .then(res => setToken(res.data?.token || null))
+      .catch(() => {});
   }, []);
 
   // Sync external value changes
