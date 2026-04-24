@@ -8,6 +8,7 @@ import PromptLibraryEditor from "../components/admin/platform/PromptLibraryEdito
 import PlatformAIConfig from "../components/admin/platform/PlatformAIConfig";
 import PlatformAnalytics from "../components/admin/platform/PlatformAnalytics";
 import ActivityLog from "./admin/ActivityLog";
+import ApiHealthDashboard from "../components/admin/platform/ApiHealthDashboard";
 
 export default function PlatformAdmin() {
   const [user, setUser] = useState(null);
@@ -49,6 +50,7 @@ export default function PlatformAdmin() {
           <TabsTrigger value="prompts">Prompt Library</TabsTrigger>
           <TabsTrigger value="ai">AI Config</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="health">API Health</TabsTrigger>
           <TabsTrigger value="logs">Activity Log</TabsTrigger>
         </TabsList>
 
@@ -66,6 +68,10 @@ export default function PlatformAdmin() {
 
         <TabsContent value="analytics" className="mt-6">
           <PlatformAnalytics />
+        </TabsContent>
+
+        <TabsContent value="health" className="mt-6">
+          <ApiHealthDashboard />
         </TabsContent>
 
         <TabsContent value="logs" className="mt-6">

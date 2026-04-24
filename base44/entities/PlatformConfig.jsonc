@@ -165,6 +165,10 @@
     "generation_perf_snapshot": {
       "type": "object",
       "description": "Rolling 7-day performance metrics per tier with last_computed timestamp"
+    },
+    "api_balances": {
+      "type": "object",
+      "description": "Manually entered current credit balances per provider (keys: anthropic, openai, gemini, perplexity, rentcast, attom)"
     }
   },
   "required": []
