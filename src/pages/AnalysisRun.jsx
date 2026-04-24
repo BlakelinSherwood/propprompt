@@ -119,10 +119,9 @@ export default function AnalysisRun() {
 
       setStatus("streaming");
 
-      // Fire generateAnalysis — don't await the full response (may 504 on long analyses)
-      // Instead, poll the Analysis entity for completion every 4 seconds
+      // Fire generateAnalysis — don't await (may 504 on long analyses like client_portfolio ~3 min)
+      // Polling below is the source of truth for completion.
       base44.functions.invoke("generateAnalysis", { analysisId, orgId }).then(res => {
-        // If the invoke returns before polling catches it, handle it directly
         if (res.data?.anomaly) {
           setAnomalyData(res.data.anomaly);
           setStatus("complete");
@@ -130,13 +129,14 @@ export default function AnalysisRun() {
           setKeySource(res.data.keySource);
           simulateTyping(res.data.output);
         }
-        // If it 504'd, the polling loop below will catch completion
+        // Polling loop will also catch completion — no duplicate harm
       }).catch(() => {
-        // 504 / network error — polling will detect completion
+        // 504 / network timeout — completely expected for long analyses. Polling handles it.
       });
 
-      // Poll the Analysis entity every 4 seconds for up to 5 minutes
-      const maxAttempts = 75; // 75 × 4s = 5 min
+      // Poll the Analysis entity every 5 seconds for up to 8 minutes
+      // Client portfolio analyses can take 3+ minutes — must not give up too early
+      const maxAttempts = 96; // 96 × 5s = 8 min
       let attempts = 0;
       await new Promise((resolve) => {
         const poll = setInterval(async () => {
@@ -172,11 +172,11 @@ export default function AnalysisRun() {
 
           if (attempts >= maxAttempts) {
             clearInterval(poll);
-            setErrorMsg("Analysis is taking longer than expected. Please check back in a moment — your report may still be generating.");
+            setErrorMsg("Your report is still generating — this analysis type can take 3–4 minutes. Please refresh this page in a moment to check for your completed report.");
             setStatus("error");
             resolve();
           }
-        }, 4000);
+        }, 5000);
       });
     }
 
