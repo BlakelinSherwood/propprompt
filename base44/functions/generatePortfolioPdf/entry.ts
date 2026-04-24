@@ -106,6 +106,8 @@ function drawSectionDivider(doc, branding, sectionNum, sectionTitle, subtitle) {
   const footerText = [branding.agent_name, branding.org_name].filter(Boolean).join(' · ');
   doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(180, 180, 180);
   doc.text(footerText, 40, 758);
+  doc.setFontSize(5.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(110, 110, 110);
+  doc.text('Proprietary PropPrompt system built by Blake Sherwood | Sherwood & Company Team | Confidential', pageWidth / 2, 770, { align: 'center' });
 }
 
 async function drawPageFrame(doc, branding, breadcrumb, pageTitle) {
@@ -127,6 +129,8 @@ async function drawPageFrame(doc, branding, breadcrumb, pageTitle) {
   if (branding.org_name) footerParts.push(branding.org_name);
   doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(255, 255, 255);
   doc.text(footerParts.join(' · '), 40, 758);
+  doc.setFontSize(5.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(160, 160, 160);
+  doc.text('Proprietary PropPrompt system built by Blake Sherwood | Sherwood & Company Team | Confidential', pageWidth / 2, 770, { align: 'center' });
 
   if (branding.org_logo_url) {
     try {
