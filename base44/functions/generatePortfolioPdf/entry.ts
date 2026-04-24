@@ -82,11 +82,11 @@ function drawSectionDivider(doc, branding, sectionNum, sectionTitle, subtitle) {
   doc.text(`SECTION ${String(sectionNum).padStart(2, '0')}`, 40, headerLineY + 22);
 
   doc.setFillColor(accent.r, accent.g, accent.b);
-  doc.rect(40, contentStartY - 12, 3, 60, 'F');
+  doc.rect(40, contentStartY + 4, 3, 60, 'F');
 
   doc.setFontSize(30); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
   const titleLines = doc.splitTextToSize(sectionTitle.replace(/\n/g, ' '), 460);
-  doc.text(titleLines.slice(0, 2), 52, contentStartY + 4);
+  doc.text(titleLines.slice(0, 2), 52, contentStartY + 20);
   const titleBlockH = Math.min(titleLines.length, 2) * 36;
 
   if (subtitle) {
