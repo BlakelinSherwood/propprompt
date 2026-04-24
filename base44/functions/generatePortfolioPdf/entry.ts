@@ -72,14 +72,14 @@ function drawSectionDivider(doc, branding, sectionNum, sectionTitle, subtitle) {
   doc.text(ghostNum, pageWidth - 20, pageHeight - 60, { align: 'right' });
 
   // Center content vertically — place at ~38% down the page
-  const contentStartY = pageHeight * 0.34;
-  const headerLineY = contentStartY - 36;
+  const contentStartY = pageHeight * 0.38;
+  const headerLineY = contentStartY - 56;
 
   doc.setDrawColor(accent.r, accent.g, accent.b); doc.setLineWidth(1);
   doc.line(40, headerLineY, 390, headerLineY);
 
   doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(accent.r, accent.g, accent.b);
-  doc.text(`SECTION ${String(sectionNum).padStart(2, '0')}`, 40, headerLineY + 18);
+  doc.text(`SECTION ${String(sectionNum).padStart(2, '0')}`, 40, headerLineY + 22);
 
   doc.setFillColor(accent.r, accent.g, accent.b);
   doc.rect(40, contentStartY - 12, 3, 60, 'F');
