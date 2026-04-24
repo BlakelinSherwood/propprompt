@@ -84,17 +84,18 @@ function drawSectionDivider(doc, branding, sectionNum, sectionTitle, subtitle) {
   doc.setFillColor(accent.r, accent.g, accent.b);
   doc.rect(40, contentStartY - 12, 3, 60, 'F');
 
-  doc.setFontSize(32); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
-  const titleLines = doc.splitTextToSize(sectionTitle, 480);
-  doc.text(titleLines.slice(0, 2), 52, contentStartY);
+  doc.setFontSize(30); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
+  const titleLines = doc.splitTextToSize(sectionTitle.replace(/\n/g, ' '), 460);
+  doc.text(titleLines.slice(0, 2), 52, contentStartY + 4);
+  const titleBlockH = Math.min(titleLines.length, 2) * 36;
 
   if (subtitle) {
     doc.setFontSize(11); doc.setFont('helvetica', 'normal'); doc.setTextColor(accent.r, accent.g, accent.b);
-    doc.text(subtitle, 52, contentStartY + 58, { maxWidth: 480 });
+    doc.text(subtitle, 52, contentStartY + titleBlockH + 14, { maxWidth: 480 });
   }
 
   // Decorative horizontal rule below subtitle
-  const ruleY = contentStartY + 82;
+  const ruleY = contentStartY + titleBlockH + 38;
   doc.setDrawColor(Math.min(255, primary.r + 35), Math.min(255, primary.g + 35), Math.min(255, primary.b + 35));
   doc.setLineWidth(0.5);
   doc.line(52, ruleY, pageWidth - 40, ruleY);
@@ -395,6 +396,62 @@ async function renderClientPortfolioPdf(doc, data, branding) {
     y = await renderNarrative(data.executive_summary, 'Section 01 · Ownership Profile', 'Property & Ownership Overview', y);
   }
 
+  // Property detail stat blocks
+  const propCtx = data.property_context || {};
+  const intake = data.intake_data || {};
+  const statItems = [
+    { label: 'Year Built', value: data.year_built || intake.year_built || '—' },
+    { label: 'Bedrooms', value: data.bedrooms || intake.bedrooms || '—' },
+    { label: 'Bathrooms', value: data.bathrooms || intake.bathrooms || '—' },
+    { label: 'Sq Ft (Above Grade)', value: data.sqft ? `${Number(data.sqft).toLocaleString()} SF` : (intake.sqft ? `${Number(intake.sqft).toLocaleString()} SF` : '—') },
+    { label: 'Lot Size', value: data.lot_size_sqft ? `${Number(data.lot_size_sqft).toLocaleString()} SF` : '—' },
+    { label: 'Property Type', value: data.property_style || intake.property_type || '—' },
+    { label: 'Walk Score', value: propCtx.walkability?.walk_score != null ? `${propCtx.walkability.walk_score}/100` : '—' },
+    { label: 'Flood Zone', value: propCtx.flood_zone?.flood_zone || '—' },
+  ].filter(s => s.value !== '—');
+
+  if (statItems.length > 0) {
+    if (y + 80 > BOTTOM) { doc.addPage(); await drawPageFrame(doc, branding, 'Section 01 · Ownership Profile', 'Property Details'); y = 90; }
+    y += 8;
+    doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b);
+    doc.text('Property Details', margin, y); y += 10;
+    doc.setDrawColor(accent.r, accent.g, accent.b); doc.setLineWidth(1.5); doc.line(margin, y, margin + 120, y); y += 14;
+    const cols = 4;
+    const cardW = (contentWidth - (cols - 1) * 8) / cols;
+    const cardH = 48;
+    statItems.forEach((s, i) => {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const cx = margin + col * (cardW + 8);
+      const cy = y + row * (cardH + 8);
+      doc.setFillColor(primary.r, primary.g, primary.b);
+      doc.roundedRect(cx, cy, cardW, cardH, 3, 3, 'F');
+      doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(accent.r, accent.g, accent.b);
+      doc.text(s.label.toUpperCase(), cx + cardW / 2, cy + 14, { align: 'center' });
+      doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
+      const valStr = String(s.value);
+      const valLines = doc.splitTextToSize(valStr, cardW - 8);
+      doc.text(valLines[0], cx + cardW / 2, cy + 32, { align: 'center' });
+    });
+    const totalRows = Math.ceil(statItems.length / cols);
+    y += totalRows * (cardH + 8) + 8;
+  }
+
+  // Schools block if available
+  const schools = propCtx.schools?.assigned_schools || [];
+  if (schools.length > 0) {
+    if (y + 60 > BOTTOM) { doc.addPage(); await drawPageFrame(doc, branding, 'Section 01 · Ownership Profile', 'Schools'); y = 90; }
+    doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b);
+    doc.text('Assigned Schools', margin, y); y += 10;
+    doc.setDrawColor(accent.r, accent.g, accent.b); doc.setLineWidth(1.5); doc.line(margin, y, margin + 120, y); y += 14;
+    for (const sch of schools.slice(0, 4)) {
+      const schLabel = `${sch.name} (${sch.type}, ${sch.grades})${sch.rating ? '  —  GreatSchools: ' + sch.rating + '/10' : ''}  ·  ${sch.distance_miles} mi`;
+      doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(50, 50, 50);
+      doc.text('•  ' + schLabel, margin + 8, y, { maxWidth: contentWidth - 10 }); y += 14;
+    }
+    y += 6;
+  }
+
   // ── SECTION 02: Current Value ──
   if (data.tiered_comps?.tiers) {
     doc.addPage();
@@ -590,19 +647,34 @@ async function renderClientPortfolioPdf(doc, data, branding) {
       doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(primary.r,primary.g,primary.b); doc.text('Kitchen Styles Trending Now',margin,y); y+=12;
       doc.setDrawColor(accent.r,accent.g,accent.b); doc.setLineWidth(1.5); doc.line(margin,y,margin+180,y); y+=12;
       for (const [ki,ks] of dt.kitchen_styles.entries()) {
-        const dl=doc.splitTextToSize(ks.description||'',contentWidth-22); const rl=ks.relevance_to_subject?doc.splitTextToSize(`Relevance: ${ks.relevance_to_subject}`,contentWidth-22):[]; const ch=Math.max(68,28+dl.length*13+rl.length*11+16);
+        const roiBadgeW = 100;
+        const textMaxW = contentWidth - 24 - roiBadgeW - 12; // leave room for ROI badge column
+        const dl=doc.splitTextToSize(ks.description||'',textMaxW);
+        const rl=ks.relevance_to_subject?doc.splitTextToSize(`Relevance: ${ks.relevance_to_subject}`,textMaxW):[];
+        const ch=Math.max(72,38+dl.length*13+rl.length*11+16);
         if(y+ch>BOTTOM){doc.addPage();await drawPageFrame(doc,branding,'Section 04 · Design Trends','Kitchen Styles (cont.)');y=90;}
         doc.setFillColor(ki%2===0?248:255,ki%2===0?245:255,240); doc.roundedRect(margin,y,contentWidth,ch,3,3,'F');
         doc.setFillColor(accent.r,accent.g,accent.b); doc.roundedRect(margin,y,4,ch,2,2,'F');
         doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(primary.r,primary.g,primary.b); doc.text(ks.trend||'',margin+14,y+16);
         if(ks.cost_range){doc.setFontSize(8);doc.setFont('helvetica','normal');doc.setTextColor(100,100,100);doc.text(ks.cost_range,margin+14,y+27);}
-        if(ks.roi_estimate){const rW=90;doc.setFillColor(primary.r,primary.g,primary.b);doc.roundedRect(margin+contentWidth-rW-4,y+8,rW,16,2,2,'F');doc.setFontSize(7);doc.setFont('helvetica','bold');doc.setTextColor(accent.r,accent.g,accent.b);doc.text(ks.roi_estimate,margin+contentWidth-rW/2-4,y+18,{align:'center',maxWidth:rW-4});}
-        doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(50,50,50); doc.text(dl,margin+14,y+38);
-        if(rl.length){doc.setFontSize(8);doc.setFont('helvetica','italic');doc.setTextColor(accent.r,accent.g,accent.b);doc.text(rl,margin+14,y+38+dl.length*13+4);}
+        if(ks.roi_estimate){
+          // ROI badge on right — two lines with proper sizing
+          const roiLines = doc.splitTextToSize(ks.roi_estimate, roiBadgeW - 8);
+          const roiBadgeH = Math.max(20, roiLines.length * 11 + 8);
+          doc.setFillColor(primary.r,primary.g,primary.b);
+          doc.roundedRect(margin+contentWidth-roiBadgeW-4,y+8,roiBadgeW,roiBadgeH,2,2,'F');
+          doc.setFontSize(7);doc.setFont('helvetica','bold');doc.setTextColor(accent.r,accent.g,accent.b);
+          roiLines.forEach((rl2, ri) => {
+            doc.text(rl2, margin+contentWidth-roiBadgeW/2-4, y+18+ri*10, {align:'center'});
+          });
+        }
+        doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(50,50,50); doc.text(dl,margin+14,y+40);
+        if(rl.length){doc.setFontSize(8);doc.setFont('helvetica','italic');doc.setTextColor(accent.r,accent.g,accent.b);doc.text(rl,margin+14,y+40+dl.length*13+4);}
         y+=ch+8;
       }
     }
     if (dt.popular_renovations?.length) {
+      y += 16; // extra breathing room above this section
       if(y+80>BOTTOM){doc.addPage();await drawPageFrame(doc,branding,'Section 04 · Design Trends','Top Renovations by ROI');y=90;}
       doc.setFontSize(11);doc.setFont('helvetica','bold');doc.setTextColor(primary.r,primary.g,primary.b);doc.text('Top Renovations by ROI',margin,y);y+=12;
       doc.setDrawColor(accent.r,accent.g,accent.b);doc.setLineWidth(1.5);doc.line(margin,y,margin+170,y);y+=12;
@@ -639,12 +711,15 @@ async function renderClientPortfolioPdf(doc, data, branding) {
         const ic = dev.value_impact === 'positive' ? { r: 22, g: 101, b: 52 } : dev.value_impact === 'negative' ? { r: 153, g: 27, b: 27 } : { r: 100, g: 100, b: 100 };
         doc.setFillColor(248, 247, 244); doc.roundedRect(margin, y, contentWidth, cH, 3, 3, 'F');
         doc.setFillColor(ic.r, ic.g, ic.b); doc.roundedRect(margin, y, 5, cH, 2, 2, 'F');
-        doc.setFillColor(ic.r, ic.g, ic.b); doc.roundedRect(margin + contentWidth - 84, y + 6, 80, 16, 2, 2, 'F');
-        doc.setFontSize(6.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255); doc.text((dev.status || '').toUpperCase(), margin + contentWidth - 44, y + 17, { align: 'center' });
-        doc.setFontSize(9.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b); doc.text(dev.project || '', margin + 14, y + 14, { maxWidth: contentWidth - 100 });
-        if (dev.timeline) { doc.setFontSize(7.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(90, 90, 90); doc.text(`Timeline: ${dev.timeline}`, margin + 14, y + 24); }
-        doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(50, 50, 50); doc.text(dL, margin + 14, y + 34);
-        if (iL.length) { doc.setFontSize(8); doc.setFont('helvetica', 'italic'); doc.setTextColor(ic.r, ic.g, ic.b); doc.text(iL, margin + 14, y + 34 + dL.length * 12); }
+        // Status badge with impact label + value_impact color
+        const badgeLabel = dev.value_impact ? dev.value_impact.toUpperCase() : (dev.status || 'PROJECT').toUpperCase();
+        doc.setFillColor(ic.r, ic.g, ic.b); doc.roundedRect(margin + contentWidth - 88, y + 7, 84, 18, 3, 3, 'F');
+        doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
+        doc.text(badgeLabel, margin + contentWidth - 46, y + 19, { align: 'center', maxWidth: 78 });
+        doc.setFontSize(9.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b); doc.text(dev.project || '', margin + 14, y + 14, { maxWidth: contentWidth - 108 });
+        if (dev.timeline) { doc.setFontSize(7.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(90, 90, 90); doc.text(`Timeline: ${dev.timeline}`, margin + 14, y + 25); }
+        doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(50, 50, 50); doc.text(dL, margin + 14, y + 36);
+        if (iL.length) { doc.setFontSize(8); doc.setFont('helvetica', 'italic'); doc.setTextColor(ic.r, ic.g, ic.b); doc.text(iL, margin + 14, y + 36 + dL.length * 12); }
         y += cH + 6;
       }
     }
