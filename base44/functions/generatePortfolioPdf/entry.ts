@@ -71,23 +71,37 @@ function drawSectionDivider(doc, branding, sectionNum, sectionTitle, subtitle) {
   doc.setFontSize(200); doc.setFont('helvetica', 'bold'); doc.setTextColor(gL, gLG, gLB);
   doc.text(ghostNum, pageWidth - 20, pageHeight - 60, { align: 'right' });
 
+  // Center content vertically — place at ~38% down the page
+  const contentStartY = pageHeight * 0.34;
+  const headerLineY = contentStartY - 36;
+
   doc.setDrawColor(accent.r, accent.g, accent.b); doc.setLineWidth(1);
-  doc.line(40, 140, 390, 140);
+  doc.line(40, headerLineY, 390, headerLineY);
 
   doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(accent.r, accent.g, accent.b);
-  doc.text(`SECTION ${String(sectionNum).padStart(2, '0')}`, 40, 160);
+  doc.text(`SECTION ${String(sectionNum).padStart(2, '0')}`, 40, headerLineY + 18);
 
   doc.setFillColor(accent.r, accent.g, accent.b);
-  doc.rect(40, 185, 3, 60, 'F');
+  doc.rect(40, contentStartY - 12, 3, 60, 'F');
 
   doc.setFontSize(32); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
   const titleLines = doc.splitTextToSize(sectionTitle, 480);
-  doc.text(titleLines.slice(0, 2), 52, 210);
+  doc.text(titleLines.slice(0, 2), 52, contentStartY);
 
   if (subtitle) {
     doc.setFontSize(11); doc.setFont('helvetica', 'normal'); doc.setTextColor(accent.r, accent.g, accent.b);
-    doc.text(subtitle, 52, 265, { maxWidth: 480 });
+    doc.text(subtitle, 52, contentStartY + 58, { maxWidth: 480 });
   }
+
+  // Decorative horizontal rule below subtitle
+  const ruleY = contentStartY + 82;
+  doc.setDrawColor(Math.min(255, primary.r + 35), Math.min(255, primary.g + 35), Math.min(255, primary.b + 35));
+  doc.setLineWidth(0.5);
+  doc.line(52, ruleY, pageWidth - 40, ruleY);
+
+  // Section number in full text — bottom right accent
+  doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(accent.r, accent.g, accent.b);
+  doc.text(`SECTION ${String(sectionNum).padStart(2, '0')} OF 06`, pageWidth - 40, ruleY + 18, { align: 'right' });
 
   const footerText = [branding.agent_name, branding.org_name].filter(Boolean).join(' · ');
   doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(180, 180, 180);
@@ -341,6 +355,26 @@ async function renderClientPortfolioPdf(doc, data, branding) {
     doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(accent.r, accent.g, accent.b);
     doc.text(ctact, pageWidth / 2, metaY + 36, { align: 'center' });
   }
+  // Decorative mid-section divider line
+  const dividerY = metaY + 70;
+  doc.setDrawColor(accent.r, accent.g, accent.b); doc.setLineWidth(0.5);
+  doc.line(margin + 40, dividerY, pageWidth - margin - 40, dividerY);
+
+  // Report contents preview block
+  const sections = ['Property & Ownership Profile', 'Current Valuation & Comps', 'Equity Strategy Options', 'Design & Renovation Trends', 'Local Market Intelligence'];
+  let secY = dividerY + 22;
+  doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(accent.r, accent.g, accent.b);
+  doc.text('REPORT INCLUDES', pageWidth / 2, secY, { align: 'center' }); secY += 14;
+  sections.forEach((s, i) => {
+    const numX = pageWidth / 2 - 120;
+    doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(accent.r, accent.g, accent.b);
+    doc.text(String(i + 1).padStart(2, '0'), numX, secY);
+    doc.setFont('helvetica', 'normal'); doc.setTextColor(160, 160, 160);
+    doc.text(s, numX + 18, secY);
+    secY += 16;
+  });
+
+  // Bottom footer bar
   doc.setFillColor(Math.min(255, primary.r + 12), Math.min(255, primary.g + 12), Math.min(255, primary.b + 12));
   doc.rect(0, pageHeight - 38, pageWidth, 38, 'F');
   doc.setFillColor(accent.r, accent.g, accent.b); doc.rect(0, pageHeight - 38, pageWidth, 1.5, 'F');
@@ -469,7 +503,8 @@ async function renderClientPortfolioPdf(doc, data, branding) {
     }
 
     const TIMING_COLORS = { favorable: { r: 22, g: 101, b: 52 }, neutral: { r: 101, g: 85, b: 22 }, unfavorable: { r: 153, g: 27, b: 27 } };
-    const OPTION_ICONS = { move_up: '↑', downsize: '↓', heloc: '⬡', refinance: '↺', renovate: '✦' };
+    const OPTION_ICONS = { move_up: 'UP', downsize: 'DN', heloc: 'HE', refinance: 'RF', renovate: 'RN' };
+    const OPTION_LABELS = { move_up: 'Move Up', downsize: 'Down', heloc: 'HELOC', refinance: 'Refi', renovate: 'Reno' };
 
     for (const [idx, opt] of equityOptions.entries()) {
       const summaryLines = doc.splitTextToSize(opt.option_summary || '', contentWidth - 80);
@@ -481,9 +516,9 @@ async function renderClientPortfolioPdf(doc, data, branding) {
       doc.setFillColor(idx % 2 === 0 ? 247 : 253, idx % 2 === 0 ? 247 : 253, 244);
       doc.roundedRect(margin, y, contentWidth, cardH, 4, 4, 'F');
       doc.setFillColor(primary.r, primary.g, primary.b); doc.roundedRect(margin, y, 5, cardH, 2, 2, 'F');
-      doc.setFillColor(accent.r, accent.g, accent.b); doc.circle(margin + 28, y + 20, 12, 'F');
-      doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b);
-      doc.text(OPTION_ICONS[opt.id] || '→', margin + 28, y + 24, { align: 'center' });
+      doc.setFillColor(accent.r, accent.g, accent.b); doc.roundedRect(margin + 10, y + 10, 34, 22, 3, 3, 'F');
+      doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b);
+      doc.text(OPTION_LABELS[opt.id] || (opt.title || '').slice(0, 5).toUpperCase(), margin + 27, y + 24, { align: 'center', maxWidth: 30 });
       doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b);
       doc.text(opt.title || '', margin + 46, y + 16);
       doc.setFontSize(8.5); doc.setFont('helvetica', 'italic'); doc.setTextColor(accent.r, accent.g, accent.b);
