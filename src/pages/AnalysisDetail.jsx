@@ -12,6 +12,7 @@ const ASSESSMENT_LABELS = {
   investment_analysis: "Investment Analysis",
   cma: "Comparative Market Analysis",
   rental_analysis: "Rental Analysis",
+  client_portfolio: "Client Portfolio Review",
 };
 const FORMAT_LABELS = { narrative: "Narrative", structured: "Structured", bullets: "Bullet Points" };
 const STATUS_STYLES = {
@@ -213,15 +214,15 @@ export default function AnalysisDetail() {
         <ExportPanel analysis={analysis} orgPlan={orgPlan} />
       )}
 
-      {/* Prompt assembly guidance (for manual copy mode) */}
+      {/* Run guidance */}
       {analysis.ai_platform && !isComplete && (
         <div className="rounded-xl border border-[#1A3226]/10 bg-white p-5">
-          <h3 className="text-sm font-semibold text-[#1A3226] mb-2">How to run this analysis manually</h3>
+          <h3 className="text-sm font-semibold text-[#1A3226] mb-2">How PropPrompt generates your report</h3>
           <ol className="space-y-2 text-sm text-[#1A3226]/70 list-decimal list-inside">
-            <li>Click "Run Analysis" above to open the analysis runner.</li>
-            <li>Copy the assembled prompt from the runner page.</li>
-            <li>Paste it into <strong>{PLATFORM_LABELS[analysis.ai_platform]}</strong> and run.</li>
-            <li>Paste the AI response back into PropPrompt to save and export your report.</li>
+            <li>Click "Run Analysis" above to start the automated pipeline.</li>
+            <li>PropPrompt sends your property data directly to <strong>{PLATFORM_LABELS[analysis.ai_platform]}</strong> on your behalf.</li>
+            <li>The AI generates a structured report — no copying or pasting required.</li>
+            <li>Your completed report is saved here and ready to export as a PDF or presentation.</li>
           </ol>
         </div>
       )}
