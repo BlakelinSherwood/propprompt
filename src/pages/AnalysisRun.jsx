@@ -119,25 +119,65 @@ export default function AnalysisRun() {
 
       setStatus("streaming");
 
-      // Call generateAnalysis via SDK (proper auth handled automatically)
-      const res = await base44.functions.invoke("generateAnalysis", { analysisId, orgId });
+      // Fire generateAnalysis — don't await the full response (may 504 on long analyses)
+      // Instead, poll the Analysis entity for completion every 4 seconds
+      base44.functions.invoke("generateAnalysis", { analysisId, orgId }).then(res => {
+        // If the invoke returns before polling catches it, handle it directly
+        if (res.data?.anomaly) {
+          setAnomalyData(res.data.anomaly);
+          setStatus("complete");
+        } else if (res.data?.output) {
+          setKeySource(res.data.keySource);
+          simulateTyping(res.data.output);
+        }
+        // If it 504'd, the polling loop below will catch completion
+      }).catch(() => {
+        // 504 / network error — polling will detect completion
+      });
 
-      // Handle valuation anomaly block
-      if (res.data?.anomaly) {
-        setAnomalyData(res.data.anomaly);
-        setStatus("complete");
-        return;
-      }
+      // Poll the Analysis entity every 4 seconds for up to 5 minutes
+      const maxAttempts = 75; // 75 × 4s = 5 min
+      let attempts = 0;
+      await new Promise((resolve) => {
+        const poll = setInterval(async () => {
+          attempts++;
+          try {
+            const records = await base44.entities.Analysis.filter({ id: analysisId });
+            const latest = records[0];
+            if (!latest) { clearInterval(poll); resolve(); return; }
 
-      if (!res.data?.output) {
-        const errMsg = res.data?.error || "Analysis generation failed";
-        setErrorMsg(errMsg);
-        setStatus("error");
-        return;
-      }
+            if (latest.status === 'anomaly_flagged' && latest.valuation_anomaly) {
+              clearInterval(poll);
+              setAnomalyData(latest.valuation_anomaly);
+              setStatus("complete");
+              resolve();
+              return;
+            }
 
-      setKeySource(res.data.keySource);
-      simulateTyping(res.data.output);
+            if (latest.status === 'complete' && latest.output_text) {
+              clearInterval(poll);
+              simulateTyping(latest.output_text);
+              resolve();
+              return;
+            }
+
+            if (latest.status === 'error') {
+              clearInterval(poll);
+              setErrorMsg("Analysis generation failed. Please try again.");
+              setStatus("error");
+              resolve();
+              return;
+            }
+          } catch (e) { /* poll silently */ }
+
+          if (attempts >= maxAttempts) {
+            clearInterval(poll);
+            setErrorMsg("Analysis is taking longer than expected. Please check back in a moment — your report may still be generating.");
+            setStatus("error");
+            resolve();
+          }
+        }, 4000);
+      });
     }
 
     loadAndRun().catch(err => {
