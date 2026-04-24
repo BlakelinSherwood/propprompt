@@ -35,23 +35,16 @@ export default function FlipbookViewer() {
 
   const containerRef = useRef(null); // unused but kept for safety
 
-  // ── 1. Load flipbook record ─────────────────────────────────────────────────
+  // ── 1. Load flipbook record via public backend function (no auth required) ────
   useEffect(() => {
     async function init() {
       if (!token) { setStatus('not_found'); return; }
 
-      const records = await base44.entities.FlipbookLink.filter({ share_token: token });
-      const record = records[0];
+      const res = await base44.functions.invoke('getFlipbook', { token });
+      const { status: s, record } = res.data || {};
 
-      if (!record) { setStatus('not_found'); return; }
-
-      const now = new Date().toISOString();
-      const isReallyExpired = record.is_expired || (record.expires_at && record.expires_at <= now);
-
-      if (isReallyExpired) { setStatus('expired'); return; }
-
-      // Increment view_count (best-effort, don't block render)
-      base44.entities.FlipbookLink.update(record.id, { view_count: (record.view_count || 0) + 1 }).catch(() => {});
+      if (s === 'not_found' || !record) { setStatus('not_found'); return; }
+      if (s === 'expired') { setStatus('expired'); return; }
 
       setFlipbook(record);
       setStatus('ready');
