@@ -23,20 +23,35 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(true);
 
       // Admins and known agent roles always have full access — no subscription check needed
-      const privilegedRoles = ['admin', 'platform_owner', 'agent', 'team_agent', 'team_lead', 'brokerage_admin'];
+      const privilegedRoles = ['admin', 'platform_owner', 'agent', 'team_agent', 'team_lead', 'brokerage_admin', 'assistant'];
       if (privilegedRoles.includes(currentUser.role)) {
         setHasActiveSubscription(true);
         setIsLoadingAuth(false);
         return;
       }
 
-      // Regular users: check for an active territory subscription
+      // Regular users: check for their own active territory subscription,
+      // OR if they belong to an org that has active subscriptions (inherited access)
       try {
         const subs = await base44.entities.TerritorySubscription.filter({
           user_id: currentUser.id,
           status: 'active',
         });
-        setHasActiveSubscription(subs && subs.length > 0);
+        if (subs && subs.length > 0) {
+          setHasActiveSubscription(true);
+        } else if (currentUser.org_id) {
+          // Check if any active subscription exists in their org (inherited team access)
+          const orgMembers = await base44.entities.User.filter({ org_id: currentUser.org_id });
+          const orgUserIds = orgMembers.map(m => m.id);
+          let orgHasSub = false;
+          for (const uid of orgUserIds) {
+            const orgSubs = await base44.entities.TerritorySubscription.filter({ user_id: uid, status: 'active' });
+            if (orgSubs && orgSubs.length > 0) { orgHasSub = true; break; }
+          }
+          setHasActiveSubscription(orgHasSub);
+        } else {
+          setHasActiveSubscription(false);
+        }
       } catch {
         // Subscription check failed — don't log the user out, just assume no sub
         setHasActiveSubscription(false);
