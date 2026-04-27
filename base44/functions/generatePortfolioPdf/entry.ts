@@ -658,14 +658,14 @@ async function renderClientPortfolioPdf(doc, data, branding) {
         doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(primary.r,primary.g,primary.b); doc.text(ks.trend||'',margin+14,y+16);
         if(ks.cost_range){doc.setFontSize(8);doc.setFont('helvetica','normal');doc.setTextColor(100,100,100);doc.text(ks.cost_range,margin+14,y+27);}
         if(ks.roi_estimate){
-          // ROI badge on right — two lines with proper sizing
-          const roiLines = doc.splitTextToSize(ks.roi_estimate, roiBadgeW - 8);
-          const roiBadgeH = Math.max(20, roiLines.length * 11 + 8);
+          // ROI badge on right — wrap text within badge width
+          const roiLines = doc.splitTextToSize(ks.roi_estimate, roiBadgeW - 10);
+          const roiBadgeH = Math.max(24, roiLines.length * 10 + 10);
           doc.setFillColor(primary.r,primary.g,primary.b);
           doc.roundedRect(margin+contentWidth-roiBadgeW-4,y+8,roiBadgeW,roiBadgeH,2,2,'F');
           doc.setFontSize(7);doc.setFont('helvetica','bold');doc.setTextColor(accent.r,accent.g,accent.b);
           roiLines.forEach((rl2, ri) => {
-            doc.text(rl2, margin+contentWidth-roiBadgeW/2-4, y+18+ri*10, {align:'center'});
+            doc.text(rl2, margin+contentWidth-roiBadgeW/2-4, y+17+ri*10, {align:'center'});
           });
         }
         doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(50,50,50); doc.text(dl,margin+14,y+40);
@@ -704,20 +704,26 @@ async function renderClientPortfolioPdf(doc, data, branding) {
       doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b); doc.text('Active & Upcoming Town Developments', margin, y); y += 10;
       doc.setDrawColor(accent.r, accent.g, accent.b); doc.setLineWidth(1.5); doc.line(margin, y, margin + 240, y); y += 12;
       for (const dev of li.town_developments) {
-        const dL = doc.splitTextToSize(dev.description || '', contentWidth - 120);
-        const iL = doc.splitTextToSize(dev.impact_reason || '', contentWidth - 120);
+        const devTextMaxW = contentWidth - 108; // leave room for badge (88px) + padding
+        const dL = doc.splitTextToSize(dev.description || '', devTextMaxW);
+        const iL = doc.splitTextToSize(dev.impact_reason || '', devTextMaxW);
         const cH = Math.max(52, 30 + (dL.length + iL.length) * 12);
         if (y + cH > BOTTOM) { doc.addPage(); await drawPageFrame(doc, branding, 'Section 05 · Local Impact', 'Town Developments (cont.)'); y = 90; }
         const ic = dev.value_impact === 'positive' ? { r: 22, g: 101, b: 52 } : dev.value_impact === 'negative' ? { r: 153, g: 27, b: 27 } : { r: 100, g: 100, b: 100 };
         doc.setFillColor(248, 247, 244); doc.roundedRect(margin, y, contentWidth, cH, 3, 3, 'F');
         doc.setFillColor(ic.r, ic.g, ic.b); doc.roundedRect(margin, y, 5, cH, 2, 2, 'F');
-        // Status badge with impact label + value_impact color
-        const badgeLabel = dev.value_impact ? dev.value_impact.toUpperCase() : (dev.status || 'PROJECT').toUpperCase();
-        doc.setFillColor(ic.r, ic.g, ic.b); doc.roundedRect(margin + contentWidth - 88, y + 7, 84, 18, 3, 3, 'F');
-        doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
-        doc.text(badgeLabel, margin + contentWidth - 46, y + 19, { align: 'center', maxWidth: 78 });
-        doc.setFontSize(9.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b); doc.text(dev.project || '', margin + 14, y + 14, { maxWidth: contentWidth - 108 });
-        if (dev.timeline) { doc.setFontSize(7.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(90, 90, 90); doc.text(`Timeline: ${dev.timeline}`, margin + 14, y + 25); }
+        // Status badge with impact label + value_impact color — truncate long labels
+        const rawBadgeLabel = dev.value_impact ? dev.value_impact.toUpperCase() : (dev.status || 'PROJECT').toUpperCase();
+        const badgeLabel = rawBadgeLabel.replace(/_/g, ' '); // e.g. UNDER_CONSTRUCTION → UNDER CONSTRUCTION
+        const badgeW = 88; const badgeH = 24;
+        doc.setFillColor(ic.r, ic.g, ic.b); doc.roundedRect(margin + contentWidth - badgeW, y + 6, badgeW, badgeH, 3, 3, 'F');
+        doc.setFontSize(6.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
+        const badgeLines = doc.splitTextToSize(badgeLabel, badgeW - 8);
+        badgeLines.slice(0, 2).forEach((bl, bi) => {
+          doc.text(bl, margin + contentWidth - badgeW / 2, y + 15 + bi * 8, { align: 'center' });
+        });
+        doc.setFontSize(9.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b); doc.text(dev.project || '', margin + 14, y + 14, { maxWidth: contentWidth - badgeW - 20 });
+        if (dev.timeline) { doc.setFontSize(7.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(90, 90, 90); doc.text(`Timeline: ${dev.timeline}`, margin + 14, y + 25, { maxWidth: contentWidth - 110 }); }
         doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(50, 50, 50); doc.text(dL, margin + 14, y + 36);
         if (iL.length) { doc.setFontSize(8); doc.setFont('helvetica', 'italic'); doc.setTextColor(ic.r, ic.g, ic.b); doc.text(iL, margin + 14, y + 36 + dL.length * 12); }
         y += cH + 6;
