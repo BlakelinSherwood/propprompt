@@ -4,7 +4,7 @@ import { UserPlus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ROLE_LABELS } from "@/lib/constants";
-import InviteMemberDialog from "../components/InviteMemberDialog";
+import InviteMemberDialog from "../components/InviteMemberDialog.jsx";
 import MemberRow from "../components/MemberRow";
 import { base44 } from "@/api/base44Client";
 
@@ -65,6 +65,13 @@ export default function Members() {
   const canInvite =
     user?.role === "platform_owner" ||
     user?.role === "brokerage_admin" ||
+    user?.role === "brokerage_owner" ||
+    user?.role === "team_lead";
+
+  const canManage =
+    user?.role === "platform_owner" ||
+    user?.role === "brokerage_admin" ||
+    user?.role === "brokerage_owner" ||
     user?.role === "team_lead";
 
   if (authLoading || loading) {
@@ -122,7 +129,7 @@ export default function Members() {
           </div>
         ) : (
           filtered.map((member) => (
-            <MemberRow key={member.id} member={member} roleLabels={ROLE_LABELS} />
+            <MemberRow key={member.id} member={member} roleLabels={ROLE_LABELS} canManage={canManage} onActionDone={loadData} />
           ))
         )}
       </div>

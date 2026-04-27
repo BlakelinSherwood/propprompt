@@ -21,7 +21,14 @@ const ROLE_COLORS = {
   team_agent: "bg-gray-100 text-gray-600",
 };
 
-export default function MemberRow({ member, roleLabels }) {
+import { useState } from "react";
+import { base44 } from "@/api/base44Client";
+import { MoreHorizontal, UserX, XCircle } from "lucide-react";
+
+export default function MemberRow({ member, roleLabels, canManage, onActionDone }) {
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+
   const initials = (member.full_name || member.email || "?")
     .split(" ")
     .map((w) => w[0])
@@ -29,16 +36,35 @@ export default function MemberRow({ member, roleLabels }) {
     .toUpperCase()
     .slice(0, 2);
 
+  const isPending = member.status === 'pending_invite';
+
+  async function handleAction() {
+    if (!confirming) { setConfirming(true); return; }
+    setBusy(true);
+    try {
+      await base44.functions.invoke("revokeMemberAccess", {
+        targetEmail: member.email,
+        action: isPending ? 'cancel_invite' : 'revoke',
+      });
+      onActionDone?.();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setBusy(false);
+      setConfirming(false);
+    }
+  }
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 sm:gap-4 items-center px-5 py-4 border-b border-[#1A3226]/5 last:border-0 hover:bg-[#FAF8F4]/50 transition-colors">
       <div className="sm:col-span-4 flex items-center gap-3">
         <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0 ${
-          member.status === 'pending_invite' ? 'bg-amber-100 text-amber-600 border-2 border-dashed border-amber-300' : 'bg-[#1A3226] text-white'
+          isPending ? 'bg-amber-100 text-amber-600 border-2 border-dashed border-amber-300' : 'bg-[#1A3226] text-white'
         }`}>
           {initials}
         </div>
-        <span className={`text-sm font-medium truncate ${member.status === 'pending_invite' ? 'text-[#1A3226]/40 italic' : 'text-[#1A3226]'}`}>
-          {member.full_name || (member.status === 'pending_invite' ? 'Invited user' : '—')}
+        <span className={`text-sm font-medium truncate ${isPending ? 'text-[#1A3226]/40 italic' : 'text-[#1A3226]'}`}>
+          {member.full_name || (isPending ? 'Invited user' : '—')}
         </span>
       </div>
       <div className="sm:col-span-3 text-sm text-[#1A3226]/60 truncate pl-12 sm:pl-0">
@@ -54,7 +80,35 @@ export default function MemberRow({ member, roleLabels }) {
           {STATUS_LABELS[member.status] || member.status || "active"}
         </span>
       </div>
-      <div className="sm:col-span-1" />
+      <div className="sm:col-span-1 flex justify-end pl-12 sm:pl-0">
+        {canManage && (
+          confirming ? (
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={handleAction}
+                disabled={busy}
+                className="text-[10px] font-semibold text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1 hover:bg-red-100 transition-colors disabled:opacity-50"
+              >
+                {busy ? '...' : 'Confirm'}
+              </button>
+              <button
+                onClick={() => setConfirming(false)}
+                className="text-[10px] text-[#1A3226]/40 hover:text-[#1A3226]/70 transition-colors"
+              >
+                No
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={handleAction}
+              title={isPending ? 'Cancel invite' : 'Revoke access'}
+              className="p-1.5 rounded-md text-[#1A3226]/25 hover:text-red-500 hover:bg-red-50 transition-colors"
+            >
+              {isPending ? <XCircle className="w-4 h-4" /> : <UserX className="w-4 h-4" />}
+            </button>
+          )
+        )}
+      </div>
     </div>
   );
 }
