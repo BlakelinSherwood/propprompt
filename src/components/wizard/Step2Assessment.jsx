@@ -3,7 +3,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import WizardNav from "./WizardNav";
 import { ANALYSIS_MODULES } from "@/lib/analysisModules";
 
-const STARTER_ASSESSMENT_IDS = ['cma', 'buyer_intelligence'];
+const PLATFORM_OWNER_ONLY_IDS = ['buyer_intelligence', 'cma', 'investment_analysis', 'rental_analysis', 'custom'];
 
 const ASSESSMENT_TYPES = [
   {
@@ -82,10 +82,16 @@ const ASSESSMENT_TYPES = [
   },
 ];
 
-export default function Step2Assessment({ intake, update, onNext, onBack, userTier }) {
+export default function Step2Assessment({ intake, update, onNext, onBack, userTier, isPlatformOwner }) {
   const isStarter = !userTier || userTier === 'starter';
-  const availableTypes = ASSESSMENT_TYPES.filter(a => !a.proOnly || !isStarter);
-  const lockedTypes = isStarter ? ASSESSMENT_TYPES.filter(a => a.proOnly) : [];
+
+  // Non-platform-owners can only access client_portfolio and listing_pricing
+  const visibleTypes = isPlatformOwner
+    ? ASSESSMENT_TYPES
+    : ASSESSMENT_TYPES.filter(a => !PLATFORM_OWNER_ONLY_IDS.includes(a.id));
+
+  const availableTypes = visibleTypes.filter(a => !a.proOnly || !isStarter);
+  const lockedTypes = isStarter ? visibleTypes.filter(a => a.proOnly) : [];
   const standardTypes = availableTypes.filter(a => a.id !== 'custom');
   const customType = availableTypes.find(a => a.id === 'custom');
 

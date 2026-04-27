@@ -249,7 +249,8 @@ export default function NewAnalysis() {
     }
   }
 
-  const stepProps = { intake, update, user, userTier, onNext: next, onBack: back };
+  const isPlatformOwner = user?.role === 'platform_owner' || user?.role === 'admin';
+  const stepProps = { intake, update, user, userTier, isPlatformOwner, onNext: next, onBack: back };
   const maxStep = getMaxStep(intake.assessment_type);
   const stepLabels = getStepLabels(intake.assessment_type);
   const hasFinancialStep = intake.assessment_type === "client_portfolio";
