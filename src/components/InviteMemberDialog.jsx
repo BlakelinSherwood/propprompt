@@ -121,16 +121,24 @@ export default function InviteMemberDialog({ userRole, onClose, onInvited }) {
           </button>
         </div>
 
-        {/* Discount Banner */}
-        <div className="mx-5 mt-4 flex items-center gap-3 bg-[#B8982F]/8 border border-[#B8982F]/25 rounded-xl px-4 py-3">
-          <Gift className="w-4 h-4 text-[#B8982F] flex-shrink-0" />
-          <div>
-            <p className="text-xs font-semibold text-[#1A3226]">
-              {tab === "team" ? "Invitee gets 20% off their first 2 months" : "They get 20% off · You get 10% off your next month"}
-            </p>
-            <p className="text-[10px] text-[#1A3226]/50 mt-0.5">Must sign up within 30 days of the invite.</p>
+        {/* Info Banner */}
+        {tab === "team" ? (
+          <div className="mx-5 mt-4 flex items-center gap-3 bg-[#1A3226]/5 border border-[#1A3226]/10 rounded-xl px-4 py-3">
+            <Users className="w-4 h-4 text-[#1A3226]/50 flex-shrink-0" />
+            <div>
+              <p className="text-xs font-semibold text-[#1A3226]">Joins your existing license</p>
+              <p className="text-[10px] text-[#1A3226]/50 mt-0.5">Billing stays with the brokerage owner or team lead.</p>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="mx-5 mt-4 flex items-center gap-3 bg-[#B8982F]/8 border border-[#B8982F]/25 rounded-xl px-4 py-3">
+            <Gift className="w-4 h-4 text-[#B8982F] flex-shrink-0" />
+            <div>
+              <p className="text-xs font-semibold text-[#1A3226]">They get 20% off · You get 10% off your next month</p>
+              <p className="text-[10px] text-[#1A3226]/50 mt-0.5">Must sign up within 30 days of the invite.</p>
+            </div>
+          </div>
+        )}
 
         <div className="p-5 space-y-4">
           <div>
@@ -186,7 +194,7 @@ export default function InviteMemberDialog({ userRole, onClose, onInvited }) {
 
           {tab === "team" && (
             <p className="text-xs text-[#1A3226]/40">
-              An invitation email will be sent. The user will set their password upon first login.
+              An invitation email will be sent. The user will set their password upon first login. No separate subscription is required — they operate under your license.
             </p>
           )}
         </div>
