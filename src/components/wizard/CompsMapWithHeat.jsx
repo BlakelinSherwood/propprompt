@@ -50,6 +50,12 @@ export default function CompsMapWithHeat({ subjectAddress, comps, selected, onTo
   const minPpsf = ppsfValues.length ? Math.min(...ppsfValues) : 0;
   const maxPpsf = ppsfValues.length ? Math.max(...ppsfValues) : 1;
 
+  // Pre-fetch neighborhood data as soon as subject address is known (don't wait for heat toggle)
+  useEffect(() => {
+    if (!subjectAddress || neighborhoodData || loadingNeighborhood) return;
+    loadNeighborhoodData();
+  }, [subjectAddress]);
+
   // Step 1: resolve coordinates
   useEffect(() => {
     if (!subjectAddress) return;
@@ -222,7 +228,7 @@ Return ONLY JSON: {"town": "...", "median_ppsf": 625, "neighborhoods": [{"name":
         {/* Controls */}
         <div className="absolute top-3 left-3 z-10 flex flex-col gap-2">
           <button
-            onClick={() => setShowHeat(v => { const next = !v; if (next && !neighborhoodData) loadNeighborhoodData(); return next; })}
+            onClick={() => setShowHeat(v => !v)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium shadow-md transition-all ${showHeat ? "bg-[#1A3226] text-white" : "bg-white text-[#1A3226] border border-[#1A3226]/20"}`}
           >
             <Layers className="w-3.5 h-3.5" />
