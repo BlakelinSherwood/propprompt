@@ -94,11 +94,19 @@ export default function CompsMapWithHeat({ subjectAddress, comps, selected, onTo
     return () => { cancelled = true; };
   }, [subjectAddress, comps?.length]);
 
-  // Step 2: Initialize map
+  // Step 2: Initialize map — wait for container to have non-zero dimensions
   useEffect(() => {
     if (!subjectCoords || mapRef.current) return;
-    const t = setTimeout(() => {
-      if (!containerRef.current) return;
+    let cancelled = false;
+
+    function tryInit() {
+      if (cancelled || !containerRef.current) return;
+      const { offsetWidth, offsetHeight } = containerRef.current;
+      if (!offsetWidth || !offsetHeight) {
+        // Container not visible yet — retry shortly
+        setTimeout(tryInit, 100);
+        return;
+      }
       const map = new mapboxgl.Map({
         container: containerRef.current,
         style: "mapbox://styles/mapbox/light-v11",
@@ -111,9 +119,13 @@ export default function CompsMapWithHeat({ subjectAddress, comps, selected, onTo
       ro.observe(containerRef.current);
       mapRef.current = map;
       mapRef.current._ro = ro;
-    }, 100);
+    }
+
+    // Small initial delay to let the wizard step finish rendering
+    const t = setTimeout(tryInit, 150);
 
     return () => {
+      cancelled = true;
       clearTimeout(t);
       if (mapRef.current) {
         mapRef.current._ro?.disconnect();
