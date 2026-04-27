@@ -249,7 +249,7 @@ async function addDisclaimerPage(doc, branding) {
     'COMPARABLE SALES DATA: Comparable sales are sourced from publicly available MLS records, county registry data, and AI-assembled research. Adjustments are estimates, not appraisal-grade adjustments.',
     'AVM ESTIMATES: Third-party Automated Valuation Model estimates are for informational purposes only and may not reflect property-specific conditions, recent renovations, or local market nuances.',
     'EQUITY OPTIONS: All financial option analyses are estimates only. Rates, payoff balances, and market values should be verified with licensed lenders and appraisers before any financial decision.',
-    'AI-GENERATED CONTENT: This report uses large language model technology. Users are solely responsible for verifying accuracy before reliance.',
+    'AI-GENERATED CONTENT: This report was produced using PropPrompt\'s proprietary Ensemble AI engine, which orchestrates multiple best-in-class large language models — including ChatGPT (OpenAI), Claude (Anthropic), Gemini (Google), and Perplexity — to synthesize market research, valuation analysis, and strategic recommendations. Users are solely responsible for verifying accuracy before reliance.',
   ];
   doc.setFontSize(8.5);
   for (const para of paras) {
