@@ -106,15 +106,23 @@ export default function FlipbookViewer() {
           </div>
         )}
 
-        {/* PDF Viewer — uses Google Docs viewer to bypass iframe restrictions */}
+        {/* PDF Viewer — direct embed */}
         {pdfReady && (
           <>
-            <iframe
-              src={`https://docs.google.com/viewer?url=${encodeURIComponent(flipbook.pdf_public_url)}&embedded=true`}
+            <object
+              data={flipbook.pdf_public_url}
+              type="application/pdf"
               className="w-full rounded-xl shadow-2xl border border-gray-200"
               style={{ maxWidth: 960, height: '80vh' }}
-              title="Report PDF"
-            />
+            >
+              {/* Fallback for browsers that don't support object/embed (e.g. mobile Safari) */}
+              <iframe
+                src={flipbook.pdf_public_url}
+                className="w-full rounded-xl"
+                style={{ maxWidth: 960, height: '80vh', border: 'none' }}
+                title="Report PDF"
+              />
+            </object>
             <div className="flex items-center gap-4 mt-4">
               <a
                 href={flipbook.pdf_public_url}
