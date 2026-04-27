@@ -78,7 +78,30 @@ Deno.serve(async (req) => {
       console.log('Could not create OrgMembership:', e.message);
     }
 
-    return Response.json({ success: true, email, appRole, platformRole });
+    // Create ReferralInvite record so discount is tracked on signup
+    const signupDeadline = new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString();
+    const inviteToken = crypto.randomUUID().replace(/-/g, '');
+    try {
+      await base44.asServiceRole.entities.ReferralInvite.create({
+        invite_token: inviteToken,
+        inviter_email: user.email,
+        inviter_org_id: user.org_id || null,
+        invitee_email: email,
+        invite_type: 'team_member',
+        intended_role: appRole,
+        invitee_discount_pct: 20,
+        invitee_discount_months: 2,
+        inviter_discount_pct: 10,
+        inviter_discount_months: 1,
+        signup_deadline: signupDeadline,
+        invite_sent_at: new Date().toISOString(),
+        status: 'pending',
+      });
+    } catch (e) {
+      console.warn('[inviteMember] Could not create ReferralInvite:', e.message);
+    }
+
+    return Response.json({ success: true, email, appRole, platformRole, invite_token: inviteToken });
   } catch (error) {
     console.error("inviteMember error:", error);
     return Response.json({ error: error.message }, { status: 500 });

@@ -137,6 +137,63 @@ Deno.serve(async (req) => {
             });
           }
         }
+        // Apply referral discount if invitee signed up within 45-day window
+        try {
+          const customerId = session.customer;
+          if (customerId && userEmail) {
+            const now = new Date();
+            const pendingInvites = await base44.asServiceRole.entities.ReferralInvite.filter({
+              invitee_email: userEmail,
+              status: 'pending',
+            });
+            const validInvite = pendingInvites.find(i => new Date(i.signup_deadline) > now);
+            if (validInvite) {
+              // Create a 20%-off coupon for invitee's first 2 months
+              const coupon = await stripe.coupons.create({
+                percent_off: validInvite.invitee_discount_pct || 20,
+                duration: 'repeating',
+                duration_in_months: validInvite.invitee_discount_months || 2,
+                name: `PropPrompt Referral Discount`,
+                metadata: { referral_invite_id: validInvite.id },
+              });
+              await stripe.customers.update(customerId, { coupon: coupon.id });
+              console.log(`[stripeWebhook] Applied ${validInvite.invitee_discount_pct || 20}% referral coupon to ${userEmail}`);
+
+              // Mark invite accepted
+              await base44.asServiceRole.entities.ReferralInvite.update(validInvite.id, {
+                status: 'accepted',
+                accepted_at: now.toISOString(),
+                invitee_stripe_customer_id: customerId,
+                discount_applied: true,
+              });
+
+              // Reward the inviter (10% off 1 month) — find their Stripe customer ID
+              const inviterUsers = await base44.asServiceRole.entities.User.filter({ email: validInvite.inviter_email });
+              if (inviterUsers.length > 0) {
+                const inviterOrgs = await base44.asServiceRole.entities.Organization.filter({ owner_email: validInvite.inviter_email });
+                const inviterCustomerId = inviterOrgs[0]?.stripe_customer_id || null;
+                if (inviterCustomerId) {
+                  const inviterCoupon = await stripe.coupons.create({
+                    percent_off: validInvite.inviter_discount_pct || 10,
+                    duration: 'once',
+                    name: `PropPrompt Referral Reward`,
+                    metadata: { referral_invite_id: validInvite.id },
+                  });
+                  await stripe.customers.update(inviterCustomerId, { coupon: inviterCoupon.id });
+                  await base44.asServiceRole.entities.ReferralInvite.update(validInvite.id, {
+                    inviter_stripe_customer_id: inviterCustomerId,
+                    inviter_rewarded: true,
+                    status: 'inviter_rewarded',
+                  });
+                  console.log(`[stripeWebhook] Applied inviter reward coupon to ${validInvite.inviter_email}`);
+                }
+              }
+            }
+          }
+        } catch (referralErr) {
+          console.warn('[stripeWebhook] Referral discount application failed (non-fatal):', referralErr.message);
+        }
+
         console.log(`Checkout completed for ${userEmail}, plan: ${meta.plan}`);
         break;
       }

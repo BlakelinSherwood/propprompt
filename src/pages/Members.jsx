@@ -4,7 +4,7 @@ import { UserPlus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ROLE_LABELS } from "@/lib/constants";
-import InviteMemberDialog from "../components/InviteMemberDialog";
+import InviteMemberDialog from "../components/InviteMemberDialog.jsx";
 import MemberRow from "../components/MemberRow";
 import { base44 } from "@/api/base44Client";
 

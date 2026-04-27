@@ -1,0 +1,107 @@
+{
+  "name": "ReferralInvite",
+  "type": "object",
+  "description": "Tracks invite referrals \u2014 both team member invites and external agent invites. Records discount eligibility and redemption status.",
+  "properties": {
+    "invite_token": {
+      "type": "string",
+      "description": "Unique token used in the invite link. Used to attribute signups."
+    },
+    "inviter_email": {
+      "type": "string",
+      "description": "Email of the user who sent the invite."
+    },
+    "inviter_org_id": {
+      "type": "string",
+      "description": "Org of the inviter (null for external invites with no org)."
+    },
+    "invitee_email": {
+      "type": "string",
+      "description": "Email address of the person invited."
+    },
+    "invite_type": {
+      "type": "string",
+      "enum": [
+        "team_member",
+        "external"
+      ],
+      "description": "team_member = invited to join as part of the inviter's org. external = independent referral with discount offer only."
+    },
+    "intended_role": {
+      "type": "string",
+      "description": "Role assigned for team_member invites (e.g. team_agent, assistant). Null for external invites."
+    },
+    "invitee_discount_pct": {
+      "type": "integer",
+      "default": 20,
+      "description": "Discount % the invitee gets on their first N months if they sign up within the window."
+    },
+    "invitee_discount_months": {
+      "type": "integer",
+      "default": 2,
+      "description": "Number of months the invitee discount applies."
+    },
+    "inviter_discount_pct": {
+      "type": "integer",
+      "default": 10,
+      "description": "Discount % the inviter gets on their next month when invitee signs up."
+    },
+    "inviter_discount_months": {
+      "type": "integer",
+      "default": 1,
+      "description": "Number of months the inviter discount applies."
+    },
+    "signup_deadline": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Hard deadline for discount eligibility. Set to 45 days (30 public + 15 silent buffer) after invite_sent_at."
+    },
+    "invite_sent_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "accepted",
+        "expired",
+        "inviter_rewarded"
+      ],
+      "default": "pending"
+    },
+    "accepted_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the invitee completed signup / first subscription."
+    },
+    "invitee_stripe_customer_id": {
+      "type": "string",
+      "description": "Stripe customer ID of the invitee after signup (used to apply coupon)."
+    },
+    "inviter_stripe_customer_id": {
+      "type": "string",
+      "description": "Stripe customer ID of the inviter (used to apply inviter reward coupon)."
+    },
+    "discount_applied": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether the Stripe discount coupon has been applied to the invitee."
+    },
+    "inviter_rewarded": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether the inviter reward has been applied."
+    },
+    "org_membership_id": {
+      "type": "string",
+      "description": "References OrgMembership.id for team_member invites."
+    }
+  },
+  "required": [
+    "inviter_email",
+    "invitee_email",
+    "invite_type",
+    "signup_deadline"
+  ]
+}
