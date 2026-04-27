@@ -730,6 +730,7 @@ async function renderClientPortfolioPdf(doc, data, branding) {
       }
     }
     if (li.ma_housing_policies?.length) {
+      y += 20; // extra padding before MA Housing Policies section
       if (y + 50 > BOTTOM) { doc.addPage(); await drawPageFrame(doc, branding, 'Section 05 · Local Impact', 'MA Housing Policy'); y = 90; }
       doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b); doc.text('Massachusetts Housing Policies Affecting This Property', margin, y); y += 10;
       doc.setDrawColor(accent.r, accent.g, accent.b); doc.setLineWidth(1.5); doc.line(margin, y, margin + 280, y); y += 12;
