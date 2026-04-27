@@ -23,7 +23,7 @@ export default function DriveConnectedApp() {
         setSettings({
           subfolder_by_property_type: res.data.subfolder_by_property_type || false,
           subfolder_by_assessment_type: res.data.subfolder_by_assessment_type || false,
-          auto_sync_pdf: res.data.auto_sync_pdf !== false,
+          auto_sync_pdf: res.data.auto_sync_pdf === true,
           auto_sync_pptx: res.data.auto_sync_pptx || false,
         });
       }
