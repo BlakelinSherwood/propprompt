@@ -85,13 +85,9 @@ const ASSESSMENT_TYPES = [
 export default function Step2Assessment({ intake, update, onNext, onBack, userTier, isPlatformOwner }) {
   const isStarter = !userTier || userTier === 'starter';
 
-  // Non-platform-owners can only access client_portfolio and listing_pricing
-  const visibleTypes = isPlatformOwner
-    ? ASSESSMENT_TYPES
-    : ASSESSMENT_TYPES.filter(a => !PLATFORM_OWNER_ONLY_IDS.includes(a.id));
-
-  const availableTypes = visibleTypes.filter(a => !a.proOnly || !isStarter);
-  const lockedTypes = isStarter ? visibleTypes.filter(a => a.proOnly) : [];
+  // Non-platform-owners see all types but restricted ones are greyed out (coming soon)
+  const availableTypes = ASSESSMENT_TYPES.filter(a => !a.proOnly || !isStarter);
+  const lockedTypes = isStarter ? ASSESSMENT_TYPES.filter(a => a.proOnly) : [];
   const standardTypes = availableTypes.filter(a => a.id !== 'custom');
   const customType = availableTypes.find(a => a.id === 'custom');
 
@@ -109,34 +105,44 @@ export default function Step2Assessment({ intake, update, onNext, onBack, userTi
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
           {standardTypes.map((a) => {
             const selected = intake.assessment_type === a.id;
+            const comingSoon = !isPlatformOwner && PLATFORM_OWNER_ONLY_IDS.includes(a.id);
             return (
               <button
                 key={a.id}
-                onClick={() => update({ assessment_type: a.id })}
-                className={`text-left rounded-xl border-2 p-4 transition-all
-                  ${selected ? "border-[#1A3226] bg-[#1A3226]/5" : "border-[#1A3226]/10 hover:border-[#1A3226]/20"}`}
+                onClick={() => !comingSoon && update({ assessment_type: a.id })}
+                disabled={comingSoon}
+                className={`text-left rounded-xl border-2 p-4 transition-all relative
+                  ${comingSoon ? "border-[#1A3226]/8 bg-[#1A3226]/[0.02] opacity-50 cursor-not-allowed" :
+                    selected ? "border-[#1A3226] bg-[#1A3226]/5" : "border-[#1A3226]/10 hover:border-[#1A3226]/20"}`}
               >
+                {comingSoon && (
+                  <span className="absolute top-2 right-2 text-[9px] px-2 py-0.5 rounded-full bg-[#1A3226]/10 text-[#1A3226]/50 font-medium">
+                    Coming Soon
+                  </span>
+                )}
                 <div className="flex items-start gap-3">
-                  <span className="text-2xl leading-none mt-0.5">{a.icon}</span>
+                  <span className={`text-2xl leading-none mt-0.5 ${comingSoon ? 'grayscale' : ''}`}>{a.icon}</span>
                   <div className="flex-1">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-semibold text-[#1A3226]">{a.title}</span>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Info className="w-3.5 h-3.5 text-[#B8982F] flex-shrink-0 cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs text-xs bg-[#1A3226] text-white border-0">
-                              {a.tooltip}
-                            </TooltipContent>
-                          </Tooltip>
+                          {!comingSoon && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Info className="w-3.5 h-3.5 text-[#B8982F] flex-shrink-0 cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs text-xs bg-[#1A3226] text-white border-0">
+                                {a.tooltip}
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
                         </div>
                         {a.sublabel && (
                           <p className="text-[10px] text-[#1A3226]/50 mt-0.5">{a.sublabel}</p>
                         )}
                       </div>
-                      {a.badge && (
+                      {a.badge && !comingSoon && (
                         <span className={`text-[9px] px-2 py-1 rounded flex-shrink-0 font-medium whitespace-nowrap
                           ${a.badgeColor === 'green' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
                           {a.badge}
@@ -146,8 +152,10 @@ export default function Step2Assessment({ intake, update, onNext, onBack, userTi
                     <p className="text-xs text-[#1A3226]/55 leading-relaxed mt-1">{a.description}</p>
                     <p className="text-[10px] text-[#B8982F] mt-2 font-medium">{a.time}</p>
                   </div>
-                  <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 mt-1
-                    ${selected ? "border-[#1A3226] bg-[#1A3226]" : "border-[#1A3226]/20"}`} />
+                  {!comingSoon && (
+                    <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 mt-1
+                      ${selected ? "border-[#1A3226] bg-[#1A3226]" : "border-[#1A3226]/20"}`} />
+                  )}
                 </div>
               </button>
             );
@@ -157,13 +165,23 @@ export default function Step2Assessment({ intake, update, onNext, onBack, userTi
         {/* Custom Analysis - Full Width */}
         {customType && (
           <div className="mb-8">
+            {(() => {
+              const comingSoon = !isPlatformOwner && PLATFORM_OWNER_ONLY_IDS.includes('custom');
+              return (
             <button
-              onClick={() => update({ assessment_type: 'custom' })}
-              className={`w-full text-left rounded-xl border-2 p-4 transition-all
-                ${intake.assessment_type === 'custom' ? "border-[#1A3226] bg-[#1A3226]/5" : "border-[#1A3226]/10 hover:border-[#1A3226]/20"}`}
-            >
-              <div className="flex items-start gap-3">
-                <span className="text-2xl leading-none mt-0.5">{customType.icon}</span>
+              onClick={() => !comingSoon && update({ assessment_type: 'custom' })}
+              disabled={comingSoon}
+              className={`w-full text-left rounded-xl border-2 p-4 transition-all relative
+                ${comingSoon ? "border-[#1A3226]/8 bg-[#1A3226]/[0.02] opacity-50 cursor-not-allowed" :
+                  intake.assessment_type === 'custom' ? "border-[#1A3226] bg-[#1A3226]/5" : "border-[#1A3226]/10 hover:border-[#1A3226]/20"}`}
+              >
+                {comingSoon && (
+                  <span className="absolute top-2 right-2 text-[9px] px-2 py-0.5 rounded-full bg-[#1A3226]/10 text-[#1A3226]/50 font-medium">
+                    Coming Soon
+                  </span>
+                )}
+                <div className="flex items-start gap-3">
+                <span className={`text-2xl leading-none mt-0.5 ${comingSoon ? 'grayscale' : ''}`}>{customType.icon}</span>
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-sm font-semibold text-[#1A3226]">{customType.title}</span>
@@ -217,6 +235,8 @@ export default function Step2Assessment({ intake, update, onNext, onBack, userTi
                   ${intake.assessment_type === 'custom' ? "border-[#1A3226] bg-[#1A3226]" : "border-[#1A3226]/20"}`} />
               </div>
             </button>
+              );
+            })()}
           </div>
         )}
 
