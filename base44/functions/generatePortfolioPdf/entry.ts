@@ -704,28 +704,31 @@ async function renderClientPortfolioPdf(doc, data, branding) {
       doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b); doc.text('Active & Upcoming Town Developments', margin, y); y += 10;
       doc.setDrawColor(accent.r, accent.g, accent.b); doc.setLineWidth(1.5); doc.line(margin, y, margin + 240, y); y += 12;
       for (const dev of li.town_developments) {
-        const devTextMaxW = contentWidth - 108; // leave room for badge (88px) + padding
+        const devTextMaxW = contentWidth - 120; // leave room for badge (100px) + padding
         const dL = doc.splitTextToSize(dev.description || '', devTextMaxW);
         const iL = doc.splitTextToSize(dev.impact_reason || '', devTextMaxW);
-        const cH = Math.max(52, 30 + (dL.length + iL.length) * 12);
+        const cH = Math.max(64, 42 + (dL.length + iL.length) * 12);
         if (y + cH > BOTTOM) { doc.addPage(); await drawPageFrame(doc, branding, 'Section 05 · Local Impact', 'Town Developments (cont.)'); y = 90; }
         const ic = dev.value_impact === 'positive' ? { r: 22, g: 101, b: 52 } : dev.value_impact === 'negative' ? { r: 153, g: 27, b: 27 } : { r: 100, g: 100, b: 100 };
         doc.setFillColor(248, 247, 244); doc.roundedRect(margin, y, contentWidth, cH, 3, 3, 'F');
         doc.setFillColor(ic.r, ic.g, ic.b); doc.roundedRect(margin, y, 5, cH, 2, 2, 'F');
-        // Status badge with impact label + value_impact color — truncate long labels
-        const rawBadgeLabel = dev.value_impact ? dev.value_impact.toUpperCase() : (dev.status || 'PROJECT').toUpperCase();
+        // Status badge — show status field, fall back to value_impact
+        const rawBadgeLabel = (dev.status || dev.value_impact || 'PROJECT').toUpperCase();
         const badgeLabel = rawBadgeLabel.replace(/_/g, ' '); // e.g. UNDER_CONSTRUCTION → UNDER CONSTRUCTION
-        const badgeW = 88; const badgeH = 24;
+        const badgeW = 100; const badgeH = 24;
         doc.setFillColor(ic.r, ic.g, ic.b); doc.roundedRect(margin + contentWidth - badgeW, y + 6, badgeW, badgeH, 3, 3, 'F');
         doc.setFontSize(6.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
         const badgeLines = doc.splitTextToSize(badgeLabel, badgeW - 8);
         badgeLines.slice(0, 2).forEach((bl, bi) => {
           doc.text(bl, margin + contentWidth - badgeW / 2, y + 15 + bi * 8, { align: 'center' });
         });
-        doc.setFontSize(9.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b); doc.text(dev.project || '', margin + 14, y + 14, { maxWidth: contentWidth - badgeW - 20 });
-        if (dev.timeline) { doc.setFontSize(7.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(90, 90, 90); doc.text(`Timeline: ${dev.timeline}`, margin + 14, y + 25, { maxWidth: contentWidth - 110 }); }
-        doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(50, 50, 50); doc.text(dL, margin + 14, y + 36);
-        if (iL.length) { doc.setFontSize(8); doc.setFont('helvetica', 'italic'); doc.setTextColor(ic.r, ic.g, ic.b); doc.text(iL, margin + 14, y + 36 + dL.length * 12); }
+        // Project heading — try multiple field names
+        const projectHeading = dev.project || dev.project_name || dev.name || dev.title || '';
+        doc.setFontSize(9.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b);
+        doc.text(projectHeading, margin + 14, y + 14, { maxWidth: contentWidth - badgeW - 24 });
+        if (dev.timeline) { doc.setFontSize(7.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(90, 90, 90); doc.text(`Timeline: ${dev.timeline}`, margin + 14, y + 26, { maxWidth: contentWidth - 120 }); }
+        doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(50, 50, 50); doc.text(dL, margin + 14, y + 38);
+        if (iL.length) { doc.setFontSize(8); doc.setFont('helvetica', 'italic'); doc.setTextColor(ic.r, ic.g, ic.b); doc.text(iL, margin + 14, y + 38 + dL.length * 12); }
         y += cH + 6;
       }
     }
@@ -742,7 +745,9 @@ async function renderClientPortfolioPdf(doc, data, branding) {
         const pc = pol.owner_impact === 'positive' ? { r: 22, g: 101, b: 52 } : pol.owner_impact === 'negative' ? { r: 153, g: 27, b: 27 } : { r: 60, g: 80, b: 100 };
         doc.setFillColor(245, 245, 250); doc.roundedRect(margin, y, contentWidth, cH2, 3, 3, 'F');
         doc.setFillColor(pc.r, pc.g, pc.b); doc.roundedRect(margin, y, 5, cH2, 2, 2, 'F');
-        doc.setFontSize(9.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b); doc.text(pol.policy || '', margin + 14, y + 14, { maxWidth: contentWidth - 100 });
+        const policyHeading = pol.policy || pol.policy_name || pol.name || pol.title || '';
+        doc.setFontSize(9.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(primary.r, primary.g, primary.b);
+        doc.text(policyHeading, margin + 14, y + 14, { maxWidth: contentWidth - 100 });
         if (pol.effective_date) { doc.setFontSize(7.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(110, 110, 110); doc.text(`Effective: ${pol.effective_date}`, margin + 14, y + 24); }
         let cy3 = y + 34;
         doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(50, 50, 50); doc.text(dL2, margin + 14, cy3); cy3 += dL2.length * 12;
