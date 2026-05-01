@@ -106,7 +106,7 @@ export default function AnalysisWizard() {
         if (subs.length > 0) {
           const tiers = subs.map(s => s.tier);
           resolvedTier = tiers.includes('team') ? 'team' : tiers.includes('pro') ? 'pro' : 'starter';
-        } else if (user.role === 'platform_owner' || user.role === 'admin') {
+        } else if (['platform_owner', 'admin', 'team_lead', 'brokerage_admin', 'team_admin', 'team_agent'].includes(user.role)) {
           resolvedTier = 'team';
         }
         setUserTier(resolvedTier);
