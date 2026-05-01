@@ -1,0 +1,63 @@
+{
+  "name": "AiApiKey",
+  "type": "object",
+  "description": "Encrypted storage of user-provided AI platform API keys. One record per user per platform.",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "Email of the key owner (references User)"
+    },
+    "ai_platform": {
+      "type": "string",
+      "enum": [
+        "claude",
+        "chatgpt",
+        "gemini",
+        "perplexity",
+        "grok"
+      ],
+      "description": "Which AI platform this key is for"
+    },
+    "encrypted_key": {
+      "type": "string",
+      "description": "AES-256 encrypted API key value. Never returned to frontend raw."
+    },
+    "key_label": {
+      "type": "string",
+      "description": "User-provided label/nickname for this key (e.g. 'Personal Claude Key')"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this key is currently in use"
+    },
+    "last_used_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of last successful API call with this key"
+    },
+    "last_validated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of last validation check"
+    },
+    "is_valid": {
+      "type": "boolean",
+      "description": "Result of last validation attempt"
+    },
+    "error_message": {
+      "type": "string",
+      "description": "Last error from API (key invalid, quota exceeded, etc.)"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this API key"
+    }
+  },
+  "required": [
+    "user_email",
+    "ai_platform",
+    "encrypted_key"
+  ]
+}

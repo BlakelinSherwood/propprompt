@@ -1,0 +1,56 @@
+{
+  "name": "AIModelRouting",
+  "type": "object",
+  "description": "AI model routing configuration per platform and complexity tier.",
+  "properties": {
+    "platform": {
+      "type": "string",
+      "enum": [
+        "anthropic",
+        "openai",
+        "gemini",
+        "perplexity",
+        "grok"
+      ],
+      "default": "anthropic",
+      "description": "AI platform"
+    },
+    "routing_tier": {
+      "type": "string",
+      "enum": [
+        "complex",
+        "standard",
+        "background"
+      ],
+      "description": "Complexity tier for model routing"
+    },
+    "model_string": {
+      "type": "string",
+      "description": "Model identifier (e.g., claude-opus-4-5, gpt-4o)"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this routing is active"
+    },
+    "updated_by": {
+      "type": "string",
+      "description": "References User.id of admin who last updated"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this routing was last updated"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this model routing configuration"
+    }
+  },
+  "required": [
+    "platform",
+    "routing_tier",
+    "model_string"
+  ]
+}

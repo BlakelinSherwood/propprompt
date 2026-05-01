@@ -57,6 +57,11 @@
       "type": "string",
       "format": "date-time",
       "description": "Auto-generated timestamp"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this generation timing entry"
     }
   },
   "required": [

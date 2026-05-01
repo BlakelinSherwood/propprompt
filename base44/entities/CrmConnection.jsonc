@@ -1,0 +1,90 @@
+{
+  "name": "CrmConnection",
+  "type": "object",
+  "description": "Per-user CRM integration credentials and configuration per Addendum A6. One record per user per CRM.",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "Email of the user who owns this CRM connection (references User)"
+    },
+    "crm_provider": {
+      "type": "string",
+      "enum": [
+        "follow_up_boss",
+        "kvcore",
+        "salesforce",
+        "lofty"
+      ],
+      "description": "CRM platform per A6.2\u2013A6.5"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "connected",
+        "disconnected",
+        "error",
+        "pending_auth"
+      ],
+      "default": "pending_auth",
+      "description": "Connection health status"
+    },
+    "encrypted_api_key": {
+      "type": "string",
+      "description": "Encrypted CRM API key or OAuth refresh token"
+    },
+    "oauth_access_token": {
+      "type": "string",
+      "description": "OAuth access token (Salesforce, Lofty). Short-lived; refreshed automatically."
+    },
+    "oauth_refresh_token": {
+      "type": "string",
+      "description": "OAuth refresh token for token refresh flow"
+    },
+    "oauth_token_expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the current access token expires"
+    },
+    "crm_user_id": {
+      "type": "string",
+      "description": "User's ID within the CRM system"
+    },
+    "crm_account_name": {
+      "type": "string",
+      "description": "Display name of the connected CRM account"
+    },
+    "default_push_format": {
+      "type": "string",
+      "enum": [
+        "note",
+        "attachment",
+        "activity"
+      ],
+      "default": "note",
+      "description": "How analysis outputs are pushed to CRM contact records"
+    },
+    "auto_push_enabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether analyses are auto-pushed on completion"
+    },
+    "last_sync_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of last successful CRM push"
+    },
+    "last_error": {
+      "type": "string",
+      "description": "Last error message from CRM API"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this CRM connection"
+    }
+  },
+  "required": [
+    "user_email",
+    "crm_provider"
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "name": "PreLoadedComps",
+  "type": "object",
+  "description": "Comparable sales loaded during pre-analysis research for a property address.",
+  "properties": {
+    "analysis_id": {
+      "type": "string",
+      "description": "References Analysis.id"
+    },
+    "address": {
+      "type": "string",
+      "maxLength": 300,
+      "description": "Full comparable property address"
+    },
+    "sale_price": {
+      "type": "number",
+      "description": "Sale price in dollars"
+    },
+    "sale_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date of sale"
+    },
+    "beds": {
+      "type": "integer"
+    },
+    "baths": {
+      "type": "number"
+    },
+    "sqft": {
+      "type": "integer",
+      "description": "Square footage"
+    },
+    "distance_miles": {
+      "type": "number",
+      "description": "Distance from subject property in miles"
+    },
+    "source": {
+      "type": "string",
+      "maxLength": 100,
+      "description": "Data source (e.g. 'mls', 'assessor', 'public_records')"
+    },
+    "loaded_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this comp was loaded"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this pre-loaded comp"
+    }
+  },
+  "required": [
+    "analysis_id",
+    "address",
+    "sale_price",
+    "sale_date"
+  ]
+}

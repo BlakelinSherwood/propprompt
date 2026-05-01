@@ -1,0 +1,44 @@
+{
+  "name": "TerritoryIntelligenceLog",
+  "type": "object",
+  "description": "Log of all agent evaluations to prevent duplicate alerts.",
+  "properties": {
+    "territory_id": {
+      "type": "string",
+      "description": "References Territory.id"
+    },
+    "evaluated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "conditions_checked": {
+      "type": "integer",
+      "description": "Total number of conditions evaluated"
+    },
+    "conditions_triggered": {
+      "type": "integer",
+      "description": "Number of conditions that triggered"
+    },
+    "alert_generated": {
+      "type": "boolean",
+      "description": "Whether an alert was created from this evaluation"
+    },
+    "significance_score": {
+      "type": "integer",
+      "description": "Total significance score from this evaluation"
+    },
+    "market_snapshot": {
+      "type": "object",
+      "description": "Snapshot of market data from this evaluation"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this intelligence log entry"
+    }
+  },
+  "required": [
+    "territory_id",
+    "evaluated_at"
+  ]
+}

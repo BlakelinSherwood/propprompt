@@ -1,0 +1,108 @@
+{
+  "name": "ChatbotSession",
+  "type": "object",
+  "description": "Tracks an in-progress or completed AI analysis conversation session.",
+  "properties": {
+    "analysis_id": {
+      "type": "string",
+      "description": "Parent analysis record ID (references Analysis)"
+    },
+    "user_email": {
+      "type": "string",
+      "description": "Email of the user conducting this session"
+    },
+    "org_id": {
+      "type": "string",
+      "description": "Organization context for this session"
+    },
+    "ai_platform": {
+      "type": "string",
+      "enum": [
+        "claude",
+        "chatgpt",
+        "gemini",
+        "perplexity",
+        "grok"
+      ],
+      "description": "AI platform for this session"
+    },
+    "session_mode": {
+      "type": "string",
+      "enum": [
+        "api",
+        "manual_copy"
+      ],
+      "description": "API mode sends prompt automatically; manual_copy generates prompt text for agent to paste"
+    },
+    "messages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "assistant",
+              "system"
+            ]
+          },
+          "content": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "description": "Ordered array of conversation turns"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "awaiting_followup",
+        "complete",
+        "abandoned"
+      ],
+      "default": "active",
+      "description": "Session lifecycle state"
+    },
+    "followup_questions_pending": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Outstanding follow-up questions the AI is waiting on (per 3.3 protocol)"
+    },
+    "prompt_assembly_step": {
+      "type": "string",
+      "enum": [
+        "intake",
+        "followup",
+        "execution",
+        "output",
+        "complete"
+      ],
+      "default": "intake",
+      "description": "Current step in the PropPrompt 4-layer architecture"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When session reached complete status"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this chatbot session"
+    }
+  },
+  "required": [
+    "user_email",
+    "org_id",
+    "ai_platform",
+    "session_mode"
+  ]
+}

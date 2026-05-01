@@ -1,0 +1,46 @@
+{
+  "name": "OnboardingChecklistItem",
+  "type": "object",
+  "description": "Individual checklist items for a subscriber's Day 0 onboarding checklist.",
+  "properties": {
+    "journey_id": {
+      "type": "string",
+      "description": "References OnboardingJourney.id"
+    },
+    "item_key": {
+      "type": "string",
+      "enum": [
+        "watch_welcome",
+        "first_analysis",
+        "add_clients",
+        "set_alerts",
+        "complete_profile",
+        "send_portfolio"
+      ],
+      "description": "Unique key for this checklist item"
+    },
+    "label": {
+      "type": "string",
+      "description": "Display label for the checklist item"
+    },
+    "completed": {
+      "type": "boolean",
+      "default": false
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this item was marked complete"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this checklist item"
+    }
+  },
+  "required": [
+    "journey_id",
+    "item_key",
+    "label"
+  ]
+}

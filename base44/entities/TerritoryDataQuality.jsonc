@@ -1,0 +1,67 @@
+{
+  "name": "TerritoryDataQuality",
+  "type": "object",
+  "description": "Daily tracking of public records reliability per territory for portfolio analysis.",
+  "properties": {
+    "territory_id": {
+      "type": "string",
+      "description": "References Territory.id"
+    },
+    "search_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "searches_attempted": {
+      "type": "integer",
+      "default": 0
+    },
+    "searches_found": {
+      "type": "integer",
+      "default": 0,
+      "description": "Searches with found or partial status"
+    },
+    "searches_not_found": {
+      "type": "integer",
+      "default": 0
+    },
+    "searches_errored": {
+      "type": "integer",
+      "default": 0
+    },
+    "average_confidence_score": {
+      "type": "number"
+    },
+    "green_state_count": {
+      "type": "integer",
+      "default": 0
+    },
+    "yellow_state_count": {
+      "type": "integer",
+      "default": 0
+    },
+    "red_state_count": {
+      "type": "integer",
+      "default": 0
+    },
+    "red_rate": {
+      "type": "number",
+      "description": "red_state_count / searches_attempted \u00d7 100"
+    },
+    "common_blocking_reasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Most frequent blocking condition strings"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this data quality record"
+    }
+  },
+  "required": [
+    "territory_id",
+    "search_date"
+  ]
+}

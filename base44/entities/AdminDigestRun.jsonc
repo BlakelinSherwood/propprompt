@@ -1,0 +1,80 @@
+{
+  "name": "AdminDigestRun",
+  "type": "object",
+  "description": "Daily digest run metadata and summary statistics.",
+  "properties": {
+    "run_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date the digest was generated for"
+    },
+    "run_completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the monitoring run completed"
+    },
+    "items_generated": {
+      "type": "integer",
+      "description": "Total number of digest items created"
+    },
+    "urgent_count": {
+      "type": "integer",
+      "description": "Count of urgent severity items"
+    },
+    "review_count": {
+      "type": "integer",
+      "description": "Count of review severity items"
+    },
+    "churn_risk_count": {
+      "type": "integer",
+      "description": "Count of churn risk items"
+    },
+    "upsell_count": {
+      "type": "integer",
+      "description": "Count of upsell opportunity items"
+    },
+    "mrr_snapshot": {
+      "type": "number",
+      "description": "Monthly recurring revenue at digest time"
+    },
+    "mrr_change": {
+      "type": "number",
+      "description": "MRR change from previous day"
+    },
+    "new_mrr_today": {
+      "type": "number",
+      "description": "MRR from new activations today"
+    },
+    "churned_mrr_today": {
+      "type": "number",
+      "description": "MRR from cancellations today"
+    },
+    "pending_mrr": {
+      "type": "number",
+      "description": "MRR in pending_approval claims"
+    },
+    "topup_revenue_mtd": {
+      "type": "number",
+      "description": "Top-up pack revenue this month to date"
+    },
+    "revenue_share_mtd": {
+      "type": "number",
+      "description": "Revenue share earned this month to date"
+    },
+    "email_sent_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When digest email was sent to admin"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this digest run"
+    }
+  },
+  "required": [
+    "run_date",
+    "run_completed_at",
+    "items_generated"
+  ]
+}

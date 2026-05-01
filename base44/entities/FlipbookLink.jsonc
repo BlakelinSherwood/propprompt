@@ -1,0 +1,56 @@
+{
+  "name": "FlipbookLink",
+  "type": "object",
+  "description": "A shareable flipbook link generated from an Analysis PDF. Expires after 7 days.",
+  "properties": {
+    "analysis_id": {
+      "type": "string",
+      "description": "ID of the Analysis record this flipbook was generated from (references Analysis)"
+    },
+    "created_by": {
+      "type": "string",
+      "description": "Email of the User who generated this flipbook (references User)"
+    },
+    "pdf_storage_path": {
+      "type": "string",
+      "description": "Internal file path in Base44 storage. Example: 'flipbooks/2024-03-17/abc123.pdf'"
+    },
+    "pdf_public_url": {
+      "type": "string",
+      "description": "Publicly accessible URL to the stored PDF \u2014 loaded by the flipbook viewer"
+    },
+    "share_token": {
+      "type": "string",
+      "description": "Randomly generated UUID used to construct the shareable URL: [app-domain]/flipbook/[share_token]. Must be unique.",
+      "unique": true
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Expiry timestamp \u2014 exactly 7 days after created_at. After this, the link is expired and file should be deleted."
+    },
+    "is_expired": {
+      "type": "boolean",
+      "default": false,
+      "description": "Set to true by the cleanup job when the link expires. Used to show 'This link has expired' on the viewer page."
+    },
+    "view_count": {
+      "type": "integer",
+      "default": 0,
+      "description": "Increments each time the flipbook link is opened by a recipient."
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this flipbook link"
+    }
+  },
+  "required": [
+    "analysis_id",
+    "created_by",
+    "pdf_storage_path",
+    "pdf_public_url",
+    "share_token",
+    "expires_at"
+  ]
+}

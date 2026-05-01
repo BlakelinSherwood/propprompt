@@ -96,6 +96,11 @@
     "org_membership_id": {
       "type": "string",
       "description": "References OrgMembership.id for team_member invites."
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this referral invite"
     }
   },
   "required": [

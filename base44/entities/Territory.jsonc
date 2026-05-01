@@ -1,0 +1,104 @@
+{
+  "name": "Territory",
+  "type": "object",
+  "description": "A single subscribable geographic territory (city or town) in the PropPrompt exclusive territory system.",
+  "properties": {
+    "state_id": {
+      "type": "string",
+      "description": "References State.id"
+    },
+    "county_id": {
+      "type": "string",
+      "description": "References County.id"
+    },
+    "city_town": {
+      "type": "string",
+      "maxLength": 150,
+      "description": "City or town name for this territory."
+    },
+    "population": {
+      "type": "integer",
+      "description": "Base population used to calculate seat count."
+    },
+    "pop_2020": {
+      "type": "integer",
+      "description": "2020 Census population."
+    },
+    "pop_estimate_current": {
+      "type": "integer",
+      "description": "Most recent population estimate."
+    },
+    "seats_total": {
+      "type": "integer",
+      "description": "Total available seats. Derived: GREATEST(1, CEIL(population / 50000))."
+    },
+    "seats_claimed": {
+      "type": "integer",
+      "default": 0,
+      "description": "Number of seats currently active or pending approval."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "available",
+        "pending_approval",
+        "active",
+        "reserved",
+        "sublicensed",
+        "coming_soon"
+      ],
+      "default": "available"
+    },
+    "reserved_by": {
+      "type": "string"
+    },
+    "reserved_reason": {
+      "type": "string"
+    },
+    "county_bundle_id": {
+      "type": "string",
+      "description": "References TerritoryBundle.id if part of a county bundle."
+    },
+    "pool_id": {
+      "type": "string",
+      "description": "References PopulationPool.id if part of a population pool."
+    },
+    "is_fully_bought_out": {
+      "type": "boolean",
+      "default": false,
+      "description": "True when a full city buyout subscription is active."
+    },
+    "buyout_subscription_id": {
+      "type": "string",
+      "description": "References FullBuyoutSubscription.id if bought out."
+    },
+    "lat": {
+      "type": "number"
+    },
+    "lng": {
+      "type": "number"
+    },
+    "registry_url": {
+      "type": "string",
+      "description": "County Registry of Deeds website URL for this territory's county."
+    },
+    "gis_url": {
+      "type": "string",
+      "description": "GIS / assessor mapping portal URL for this town."
+    },
+    "town_url": {
+      "type": "string",
+      "description": "Official town/city government website URL."
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this territory"
+    }
+  },
+  "required": [
+    "state_id",
+    "county_id",
+    "city_town"
+  ]
+}

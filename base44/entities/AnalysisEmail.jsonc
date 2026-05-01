@@ -1,0 +1,43 @@
+{
+  "name": "AnalysisEmail",
+  "type": "object",
+  "description": "Log of every email send triggered from an analysis export.",
+  "properties": {
+    "analysis_id": {
+      "type": "string",
+      "description": "References Analysis.id"
+    },
+    "sent_to": {
+      "type": "string",
+      "description": "Recipient email address"
+    },
+    "sent_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of the send"
+    },
+    "subject": {
+      "type": "string",
+      "description": "Email subject line used"
+    },
+    "included_pdf": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether a PDF attachment URL was included in the email"
+    },
+    "sent_by_email": {
+      "type": "string",
+      "description": "Email of the user who triggered the send"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this email send"
+    }
+  },
+  "required": [
+    "analysis_id",
+    "sent_to",
+    "sent_at"
+  ]
+}

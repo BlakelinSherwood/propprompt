@@ -1,0 +1,62 @@
+{
+  "name": "OrgBranding",
+  "type": "object",
+  "description": "White-label branding settings for an organization (brokerage or team). One record per org.",
+  "properties": {
+    "org_id": {
+      "type": "string",
+      "description": "References Organization.id (unique per org)"
+    },
+    "org_name": {
+      "type": "string",
+      "description": "Display name for documents"
+    },
+    "logo_url": {
+      "type": "string",
+      "description": "Public URL of uploaded logo"
+    },
+    "logo_storage_path": {
+      "type": "string",
+      "description": "Internal storage path used for deletion on logo replacement"
+    },
+    "primary_color": {
+      "type": "string",
+      "default": "#333333",
+      "description": "Hex \u2014 header bars, section headings, table headers"
+    },
+    "accent_color": {
+      "type": "string",
+      "default": "#666666",
+      "description": "Hex \u2014 dividers, callout borders, highlights"
+    },
+    "background_color": {
+      "type": "string",
+      "default": "#FFFFFF",
+      "description": "Hex \u2014 document background"
+    },
+    "address": {
+      "type": "string"
+    },
+    "phone": {
+      "type": "string"
+    },
+    "website": {
+      "type": "string"
+    },
+    "tagline": {
+      "type": "string"
+    },
+    "updated_by": {
+      "type": "string",
+      "description": "Email of the user who last updated this record"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this org branding configuration"
+    }
+  },
+  "required": [
+    "org_id"
+  ]
+}

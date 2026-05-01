@@ -1,0 +1,72 @@
+{
+  "name": "SeatQuota",
+  "type": "object",
+  "description": "Per-org seat quota and usage tracking. One record per org.",
+  "properties": {
+    "org_id": {
+      "type": "string",
+      "description": "ID of the organization (references Organization)"
+    },
+    "plan_name": {
+      "type": "string",
+      "enum": [
+        "team",
+        "brokerage",
+        "enterprise"
+      ],
+      "description": "Billing plan that sets the quota"
+    },
+    "agent_seats_included": {
+      "type": "integer",
+      "default": 0,
+      "description": "Number of agent seats included in base plan price"
+    },
+    "agent_seats_used": {
+      "type": "integer",
+      "default": 0,
+      "description": "Current active agent seats"
+    },
+    "agent_seat_overage_price_cents": {
+      "type": "integer",
+      "default": 4900,
+      "description": "Overage price per extra agent seat per month in cents (default $49)"
+    },
+    "assistant_seats_included": {
+      "type": "integer",
+      "default": 0
+    },
+    "assistant_seats_used": {
+      "type": "integer",
+      "default": 0
+    },
+    "analyses_included_per_seat_monthly": {
+      "type": "integer",
+      "default": 30,
+      "description": "Analyses per seat included in plan"
+    },
+    "analyses_overage_price_cents": {
+      "type": "integer",
+      "default": 150,
+      "description": "Price per overage analysis in cents (default $1.50)"
+    },
+    "billing_period_start": {
+      "type": "string",
+      "format": "date",
+      "description": "Start of current billing period"
+    },
+    "billing_period_end": {
+      "type": "string",
+      "format": "date",
+      "description": "End of current billing period"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this quota configuration"
+    }
+  },
+  "required": [
+    "org_id",
+    "plan_name"
+  ]
+}

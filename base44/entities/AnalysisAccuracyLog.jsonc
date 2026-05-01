@@ -1,0 +1,53 @@
+{
+  "name": "AnalysisAccuracyLog",
+  "type": "object",
+  "description": "Logs actual sale outcomes against original value estimates for model accuracy tracking.",
+  "properties": {
+    "analysis_id": {
+      "type": "string",
+      "description": "References Analysis.id"
+    },
+    "territory_id": {
+      "type": "string",
+      "description": "References Territory.id"
+    },
+    "estimated_value_low": {
+      "type": "number",
+      "description": "Low end of original value estimate range"
+    },
+    "estimated_value_high": {
+      "type": "number",
+      "description": "High end of original value estimate range"
+    },
+    "actual_sale_price": {
+      "type": "number",
+      "description": "Actual sale price when property sold"
+    },
+    "variance_pct": {
+      "type": "number",
+      "description": "Variance percentage from estimate to actual sale price"
+    },
+    "days_on_market_actual": {
+      "type": "integer",
+      "description": "Actual days on market before sale"
+    },
+    "days_on_market_territory_avg": {
+      "type": "integer",
+      "description": "Territory average DOM at time of analysis"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this accuracy log entry"
+    }
+  },
+  "required": [
+    "analysis_id",
+    "territory_id",
+    "actual_sale_price"
+  ]
+}

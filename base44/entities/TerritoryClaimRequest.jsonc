@@ -1,0 +1,94 @@
+{
+  "name": "TerritoryClaimRequest",
+  "type": "object",
+  "description": "Approval queue entry submitted when a user requests a territory or bundle subscription.",
+  "properties": {
+    "territory_id": {
+      "type": "string",
+      "description": "References Territory.id. Null for bundle-level requests."
+    },
+    "bundle_id": {
+      "type": "string",
+      "description": "References TerritoryBundle.id. Set for bundle claim requests, null otherwise."
+    },
+    "user_id": {
+      "type": "string",
+      "description": "References User.id \u2014 the requesting subscriber."
+    },
+    "brokerage_name": {
+      "type": "string",
+      "maxLength": 200,
+      "description": "Brokerage or business name provided by the applicant."
+    },
+    "brokerage_license": {
+      "type": "string",
+      "maxLength": 100,
+      "description": "Real estate license number for the brokerage."
+    },
+    "agent_count": {
+      "type": "integer",
+      "description": "Number of agents in the applicant's office (used for tier recommendation)."
+    },
+    "tier_requested": {
+      "type": "string",
+      "enum": [
+        "starter",
+        "pro",
+        "team"
+      ],
+      "description": "Subscription tier the applicant selected."
+    },
+    "type_requested": {
+      "type": "string",
+      "enum": [
+        "single",
+        "multi_bundle",
+        "county_bundle"
+      ],
+      "description": "Whether the request is for a single territory or a bundle."
+    },
+    "stripe_payment_method_id": {
+      "type": "string",
+      "description": "Stripe PaymentMethod ID captured at application time (card on file)."
+    },
+    "stripe_setup_intent_id": {
+      "type": "string",
+      "description": "Stripe SetupIntent ID used to authorize the card before approval."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "approved",
+        "rejected",
+        "expired"
+      ],
+      "default": "pending",
+      "description": "Current review status of this claim request."
+    },
+    "admin_note": {
+      "type": "string",
+      "description": "Internal note from the reviewing admin."
+    },
+    "rejected_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of rejection, if applicable."
+    },
+    "auto_approve_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "48-hour auto-approval deadline. System approves automatically if admin has not acted by this time."
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this claim request"
+    }
+  },
+  "required": [
+    "user_id",
+    "tier_requested",
+    "type_requested"
+  ]
+}

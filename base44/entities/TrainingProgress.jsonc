@@ -1,0 +1,40 @@
+{
+  "name": "TrainingProgress",
+  "type": "object",
+  "description": "Tracks a user's progress through training videos.",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "Email of the user"
+    },
+    "video_id": {
+      "type": "string",
+      "description": "References TrainingVideo.id"
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "watch_time_seconds": {
+      "type": "integer",
+      "default": 0
+    },
+    "is_completed": {
+      "type": "boolean",
+      "default": false
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this training progress entry"
+    }
+  },
+  "required": [
+    "user_email",
+    "video_id"
+  ]
+}

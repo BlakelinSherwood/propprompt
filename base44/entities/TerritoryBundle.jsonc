@@ -1,0 +1,116 @@
+{
+  "name": "TerritoryBundle",
+  "type": "object",
+  "description": "Header record for a multi-town or county-level territory bundle subscription.",
+  "properties": {
+    "owner_user_id": {
+      "type": "string",
+      "description": "References User.id \u2014 the bundle owner / primary subscriber."
+    },
+    "bundle_name": {
+      "type": "string",
+      "enum": [
+        "duo",
+        "trio",
+        "regional",
+        "district",
+        "master",
+        "county"
+      ],
+      "description": "Named bundle tier. Determines discount and seat configuration."
+    },
+    "bundle_type": {
+      "type": "string",
+      "enum": [
+        "multi_town",
+        "county"
+      ],
+      "description": "Whether this bundle covers individually selected towns or an entire county."
+    },
+    "county_id": {
+      "type": "string",
+      "description": "References County.id. Only set for county-type bundles. Nullable."
+    },
+    "tier": {
+      "type": "string",
+      "enum": [
+        "starter",
+        "pro",
+        "team"
+      ],
+      "description": "Subscription tier for all territories in this bundle."
+    },
+    "territory_count": {
+      "type": "integer",
+      "default": 0,
+      "description": "Number of territories included in this bundle."
+    },
+    "discount_pct": {
+      "type": "number",
+      "default": 0,
+      "description": "Discount percentage applied to the bundle total (e.g. 10.00 = 10%)."
+    },
+    "base_price": {
+      "type": "number",
+      "description": "Sum of individual territory prices before discount."
+    },
+    "discounted_price": {
+      "type": "number",
+      "description": "Final price charged after discount is applied."
+    },
+    "analyses_cap": {
+      "type": "integer",
+      "description": "Maximum analyses allowed per month across all bundle members."
+    },
+    "analyses_used_this_month": {
+      "type": "integer",
+      "default": 0,
+      "description": "Running count of analyses used in the current billing month."
+    },
+    "stripe_subscription_id": {
+      "type": "string",
+      "description": "Stripe subscription ID for this bundle."
+    },
+    "stripe_customer_id": {
+      "type": "string",
+      "description": "Stripe customer ID for the bundle owner."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending_approval",
+        "active",
+        "rejected",
+        "cancelled",
+        "paused"
+      ],
+      "default": "pending_approval",
+      "description": "Lifecycle status of this bundle."
+    },
+    "approved_by": {
+      "type": "string",
+      "description": "References User.id of the platform admin who approved this bundle."
+    },
+    "approved_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when the bundle was approved."
+    },
+    "white_label_enabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether white-label document output is enabled for this bundle."
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this territory bundle"
+    }
+  },
+  "required": [
+    "owner_user_id",
+    "bundle_name",
+    "bundle_type",
+    "tier"
+  ]
+}

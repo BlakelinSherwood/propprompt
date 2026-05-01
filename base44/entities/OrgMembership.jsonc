@@ -1,0 +1,74 @@
+{
+  "name": "OrgMembership",
+  "type": "object",
+  "description": "Junction table: a user can be a member of multiple orgs with different roles in each.",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "Email of the user (references User)"
+    },
+    "org_id": {
+      "type": "string",
+      "description": "ID of the organization (references Organization)"
+    },
+    "role_in_org": {
+      "type": "string",
+      "enum": [
+        "brokerage_admin",
+        "team_lead",
+        "agent",
+        "assistant",
+        "team_agent"
+      ],
+      "description": "Role of this user within this specific org (may differ from platform role)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "suspended",
+        "pending_invite"
+      ],
+      "default": "pending_invite",
+      "description": "Membership status in this org"
+    },
+    "invited_by_email": {
+      "type": "string",
+      "description": "Email of the user who sent the invite"
+    },
+    "invite_sent_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the invite was dispatched"
+    },
+    "invite_accepted_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the invitee accepted and activated their membership"
+    },
+    "invite_expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Invite link expiry (72 hours from send)"
+    },
+    "seat_cost_confirmed": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether the inviting admin confirmed the seat cost before sending"
+    },
+    "billing_confirmed_by_email": {
+      "type": "string",
+      "description": "Email of admin who confirmed the seat billing charge"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes or context about this membership"
+    }
+  },
+  "required": [
+    "user_email",
+    "org_id",
+    "role_in_org"
+  ]
+}

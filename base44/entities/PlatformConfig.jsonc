@@ -169,6 +169,11 @@
     "api_balances": {
       "type": "object",
       "description": "Manually entered current credit balances per provider (keys: anthropic, openai, gemini, perplexity, rentcast, attom)"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this platform configuration"
     }
   },
   "required": []

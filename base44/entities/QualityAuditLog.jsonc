@@ -1,0 +1,220 @@
+{
+  "name": "QualityAuditLog",
+  "type": "object",
+  "description": "Quality audit results for completed analyses. Stores per-section scores, issues, compliance checks, and model routing recommendations.",
+  "properties": {
+    "analysis_id": {
+      "type": "string",
+      "description": "References Analysis.id"
+    },
+    "audit_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this audit was performed"
+    },
+    "assessment_type": {
+      "type": "string",
+      "description": "Copied from analysis for filtering (listing_pricing, cma, buyer_intelligence, etc.)"
+    },
+    "property_type": {
+      "type": "string",
+      "description": "Property type for context"
+    },
+    "model_used": {
+      "type": "string",
+      "description": "The AI model that generated the analysis"
+    },
+    "total_token_count": {
+      "type": "integer",
+      "description": "Total tokens consumed by the analysis"
+    },
+    "score_market_context": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10,
+      "description": "Quality of market context section (1-10, null if not present)"
+    },
+    "score_comps": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10,
+      "description": "Quality of comparable sales analysis"
+    },
+    "score_valuation": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10,
+      "description": "Quality of valuation methods"
+    },
+    "score_avm_analysis": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10,
+      "description": "Quality of AVM analysis and gap explanation"
+    },
+    "score_migration": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10,
+      "description": "Quality of migration analysis (feeder markets, specificity)"
+    },
+    "score_archetypes": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10,
+      "description": "Quality of buyer archetype profiles"
+    },
+    "score_language_calibration": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10,
+      "description": "Quality and actionability of language guidance"
+    },
+    "score_portfolio_options": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10,
+      "description": "Quality of portfolio options and financial consistency"
+    },
+    "score_adu_analysis": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10,
+      "description": "Quality of ADU analysis if applicable"
+    },
+    "score_rate_environment": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10,
+      "description": "Quality of rate environment and client advantage analysis"
+    },
+    "score_overall": {
+      "type": "number",
+      "description": "Weighted average of all scored sections"
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "section": {
+            "type": "string",
+            "description": "Which section has the issue"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "critical",
+              "major",
+              "minor"
+            ],
+            "description": "Issue severity level"
+          },
+          "description": {
+            "type": "string",
+            "description": "Specific problem identified"
+          },
+          "recommendation": {
+            "type": "string",
+            "description": "How to fix or improve"
+          }
+        }
+      },
+      "description": "Array of identified issues"
+    },
+    "critical_count": {
+      "type": "integer",
+      "default": 0
+    },
+    "major_count": {
+      "type": "integer",
+      "default": 0
+    },
+    "minor_count": {
+      "type": "integer",
+      "default": 0
+    },
+    "recommended_model_strategy": {
+      "type": "string",
+      "enum": [
+        "current_optimal",
+        "upgrade_full",
+        "upgrade_sections",
+        "downgrade_full",
+        "downgrade_sections",
+        "split_routing"
+      ],
+      "description": "Recommended routing strategy"
+    },
+    "recommended_model": {
+      "type": "string",
+      "description": "Specific model if upgrade/downgrade recommended"
+    },
+    "upgrade_sections": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Section names that would benefit from a stronger model"
+    },
+    "downgrade_sections": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Section names that don't need the current model"
+    },
+    "estimated_token_savings_pct": {
+      "type": "number",
+      "description": "Estimated percentage token savings if recommendation adopted"
+    },
+    "estimated_quality_impact": {
+      "type": "string",
+      "enum": [
+        "improved",
+        "maintained",
+        "minor_degradation"
+      ],
+      "description": "Projected quality impact of recommendation"
+    },
+    "recommendation_rationale": {
+      "type": "string",
+      "description": "2-3 sentence explanation of the recommendation"
+    },
+    "fair_housing_violations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "section": {
+            "type": "string"
+          },
+          "violation": {
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Any fair housing compliance violations found"
+    },
+    "compliance_passed": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether analysis passed fair housing compliance check"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this quality audit"
+    }
+  },
+  "required": [
+    "analysis_id",
+    "assessment_type",
+    "model_used",
+    "score_overall",
+    "compliance_passed"
+  ]
+}

@@ -1,0 +1,92 @@
+{
+  "name": "FullBuyoutSubscription",
+  "type": "object",
+  "description": "Full city buyout subscription \u2014 owner holds all seats in a multi-seat territory.",
+  "properties": {
+    "territory_id": {
+      "type": "string",
+      "description": "References Territory.id"
+    },
+    "user_id": {
+      "type": "string",
+      "description": "References User.id"
+    },
+    "tier": {
+      "type": "string",
+      "enum": [
+        "starter",
+        "pro",
+        "team"
+      ]
+    },
+    "seats_total": {
+      "type": "integer"
+    },
+    "base_price": {
+      "type": "number"
+    },
+    "discount_pct": {
+      "type": "number"
+    },
+    "monthly_price": {
+      "type": "number"
+    },
+    "analyses_cap": {
+      "type": "integer",
+      "description": "Max analyses per month (seats_total \u00d7 tier_cap)"
+    },
+    "analyses_used_this_month": {
+      "type": "integer",
+      "default": 0,
+      "description": "Running count for current billing month"
+    },
+    "stripe_subscription_id": {
+      "type": "string"
+    },
+    "stripe_customer_id": {
+      "type": "string"
+    },
+    "stripe_payment_method_id": {
+      "type": "string"
+    },
+    "stripe_setup_intent_id": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending_approval",
+        "active",
+        "rejected",
+        "cancelled"
+      ],
+      "default": "pending_approval"
+    },
+    "approved_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "approved_by": {
+      "type": "string"
+    },
+    "brokerage_name": {
+      "type": "string"
+    },
+    "brokerage_license": {
+      "type": "string"
+    },
+    "agent_count": {
+      "type": "integer"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this full buyout subscription"
+    }
+  },
+  "required": [
+    "territory_id",
+    "user_id",
+    "tier"
+  ]
+}

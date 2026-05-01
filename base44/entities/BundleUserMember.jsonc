@@ -1,0 +1,63 @@
+{
+  "name": "BundleUserMember",
+  "type": "object",
+  "description": "People who have access within a territory bundle (owner, admins, and members).",
+  "properties": {
+    "bundle_id": {
+      "type": "string",
+      "description": "References TerritoryBundle.id. Cascades on delete."
+    },
+    "user_id": {
+      "type": "string",
+      "description": "References User.id. Unique per bundle."
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "owner",
+        "admin",
+        "member"
+      ],
+      "default": "member",
+      "description": "Access level within this bundle."
+    },
+    "invited_by": {
+      "type": "string",
+      "description": "References User.id of the person who sent this invitation."
+    },
+    "invited_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when the invitation was sent."
+    },
+    "accepted_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when the user accepted the invitation. Null if pending."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "active",
+        "removed"
+      ],
+      "default": "pending",
+      "description": "Membership status for this user within the bundle."
+    },
+    "analyses_this_month": {
+      "type": "integer",
+      "default": 0,
+      "description": "Number of analyses this member has run in the current billing month."
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this bundle user membership"
+    }
+  },
+  "required": [
+    "bundle_id",
+    "user_id"
+  ]
+}

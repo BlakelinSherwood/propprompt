@@ -1,0 +1,70 @@
+{
+  "name": "RevenueShareLedger",
+  "type": "object",
+  "description": "Immutable ledger of sublicensing revenue share payouts. One record per sublicensee per billing period.",
+  "properties": {
+    "sublicensor_id": {
+      "type": "string",
+      "description": "References User.id \u2014 the territory owner receiving the revenue share."
+    },
+    "sublicensee_subscription_id": {
+      "type": "string",
+      "description": "References TerritorySubscription.id \u2014 the sublicensee's subscription generating revenue."
+    },
+    "territory_id": {
+      "type": "string",
+      "description": "References Territory.id \u2014 the territory being sublicensed."
+    },
+    "period_start": {
+      "type": "string",
+      "format": "date",
+      "description": "Start date of the billing period this payout covers."
+    },
+    "period_end": {
+      "type": "string",
+      "format": "date",
+      "description": "End date of the billing period this payout covers."
+    },
+    "gross_amount": {
+      "type": "number",
+      "description": "Total amount the sublicensee paid in this period."
+    },
+    "share_pct": {
+      "type": "number",
+      "description": "Revenue share percentage owed to the sublicensor (e.g. 20.00 = 20%)."
+    },
+    "share_amount": {
+      "type": "number",
+      "description": "Calculated payout amount to the sublicensor (gross_amount \u00d7 share_pct / 100)."
+    },
+    "stripe_transfer_id": {
+      "type": "string",
+      "description": "Stripe Connect transfer ID once the payout has been executed."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "transferred",
+        "failed"
+      ],
+      "default": "pending",
+      "description": "Payout status."
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this revenue share ledger entry"
+    }
+  },
+  "required": [
+    "sublicensor_id",
+    "sublicensee_subscription_id",
+    "territory_id",
+    "period_start",
+    "period_end",
+    "gross_amount",
+    "share_pct",
+    "share_amount"
+  ]
+}

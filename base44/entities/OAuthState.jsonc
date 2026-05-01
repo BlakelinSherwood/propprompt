@@ -1,0 +1,36 @@
+{
+  "name": "OAuthState",
+  "type": "object",
+  "description": "Temporary storage for OAuth CSRF state tokens during authorization flows.",
+  "properties": {
+    "token": {
+      "type": "string",
+      "description": "Random CSRF token (UUID format)"
+    },
+    "user_email": {
+      "type": "string",
+      "description": "Email of the user initiating OAuth"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the token was created"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the token expires (typically 10 minutes)"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this OAuth state token"
+    }
+  },
+  "required": [
+    "token",
+    "user_email",
+    "created_at",
+    "expires_at"
+  ]
+}

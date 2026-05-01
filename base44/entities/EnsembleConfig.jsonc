@@ -1,0 +1,76 @@
+{
+  "name": "EnsembleConfig",
+  "type": "object",
+  "description": "One record per AI pipeline task. Together, all records define the active Ensemble AI configuration.",
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "description": "Unique task identifier"
+    },
+    "task_name": {
+      "type": "string",
+      "description": "Human-readable label shown in admin UI"
+    },
+    "task_description": {
+      "type": "string",
+      "description": "One sentence describing what this task produces"
+    },
+    "provider": {
+      "type": "string",
+      "enum": [
+        "anthropic",
+        "openai",
+        "google",
+        "perplexity",
+        "xai",
+        "mistral",
+        "meta"
+      ],
+      "description": "AI provider for this task"
+    },
+    "model": {
+      "type": "string",
+      "description": "Specific model string to pass to provider API"
+    },
+    "min_tier": {
+      "type": "string",
+      "enum": [
+        "starter",
+        "pro",
+        "team",
+        "broker"
+      ],
+      "default": "starter",
+      "description": "Minimum subscription tier required for this task"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this task is currently enabled"
+    },
+    "report_types": {
+      "type": "string",
+      "description": "Comma-separated list of report types this task applies to. E.g. 'listing_pricing, cma, client_portfolio'"
+    },
+    "updated_by": {
+      "type": "string",
+      "description": "Email of platform owner who last changed this record"
+    },
+    "change_note": {
+      "type": "string",
+      "description": "Optional note attached when saving a change"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this ensemble config task"
+    }
+  },
+  "required": [
+    "task_id",
+    "task_name",
+    "provider",
+    "model",
+    "min_tier"
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "name": "BrandingConfig",
+  "type": "object",
+  "description": "Per-org branding configuration for report colors, logo, and headshot. One record per org.",
+  "properties": {
+    "org_id": {
+      "type": "string",
+      "description": "References Organization.id \u2014 unique per org"
+    },
+    "primary_color": {
+      "type": "string",
+      "description": "Hex color for headers and dark accents, e.g. #1A3226"
+    },
+    "accent_color": {
+      "type": "string",
+      "description": "Hex color for labels, badges, and highlights, e.g. #B8982F"
+    },
+    "background_color": {
+      "type": "string",
+      "default": "#FFFFFF",
+      "description": "Background color for reports"
+    },
+    "preset_name": {
+      "type": "string",
+      "description": "Name of selected preset, or 'Custom'"
+    },
+    "org_logo_url": {
+      "type": "string",
+      "description": "Uploaded org logo URL \u2014 optional"
+    },
+    "agent_headshot_url": {
+      "type": "string",
+      "description": "Default agent headshot URL \u2014 optional"
+    },
+    "updated_by": {
+      "type": "string",
+      "description": "User id of last editor"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this branding configuration"
+    }
+  },
+  "required": [
+    "org_id",
+    "primary_color",
+    "accent_color"
+  ]
+}

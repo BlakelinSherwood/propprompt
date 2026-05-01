@@ -1,0 +1,93 @@
+{
+  "name": "OnboardingJourney",
+  "type": "object",
+  "description": "Tracks a subscriber's structured 30-day onboarding journey from subscription activation.",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "References User.id"
+    },
+    "subscription_id": {
+      "type": "string",
+      "description": "ID of the subscription that triggered this journey"
+    },
+    "subscription_type": {
+      "type": "string",
+      "enum": [
+        "single",
+        "bundle",
+        "pool",
+        "buyout"
+      ],
+      "description": "Type of subscription"
+    },
+    "territory_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Array of territory IDs this journey covers"
+    },
+    "journey_start": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the journey began (subscription activation)"
+    },
+    "current_step": {
+      "type": "string",
+      "enum": [
+        "day_0",
+        "day_1",
+        "day_3",
+        "day_7",
+        "day_14",
+        "day_30",
+        "completed"
+      ],
+      "default": "day_0",
+      "description": "Current onboarding step"
+    },
+    "completed_steps": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Array of completed step keys",
+      "default": []
+    },
+    "checklist_completion_pct": {
+      "type": "integer",
+      "default": 0,
+      "description": "Percentage of day 0 checklist items completed (0-100)"
+    },
+    "engagement_level": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "description": "Engagement level assessed at day 30"
+    },
+    "day30_snapshot_analysis_id": {
+      "type": "string",
+      "description": "References Analysis.id of the generated Day 30 territory snapshot"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the 30-day journey completed"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this onboarding journey"
+    }
+  },
+  "required": [
+    "user_id",
+    "subscription_id",
+    "subscription_type",
+    "journey_start"
+  ]
+}

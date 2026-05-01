@@ -1,0 +1,74 @@
+{
+  "name": "PopulationPool",
+  "type": "object",
+  "description": "Header record for a population-based pool subscription covering multiple small towns.",
+  "properties": {
+    "owner_user_id": {
+      "type": "string",
+      "description": "References User.id"
+    },
+    "tier": {
+      "type": "string",
+      "enum": [
+        "starter",
+        "pro",
+        "team"
+      ]
+    },
+    "territory_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Array of Territory IDs in this pool"
+    },
+    "combined_population": {
+      "type": "integer"
+    },
+    "buckets_used": {
+      "type": "integer"
+    },
+    "monthly_price": {
+      "type": "number"
+    },
+    "analyses_cap": {
+      "type": "integer",
+      "description": "buckets_used \u00d7 tier_cap"
+    },
+    "analyses_used_this_month": {
+      "type": "integer",
+      "default": 0
+    },
+    "stripe_subscription_id": {
+      "type": "string"
+    },
+    "stripe_customer_id": {
+      "type": "string"
+    },
+    "stripe_payment_method_id": {
+      "type": "string"
+    },
+    "stripe_setup_intent_id": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending_approval",
+        "active",
+        "rejected",
+        "cancelled"
+      ],
+      "default": "pending_approval"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this population pool"
+    }
+  },
+  "required": [
+    "owner_user_id",
+    "tier"
+  ]
+}

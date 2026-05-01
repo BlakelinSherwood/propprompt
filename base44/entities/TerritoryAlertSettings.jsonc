@@ -1,0 +1,62 @@
+{
+  "name": "TerritoryAlertSettings",
+  "type": "object",
+  "description": "Configurable alert thresholds and preferences per subscriber territory.",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "References User.id"
+    },
+    "territory_id": {
+      "type": "string",
+      "description": "References Territory.id"
+    },
+    "dom_threshold_days": {
+      "type": "integer",
+      "default": 21,
+      "description": "Days on market threshold for alert"
+    },
+    "price_change_pct_threshold": {
+      "type": "number",
+      "default": 5.0,
+      "description": "Price change percentage threshold"
+    },
+    "inventory_months_threshold": {
+      "type": "number",
+      "default": 1.5,
+      "description": "Months of supply threshold"
+    },
+    "email_alerts_enabled": {
+      "type": "boolean",
+      "default": true
+    },
+    "in_app_alerts_enabled": {
+      "type": "boolean",
+      "default": true
+    },
+    "alert_frequency": {
+      "type": "string",
+      "enum": [
+        "immediate",
+        "daily_digest",
+        "weekly_digest"
+      ],
+      "default": "immediate",
+      "description": "How often to send alerts"
+    },
+    "pause_until": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Pause alerts until this date (vacation mode)"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about these alert settings"
+    }
+  },
+  "required": [
+    "user_id",
+    "territory_id"
+  ]
+}

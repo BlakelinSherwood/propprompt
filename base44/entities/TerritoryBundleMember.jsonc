@@ -1,0 +1,34 @@
+{
+  "name": "TerritoryBundleMember",
+  "type": "object",
+  "description": "Junction table linking individual territories to a bundle. Each row is one territory seat within a bundle.",
+  "properties": {
+    "bundle_id": {
+      "type": "string",
+      "description": "References TerritoryBundle.id. Cascades on delete."
+    },
+    "territory_id": {
+      "type": "string",
+      "description": "References Territory.id."
+    },
+    "seat_number": {
+      "type": "integer",
+      "description": "Ordinal seat number within the bundle (1-based). Unique per bundle+territory+seat."
+    },
+    "joined_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when this territory was added to the bundle."
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this bundle member entry"
+    }
+  },
+  "required": [
+    "bundle_id",
+    "territory_id",
+    "seat_number"
+  ]
+}

@@ -1,0 +1,111 @@
+{
+  "name": "TerritorySubscription",
+  "type": "object",
+  "description": "A single-territory subscription claim. Also used as the per-territory record within bundle subscriptions.",
+  "properties": {
+    "territory_id": {
+      "type": "string",
+      "description": "References Territory.id."
+    },
+    "user_id": {
+      "type": "string",
+      "description": "References User.id \u2014 the subscriber."
+    },
+    "bundle_id": {
+      "type": "string",
+      "description": "References TerritoryBundle.id. Null for standalone single-territory subscriptions."
+    },
+    "stripe_subscription_id": {
+      "type": "string",
+      "description": "Stripe subscription ID for billing."
+    },
+    "stripe_customer_id": {
+      "type": "string",
+      "description": "Stripe customer ID for the subscriber."
+    },
+    "tier": {
+      "type": "string",
+      "enum": [
+        "starter",
+        "pro",
+        "team"
+      ],
+      "description": "Subscription tier for this territory."
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "single",
+        "multi_bundle",
+        "county_bundle"
+      ],
+      "description": "Whether this is a standalone claim or part of a bundle."
+    },
+    "monthly_price": {
+      "type": "number",
+      "description": "Monthly price charged for this subscription."
+    },
+    "discount_pct": {
+      "type": "integer",
+      "default": 0,
+      "description": "Discount percentage applied (bundle discount, etc.)."
+    },
+    "analyses_cap": {
+      "type": "integer",
+      "description": "Maximum AI analyses allowed per month under this subscription."
+    },
+    "analyses_used_this_month": {
+      "type": "integer",
+      "default": 0,
+      "description": "Running count of analyses used in the current billing month."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending_approval",
+        "active",
+        "rejected",
+        "cancelled",
+        "paused"
+      ],
+      "default": "pending_approval",
+      "description": "Lifecycle status of this subscription."
+    },
+    "approved_by": {
+      "type": "string",
+      "description": "References User.id of the platform admin who approved this subscription."
+    },
+    "approved_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of approval."
+    },
+    "rejection_reason": {
+      "type": "string",
+      "description": "Admin note explaining why a claim was rejected."
+    },
+    "seat_number": {
+      "type": "integer",
+      "description": "Which seat number within the territory this subscription occupies."
+    },
+    "sublicensor_id": {
+      "type": "string",
+      "description": "References User.id of the territory owner who is sublicensing this seat. Null if directly licensed."
+    },
+    "sublicensor_revenue_share": {
+      "type": "number",
+      "description": "Percentage of monthly revenue shared back to the sublicensor (e.g. 20.00 = 20%)."
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this territory subscription"
+    }
+  },
+  "required": [
+    "territory_id",
+    "user_id",
+    "tier",
+    "type"
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "name": "State",
+  "type": "object",
+  "description": "US states available in the PropPrompt territory system.",
+  "properties": {
+    "code": {
+      "type": "string",
+      "maxLength": 2,
+      "description": "Two-letter state code, e.g. 'MA'. Unique."
+    },
+    "name": {
+      "type": "string",
+      "maxLength": 100,
+      "description": "Full state name, e.g. 'Massachusetts'."
+    },
+    "launch_status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "pending",
+        "coming_soon"
+      ],
+      "default": "pending",
+      "description": "Whether this state is live, pending launch, or announced as coming soon."
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this state"
+    }
+  },
+  "required": [
+    "code",
+    "name"
+  ]
+}

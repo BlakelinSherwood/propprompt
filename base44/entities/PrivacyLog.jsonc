@@ -1,0 +1,77 @@
+{
+  "name": "PrivacyLog",
+  "type": "object",
+  "description": "Immutable audit log of all privacy-relevant events per Addendum A5. Records are append-only and cannot be deleted.",
+  "properties": {
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "privacy_notice_accepted",
+        "data_export_requested",
+        "data_export_delivered",
+        "account_deletion_requested",
+        "account_deleted",
+        "analysis_deleted",
+        "api_key_added",
+        "api_key_removed",
+        "crm_connected",
+        "crm_disconnected",
+        "drive_connected",
+        "drive_disconnected",
+        "invite_sent",
+        "invite_accepted",
+        "invite_revoked",
+        "user_suspended",
+        "user_reactivated",
+        "role_changed",
+        "org_created",
+        "org_suspended",
+        "password_reset",
+        "login_success",
+        "login_failure"
+      ],
+      "description": "Type of privacy/audit event"
+    },
+    "actor_email": {
+      "type": "string",
+      "description": "Email of the user who performed the action"
+    },
+    "subject_email": {
+      "type": "string",
+      "description": "Email of the user the action was performed on (if different from actor)"
+    },
+    "org_id": {
+      "type": "string",
+      "description": "Organization context for this event (if applicable)"
+    },
+    "entity_type": {
+      "type": "string",
+      "description": "Type of record affected (e.g. 'analysis', 'user', 'org_membership')"
+    },
+    "entity_id": {
+      "type": "string",
+      "description": "ID of the affected record"
+    },
+    "ip_address": {
+      "type": "string",
+      "description": "IP address of the actor at time of event"
+    },
+    "user_agent": {
+      "type": "string",
+      "description": "Browser/client user agent string"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional event-specific context (JSON). Never contains analysis content or addresses per A3.2."
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this privacy log entry"
+    }
+  },
+  "required": [
+    "event_type",
+    "actor_email"
+  ]
+}

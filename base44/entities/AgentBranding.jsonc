@@ -1,0 +1,60 @@
+{
+  "name": "AgentBranding",
+  "type": "object",
+  "description": "Agent-level personal branding for output documents (PDFs, PPTXs, emails). One record per user.",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "Email of the agent (references User, unique per user)"
+    },
+    "display_name": {
+      "type": "string",
+      "description": "Override name for documents \u2014 if set, replaces the account full name"
+    },
+    "title": {
+      "type": "string",
+      "description": "e.g. 'Senior Real Estate Advisor', 'REALTOR\u00ae'"
+    },
+    "headshot_url": {
+      "type": "string",
+      "description": "Public URL of uploaded headshot or personal logo"
+    },
+    "headshot_storage_path": {
+      "type": "string",
+      "description": "Internal storage path used for deletion on headshot replacement"
+    },
+    "direct_phone": {
+      "type": "string"
+    },
+    "direct_email": {
+      "type": "string"
+    },
+    "license_number": {
+      "type": "string",
+      "description": "Optional \u2014 some states require license number on documents"
+    },
+    "personal_tagline": {
+      "type": "string",
+      "description": "Optional \u2014 appears on documents and email signature"
+    },
+    "signature_style": {
+      "type": "string",
+      "enum": [
+        "name_only",
+        "name_title",
+        "name_title_contact",
+        "full_with_headshot"
+      ],
+      "default": "name_title_contact",
+      "description": "Controls which fields appear in the signature block on documents"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this agent branding configuration"
+    }
+  },
+  "required": [
+    "user_id"
+  ]
+}

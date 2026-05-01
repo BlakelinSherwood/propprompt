@@ -1,0 +1,57 @@
+{
+  "name": "ClientPortfolioAnalysisInputs",
+  "type": "object",
+  "description": "Special intake data for Client Portfolio Analysis, capturing homeowner equity and goal context.",
+  "properties": {
+    "analysis_id": {
+      "type": "string",
+      "description": "References Analysis.id"
+    },
+    "property_address": {
+      "type": "string",
+      "description": "Full property address"
+    },
+    "purchase_year": {
+      "type": "integer",
+      "description": "Approximate year of purchase (optional, improves output)"
+    },
+    "remaining_mortgage_balance": {
+      "type": "number",
+      "description": "Approximate remaining mortgage balance. Null if 'unknown' selected."
+    },
+    "mortgage_balance_confidence": {
+      "type": "string",
+      "enum": [
+        "known",
+        "approximate",
+        "unknown"
+      ],
+      "description": "Whether balance is known, approximate, or unknown (unknown generates range-based output)"
+    },
+    "owner_current_goal": {
+      "type": "string",
+      "enum": [
+        "no_goal_yet",
+        "thinking_about_selling",
+        "curious_about_equity",
+        "interested_in_investing"
+      ],
+      "description": "Owner's stated goal (shapes which scenarios get emphasized)"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this portfolio analysis intake"
+    }
+  },
+  "required": [
+    "analysis_id",
+    "property_address",
+    "mortgage_balance_confidence",
+    "owner_current_goal"
+  ]
+}

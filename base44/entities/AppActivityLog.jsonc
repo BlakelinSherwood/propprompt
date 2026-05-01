@@ -40,6 +40,11 @@
       "type": "string",
       "format": "date-time",
       "description": "When the event occurred"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this activity log entry"
     }
   },
   "required": [

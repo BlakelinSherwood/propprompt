@@ -1,0 +1,30 @@
+{
+  "name": "ProcessedWebhookEvent",
+  "type": "object",
+  "description": "Tracks processed Stripe webhook events for idempotency.",
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "description": "Unique Stripe event ID"
+    },
+    "event_type": {
+      "type": "string",
+      "description": "Event type (e.g. checkout.session.completed)"
+    },
+    "processed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the event was processed"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this webhook event"
+    }
+  },
+  "required": [
+    "event_id",
+    "event_type",
+    "processed_at"
+  ]
+}

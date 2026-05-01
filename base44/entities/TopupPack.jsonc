@@ -1,0 +1,47 @@
+{
+  "name": "TopupPack",
+  "type": "object",
+  "description": "One-time analysis top-up pack purchased by a subscriber to exceed their monthly cap.",
+  "properties": {
+    "subscription_id": {
+      "type": "string",
+      "description": "References TerritorySubscription.id. Null if purchased against a bundle."
+    },
+    "bundle_id": {
+      "type": "string",
+      "description": "References TerritoryBundle.id. Null if purchased against a single subscription."
+    },
+    "stripe_payment_intent_id": {
+      "type": "string",
+      "description": "Stripe PaymentIntent ID for the one-time purchase."
+    },
+    "analyses_purchased": {
+      "type": "integer",
+      "description": "Number of additional analyses purchased in this pack."
+    },
+    "analyses_remaining": {
+      "type": "integer",
+      "description": "Analyses remaining from this pack (decremented on each use)."
+    },
+    "price_paid": {
+      "type": "number",
+      "description": "Amount paid for this pack in USD."
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Expiry timestamp \u2014 90 days from purchase. Unused analyses are forfeited after this."
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this top-up pack"
+    }
+  },
+  "required": [
+    "analyses_purchased",
+    "analyses_remaining",
+    "price_paid",
+    "expires_at"
+  ]
+}

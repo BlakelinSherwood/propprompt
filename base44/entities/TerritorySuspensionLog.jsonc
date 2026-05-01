@@ -1,0 +1,70 @@
+{
+  "name": "TerritorySuspensionLog",
+  "type": "object",
+  "description": "Log of territory suspensions due to data quality or other issues, including refund tracking.",
+  "properties": {
+    "territory_id": {
+      "type": "string",
+      "description": "References Territory.id"
+    },
+    "suspension_reason": {
+      "type": "string",
+      "enum": [
+        "data_quality",
+        "admin_decision",
+        "fraud"
+      ]
+    },
+    "suspended_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "suspended_by": {
+      "type": "string",
+      "description": "References User.id of admin"
+    },
+    "resolution": {
+      "type": "string",
+      "enum": [
+        "resolved",
+        "refunded",
+        "partial_credit"
+      ],
+      "description": "How the suspension was resolved"
+    },
+    "resolved_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "refund_amount": {
+      "type": "number",
+      "description": "Amount refunded to subscriber"
+    },
+    "stripe_refund_id": {
+      "type": "string",
+      "description": "Stripe refund transaction ID"
+    },
+    "partial_credit_percentage": {
+      "type": "number",
+      "description": "Percentage credit applied if resolution = partial_credit"
+    },
+    "subscriber_notified_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "admin_notes": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this suspension log entry"
+    }
+  },
+  "required": [
+    "territory_id",
+    "suspension_reason",
+    "suspended_at",
+    "suspended_by"
+  ]
+}

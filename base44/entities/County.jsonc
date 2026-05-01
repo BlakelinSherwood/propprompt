@@ -1,0 +1,30 @@
+{
+  "name": "County",
+  "type": "object",
+  "description": "Counties within a state, used to group territories.",
+  "properties": {
+    "state_id": {
+      "type": "string",
+      "description": "References State.id"
+    },
+    "name": {
+      "type": "string",
+      "maxLength": 100,
+      "description": "County name, e.g. 'Essex County'."
+    },
+    "fips_code": {
+      "type": "string",
+      "maxLength": 10,
+      "description": "Federal FIPS code for the county."
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this county"
+    }
+  },
+  "required": [
+    "state_id",
+    "name"
+  ]
+}

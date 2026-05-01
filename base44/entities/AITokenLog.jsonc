@@ -1,0 +1,92 @@
+{
+  "name": "AITokenLog",
+  "type": "object",
+  "description": "One record per AI API call made during report generation. Raw data source for ai_cost_cents in WeeklyPLSnapshot.",
+  "properties": {
+    "analysis_id": {
+      "type": "string",
+      "description": "The report this token usage belongs to (references Analysis.id)."
+    },
+    "agent_id": {
+      "type": "string",
+      "description": "The agent whose report triggered this call (references User.id)."
+    },
+    "provider": {
+      "type": "string",
+      "enum": [
+        "anthropic",
+        "openai",
+        "google",
+        "perplexity",
+        "xai",
+        "mistral",
+        "meta"
+      ],
+      "description": "AI provider for this API call."
+    },
+    "model": {
+      "type": "string",
+      "description": "Exact model string. E.g. 'claude-sonnet-4-20250514', 'gpt-4o'."
+    },
+    "task": {
+      "type": "string",
+      "enum": [
+        "pricing_strategy",
+        "live_market_context",
+        "neighbourhood_demand",
+        "seller_narrative",
+        "buyer_archetypes",
+        "net_sheet",
+        "other"
+      ],
+      "description": "Which pipeline task this call performed."
+    },
+    "report_type": {
+      "type": "string",
+      "enum": [
+        "listing_pricing",
+        "cma",
+        "buyer_intelligence",
+        "client_portfolio",
+        "investment",
+        "rental_market"
+      ],
+      "description": "The type of report this call was part of."
+    },
+    "input_tokens": {
+      "type": "integer",
+      "default": 0,
+      "description": "Number of input tokens consumed by this API call."
+    },
+    "output_tokens": {
+      "type": "integer",
+      "default": 0,
+      "description": "Number of output tokens produced by this API call."
+    },
+    "cost_cents": {
+      "type": "integer",
+      "default": 0,
+      "description": "Cost of this specific API call in cents, calculated at time of call using the pricing table."
+    },
+    "agent_tier": {
+      "type": "string",
+      "enum": [
+        "starter",
+        "pro",
+        "team",
+        "broker"
+      ],
+      "description": "Subscription tier of the agent at time of call."
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this token log entry"
+    }
+  },
+  "required": [
+    "provider",
+    "model",
+    "task"
+  ]
+}

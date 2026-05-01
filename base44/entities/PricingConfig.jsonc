@@ -1,0 +1,169 @@
+{
+  "name": "PricingConfig",
+  "type": "object",
+  "description": "Single-row configuration record for all pricing, caps, and thresholds. Only one record should exist.",
+  "properties": {
+    "starter_monthly_price": {
+      "type": "number",
+      "default": 49
+    },
+    "pro_monthly_price": {
+      "type": "number",
+      "default": 79
+    },
+    "team_monthly_price": {
+      "type": "number",
+      "default": 129
+    },
+    "starter_analyses_cap": {
+      "type": "integer",
+      "default": 20
+    },
+    "pro_analyses_cap": {
+      "type": "integer",
+      "default": 50
+    },
+    "team_analyses_cap": {
+      "type": "integer",
+      "default": 100
+    },
+    "territory_seat_size": {
+      "type": "integer",
+      "default": 50000
+    },
+    "bundle_duo_discount": {
+      "type": "number",
+      "default": 5
+    },
+    "bundle_trio_discount": {
+      "type": "number",
+      "default": 10
+    },
+    "bundle_regional_discount": {
+      "type": "number",
+      "default": 15
+    },
+    "bundle_district_discount": {
+      "type": "number",
+      "default": 20
+    },
+    "bundle_master_discount": {
+      "type": "number",
+      "default": 25
+    },
+    "bundle_county_discount": {
+      "type": "number",
+      "default": 20
+    },
+    "bundle_duo_cap_multiplier": {
+      "type": "number",
+      "default": 100
+    },
+    "bundle_trio_cap_multiplier": {
+      "type": "number",
+      "default": 100
+    },
+    "bundle_regional_cap_multiplier": {
+      "type": "number",
+      "default": 100
+    },
+    "bundle_district_cap_multiplier": {
+      "type": "number",
+      "default": 100
+    },
+    "bundle_master_cap_multiplier": {
+      "type": "number",
+      "default": 100
+    },
+    "buyout_2seat_discount": {
+      "type": "number",
+      "default": 10
+    },
+    "buyout_3_4seat_discount": {
+      "type": "number",
+      "default": 25
+    },
+    "buyout_5_9seat_discount": {
+      "type": "number",
+      "default": 35
+    },
+    "buyout_10plus_seat_discount": {
+      "type": "number",
+      "default": 45
+    },
+    "topup_starter_analyses": {
+      "type": "integer",
+      "default": 10
+    },
+    "topup_starter_price": {
+      "type": "number",
+      "default": 29
+    },
+    "topup_standard_analyses": {
+      "type": "integer",
+      "default": 25
+    },
+    "topup_standard_price": {
+      "type": "number",
+      "default": 59
+    },
+    "topup_pro_analyses": {
+      "type": "integer",
+      "default": 50
+    },
+    "topup_pro_price": {
+      "type": "number",
+      "default": 99
+    },
+    "topup_bulk_analyses": {
+      "type": "integer",
+      "default": 100
+    },
+    "topup_bulk_price": {
+      "type": "number",
+      "default": 179
+    },
+    "topup_expiry_days": {
+      "type": "integer",
+      "default": 90
+    },
+    "auto_approve_hours": {
+      "type": "integer",
+      "default": 48
+    },
+    "reclamation_days": {
+      "type": "integer",
+      "default": 30
+    },
+    "right_of_first_refusal_hours": {
+      "type": "integer",
+      "default": 48
+    },
+    "sublicense_min_share_pct": {
+      "type": "number",
+      "default": 10,
+      "description": "Minimum revenue share % founder can set for sublicensee"
+    },
+    "sublicense_max_share_pct": {
+      "type": "number",
+      "default": 40,
+      "description": "Maximum revenue share % founder can set"
+    },
+    "sublicense_default_share_pct": {
+      "type": "number",
+      "default": 20,
+      "description": "Default revenue share % shown in sublicense modal"
+    },
+    "founder_refusal_days": {
+      "type": "integer",
+      "default": 7,
+      "description": "Days after release that founder retains right of first refusal"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this pricing configuration"
+    }
+  },
+  "required": []
+}

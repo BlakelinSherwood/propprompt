@@ -1,0 +1,61 @@
+{
+  "name": "TerritoryWatchList",
+  "type": "object",
+  "description": "Subscriber watch list entry for monitoring territory availability.",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "References User.id"
+    },
+    "territory_id": {
+      "type": "string",
+      "description": "References Territory.id"
+    },
+    "watch_type": {
+      "type": "string",
+      "enum": [
+        "manual",
+        "auto_adjacent",
+        "auto_county"
+      ],
+      "description": "How this territory was added to watch list"
+    },
+    "added_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this territory was added to watch list"
+    },
+    "last_alerted_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the subscriber was last alerted about this territory being available"
+    },
+    "follow_up_sent": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether 72-hour follow-up has been sent"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "claimed_by_other",
+        "claimed_by_user",
+        "dismissed"
+      ],
+      "default": "active",
+      "description": "Current status of this watch entry"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this watch list entry"
+    }
+  },
+  "required": [
+    "user_id",
+    "territory_id",
+    "watch_type",
+    "added_at"
+  ]
+}

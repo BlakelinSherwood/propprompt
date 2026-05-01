@@ -204,6 +204,11 @@
     "mortgage_search_result": {
       "type": "string",
       "description": "Raw JSON response from Perplexity mortgage deep search (truncated to 2000 chars)"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this public record entry"
     }
   },
   "required": [

@@ -1,0 +1,62 @@
+{
+  "name": "PayoffInput",
+  "type": "object",
+  "description": "Agent-selected payoff method and value for each analysis run.",
+  "properties": {
+    "analysis_id": {
+      "type": "string",
+      "description": "References Analysis.id"
+    },
+    "public_record_id": {
+      "type": "string",
+      "description": "References PropertyPublicRecord.id"
+    },
+    "payoff_method": {
+      "type": "string",
+      "enum": [
+        "estimated",
+        "actual"
+      ],
+      "description": "Whether estimate or actual payoff amount"
+    },
+    "actual_payoff_amount": {
+      "type": "number",
+      "description": "When payoff_method = actual"
+    },
+    "payoff_good_through_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Optional expiry date from payoff statement"
+    },
+    "estimated_payoff_low": {
+      "type": "number",
+      "description": "When payoff_method = estimated"
+    },
+    "estimated_payoff_high": {
+      "type": "number",
+      "description": "When payoff_method = estimated"
+    },
+    "estimation_basis": {
+      "type": "string",
+      "description": "How estimate was calculated"
+    },
+    "estimation_confidence": {
+      "type": "string",
+      "enum": [
+        "high",
+        "medium",
+        "low"
+      ],
+      "description": "Confidence level of the estimate"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this payoff input"
+    }
+  },
+  "required": [
+    "analysis_id",
+    "payoff_method"
+  ]
+}

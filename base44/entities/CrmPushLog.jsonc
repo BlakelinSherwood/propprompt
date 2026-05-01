@@ -1,0 +1,81 @@
+{
+  "name": "CrmPushLog",
+  "type": "object",
+  "description": "Audit log of every analysis push attempt to a CRM per Addendum A6.",
+  "properties": {
+    "analysis_id": {
+      "type": "string",
+      "description": "Analysis that was pushed (references Analysis)"
+    },
+    "crm_connection_id": {
+      "type": "string",
+      "description": "CRM connection used (references CrmConnection)"
+    },
+    "user_email": {
+      "type": "string",
+      "description": "Email of the user who initiated the push"
+    },
+    "crm_provider": {
+      "type": "string",
+      "enum": [
+        "follow_up_boss",
+        "kvcore",
+        "salesforce",
+        "lofty"
+      ],
+      "description": "Which CRM was pushed to"
+    },
+    "push_type": {
+      "type": "string",
+      "enum": [
+        "note",
+        "attachment",
+        "activity"
+      ],
+      "description": "How the analysis was pushed to CRM"
+    },
+    "crm_contact_id": {
+      "type": "string",
+      "description": "ID of the CRM contact record this was attached to"
+    },
+    "crm_record_id": {
+      "type": "string",
+      "description": "ID of the created CRM note/activity/attachment record"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "success",
+        "failed",
+        "pending"
+      ],
+      "default": "pending",
+      "description": "Push result"
+    },
+    "error_message": {
+      "type": "string",
+      "description": "Error detail if push failed"
+    },
+    "http_status_code": {
+      "type": "integer",
+      "description": "HTTP status code from CRM API response"
+    },
+    "pushed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of the push attempt"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this push log entry"
+    }
+  },
+  "required": [
+    "analysis_id",
+    "crm_connection_id",
+    "user_email",
+    "crm_provider",
+    "push_type"
+  ]
+}

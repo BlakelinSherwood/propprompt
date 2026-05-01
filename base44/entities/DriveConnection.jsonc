@@ -1,0 +1,84 @@
+{
+  "name": "DriveConnection",
+  "type": "object",
+  "description": "Per-user Google Drive OAuth connection and folder configuration per Addendum A7.",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "Email of the user who owns this Drive connection (references User)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "connected",
+        "disconnected",
+        "error",
+        "pending_auth"
+      ],
+      "default": "pending_auth",
+      "description": "OAuth connection status"
+    },
+    "google_account_email": {
+      "type": "string",
+      "description": "The Google account email authorized (may differ from PropPrompt email)"
+    },
+    "oauth_access_token": {
+      "type": "string",
+      "description": "Google OAuth access token (short-lived)"
+    },
+    "oauth_refresh_token": {
+      "type": "string",
+      "description": "Google OAuth refresh token (long-lived)"
+    },
+    "oauth_token_expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When current access token expires"
+    },
+    "root_folder_id": {
+      "type": "string",
+      "description": "Google Drive folder ID for PropPrompt output root (default: 'PropPrompt Analyses')"
+    },
+    "root_folder_name": {
+      "type": "string",
+      "description": "Display name of the root folder"
+    },
+    "subfolder_by_property_type": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to organize output into subfolders by property type"
+    },
+    "subfolder_by_assessment_type": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to organize output into subfolders by assessment type"
+    },
+    "auto_sync_pdf": {
+      "type": "boolean",
+      "default": true,
+      "description": "Automatically sync PDF outputs to Drive"
+    },
+    "auto_sync_pptx": {
+      "type": "boolean",
+      "default": true,
+      "description": "Automatically sync PPTX outputs to Drive"
+    },
+    "last_sync_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of last successful Drive upload"
+    },
+    "last_error": {
+      "type": "string",
+      "description": "Last Drive API error message"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this Drive connection"
+    }
+  },
+  "required": [
+    "user_email"
+  ]
+}

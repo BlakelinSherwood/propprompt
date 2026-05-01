@@ -1,0 +1,37 @@
+{
+  "name": "ReleasedTerritory",
+  "type": "object",
+  "description": "Log of founder-released territories with right-of-first-refusal window.",
+  "properties": {
+    "territory_id": {
+      "type": "string",
+      "description": "References Territory.id"
+    },
+    "released_by": {
+      "type": "string",
+      "description": "Email of admin who released it"
+    },
+    "release_reason": {
+      "type": "string"
+    },
+    "right_of_refusal_expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "reclaimed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Set if founder re-claims within window"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional notes about this released territory"
+    }
+  },
+  "required": [
+    "territory_id",
+    "released_by",
+    "right_of_refusal_expires_at"
+  ]
+}
