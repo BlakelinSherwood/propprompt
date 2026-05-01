@@ -98,13 +98,14 @@ export default function CompsMapWithHeat({ subjectAddress, comps, selected, onTo
   useEffect(() => {
     if (!subjectCoords || mapRef.current) return;
     let cancelled = false;
+    let retryTimer = null;
 
     function tryInit() {
       if (cancelled || !containerRef.current) return;
       const { offsetWidth, offsetHeight } = containerRef.current;
       if (!offsetWidth || !offsetHeight) {
-        // Container not visible yet — retry shortly
-        setTimeout(tryInit, 100);
+        // Container not visible yet — keep retrying every 200ms
+        retryTimer = setTimeout(tryInit, 200);
         return;
       }
       const map = new mapboxgl.Map({
@@ -114,19 +115,24 @@ export default function CompsMapWithHeat({ subjectAddress, comps, selected, onTo
         zoom: 13,
       });
       map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
-      map.on("load", () => { map.resize(); setReady(true); });
+      map.on("load", () => {
+        if (!cancelled) {
+          map.resize();
+          setReady(true);
+        }
+      });
       const ro = new ResizeObserver(() => map.resize());
       ro.observe(containerRef.current);
       mapRef.current = map;
       mapRef.current._ro = ro;
     }
 
-    // Small initial delay to let the wizard step finish rendering
-    const t = setTimeout(tryInit, 150);
+    // Wait for framer-motion page transition to complete before first attempt
+    retryTimer = setTimeout(tryInit, 400);
 
     return () => {
       cancelled = true;
-      clearTimeout(t);
+      clearTimeout(retryTimer);
       if (mapRef.current) {
         mapRef.current._ro?.disconnect();
         mapRef.current.remove();
