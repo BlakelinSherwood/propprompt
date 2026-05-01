@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     // admin and platform_owner always get unlimited access
-    const UNLIMITED_ROLES = ['platform_owner', 'admin', 'brokerage_admin', 'team_lead'];
+    const UNLIMITED_ROLES = ['platform_owner', 'admin', 'brokerage_admin', 'team_lead', 'team_agent', 'team_admin'];
     if (UNLIMITED_ROLES.includes(user.role)) {
       return Response.json({ allowed: true, unlimited: true, analyses_cap: 9999, analyses_used_this_month: 0 });
     }
