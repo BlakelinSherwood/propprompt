@@ -1,27 +1,22 @@
 /**
  * generateAnalysis — Non-streaming analysis generator.
- * Resolves API key → assembles prompt → calls Claude/OpenAI/Gemini → saves & returns output.
- * Used by AnalysisRun page via SDK invoke (avoids SSE auth issues).
+ * ALL enrichment lookups (AVM, neighborhood, walk/flood/schools, town-intel) run in parallel
+ * before the AI call. This reduces total time from ~30 min to ~5-8 min.
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 
 function runValidation({ reportJSON, prior_sale_price, prior_sale_year }) {
-  if (prior_sale_price == null || prior_sale_year == null) {
-    return { valid: true, reason: 'no_prior_sale_data' };
-  }
+  if (prior_sale_price == null || prior_sale_year == null) return { valid: true, reason: 'no_prior_sale_data' };
   const currentYear = new Date().getFullYear();
   const yearsElapsed = currentYear - Number(prior_sale_year);
   let appreciationRate = 0.04;
-  const rawRate = reportJSON?.market_context?.yoy_appreciation_rate
-    ?? reportJSON?.market_context?.yoy_appreciation;
+  const rawRate = reportJSON?.market_context?.yoy_appreciation_rate ?? reportJSON?.market_context?.yoy_appreciation;
   if (rawRate != null && !isNaN(Number(rawRate))) {
     appreciationRate = Number(rawRate);
     if (appreciationRate > 1) appreciationRate = appreciationRate / 100;
   }
   const projectedValue = Number(prior_sale_price) * Math.pow(1 + appreciationRate, yearsElapsed);
-  let aiMidpoint = reportJSON?.tiered_comps?.implied_value_range?.midpoint
-    ?? reportJSON?.implied_value_range?.midpoint
-    ?? null;
+  let aiMidpoint = reportJSON?.tiered_comps?.implied_value_range?.midpoint ?? reportJSON?.implied_value_range?.midpoint ?? null;
   if (aiMidpoint == null) return { valid: true, reason: 'no_ai_midpoint' };
   if (typeof aiMidpoint === 'string') aiMidpoint = Number(aiMidpoint.replace(/[^0-9.]/g, ''));
   aiMidpoint = Number(aiMidpoint);
@@ -41,39 +36,6 @@ function runValidation({ reportJSON, prior_sale_price, prior_sale_year }) {
   return { valid: true };
 }
 
-// Inline section matrix (must match assemblePrompt)
-function getRequiredSections(assessmentType, analysis) {
-  const matrix = {
-    listing_pricing: {
-      base: ['migration_analysis', 'buyer_archetype', 'tiered_comps', 'listing_timing', 'attribute_alignment_grid', 'location_priority_characteristics'],
-    },
-    cma: {
-      base: ['tiered_comps', 'location_priority_characteristics'],
-      migration_opt: ['migration_analysis'],
-      archetype_opt: ['buyer_archetype'],
-    },
-    buyer_intelligence: {
-      base: ['migration_analysis', 'buyer_archetype', 'listing_timing', 'attribute_alignment_grid', 'location_priority_characteristics'],
-    },
-    investment_analysis: {
-      base: ['tiered_comps', 'location_priority_characteristics', 'rate_environment'],
-      migration_opt: ['migration_analysis'],
-      archetype_opt: ['buyer_archetype'],
-    },
-    rental_analysis: { base: [] },
-    client_portfolio: {
-      base: ['tiered_comps', 'portfolio_options', 'adu_option', 'location_priority_characteristics', 'rate_environment'],
-    },
-    custom: { base: analysis.selected_modules || [] },
-  };
-
-  const config = matrix[assessmentType] || { base: [] };
-  const sections = new Set([...config.base]);
-  if (analysis.include_migration && config.migration_opt) config.migration_opt.forEach(s => sections.add(s));
-  if (analysis.include_archetypes && config.archetype_opt) config.archetype_opt.forEach(s => sections.add(s));
-  return sections;
-}
-
 // ── AI Cost Logging ─────────────────────────────────────────────────────────
 
 const PRICING = {
@@ -84,30 +46,23 @@ const PRICING = {
     default:                    { inputPer1M: 3.00,  outputPer1M: 15.00 },
   },
   openai: {
-    'gpt-4o':                   { inputPer1M: 2.50,  outputPer1M: 10.00 },
-    'gpt-4o-mini':              { inputPer1M: 0.15,  outputPer1M: 0.60  },
-    default:                    { inputPer1M: 2.50,  outputPer1M: 10.00 },
+    'gpt-4o':      { inputPer1M: 2.50,  outputPer1M: 10.00 },
+    'gpt-4o-mini': { inputPer1M: 0.15,  outputPer1M: 0.60  },
+    default:       { inputPer1M: 2.50,  outputPer1M: 10.00 },
   },
   google: {
-    'gemini-2.0-flash':         { inputPer1M: 0.075, outputPer1M: 0.30  },
-    'gemini-1.5-pro':           { inputPer1M: 1.25,  outputPer1M: 5.00  },
-    default:                    { inputPer1M: 0.075, outputPer1M: 0.30  },
+    'gemini-2.0-flash': { inputPer1M: 0.075, outputPer1M: 0.30 },
+    'gemini-1.5-pro':   { inputPer1M: 1.25,  outputPer1M: 5.00 },
+    default:            { inputPer1M: 0.075, outputPer1M: 0.30 },
   },
-  perplexity: {
-    default:                    { inputPer1M: 1.00,  outputPer1M: 1.00  },
-  },
-  xai: {
-    'grok-2-1212':              { inputPer1M: 5.00,  outputPer1M: 15.00 },
-    default:                    { inputPer1M: 5.00,  outputPer1M: 15.00 },
-  },
+  perplexity: { default: { inputPer1M: 1.00, outputPer1M: 1.00 } },
+  xai:        { default: { inputPer1M: 5.00, outputPer1M: 15.00 } },
   mistral: {
-    'mistral-large-latest':     { inputPer1M: 2.00,  outputPer1M: 6.00  },
-    'mistral-small-latest':     { inputPer1M: 0.10,  outputPer1M: 0.30  },
-    default:                    { inputPer1M: 2.00,  outputPer1M: 6.00  },
+    'mistral-large-latest': { inputPer1M: 2.00, outputPer1M: 6.00 },
+    'mistral-small-latest': { inputPer1M: 0.10, outputPer1M: 0.30 },
+    default:                { inputPer1M: 2.00, outputPer1M: 6.00 },
   },
-  meta: {
-    default:                    { inputPer1M: 0.18,  outputPer1M: 0.18  },
-  },
+  meta: { default: { inputPer1M: 0.18, outputPer1M: 0.18 } },
 };
 
 function calculateCostCents(provider, model, inputTokens, outputTokens) {
@@ -123,28 +78,24 @@ async function createAITokenLog(base44, payload) {
 }
 
 const SECTION_TO_TASK = {
-  market_research:      'live_market_context',
+  market_research:       'live_market_context',
   neighborhood_snapshot: 'neighbourhood_demand',
-  buyer_archetype:      'buyer_archetypes',
-  report_assembly:      'seller_narrative',
-  narrative_layer:      'seller_narrative',
-  pricing_strategy:     'pricing_strategy',
-  net_sheet:            'net_sheet',
+  buyer_archetype:       'buyer_archetypes',
+  report_assembly:       'seller_narrative',
+  narrative_layer:       'seller_narrative',
+  pricing_strategy:      'pricing_strategy',
+  net_sheet:             'net_sheet',
 };
 
 // ── Parse AI JSON-only response ───────────────────────────────────────────────
 
 function extractJsonOutput(rawText) {
-  // Strip markdown fences if present
   let text = rawText.trim();
   if (text.startsWith('```')) {
     text = text.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
   }
-
-  // Attempt full-response parse (JSON-only mode)
   try {
     const outputJson = JSON.parse(text);
-    // Build readable output_text from narrative fields inside the JSON
     const parts = [];
     if (outputJson.executive_summary) parts.push(`## Executive Summary\n${outputJson.executive_summary}`);
     if (outputJson.market_context?.narrative) parts.push(`## Market Context\n${outputJson.market_context.narrative}`);
@@ -156,13 +107,12 @@ function extractJsonOutput(rawText) {
     console.warn('[extractJsonOutput] Full-response JSON parse failed:', e.message, '| first 300:', text.slice(0, 300));
   }
 
-  // Fallback: delimiter-based extraction
   const START = '---BEGIN_JSON_OUTPUT---';
-  const END = '---END_JSON_OUTPUT---';
+  const END   = '---END_JSON_OUTPUT---';
   const startIdx = text.indexOf(START);
-  const endIdx = text.indexOf(END);
+  const endIdx   = text.indexOf(END);
   if (startIdx !== -1 && endIdx !== -1) {
-    const jsonStr = text.slice(startIdx + START.length, endIdx).trim();
+    const jsonStr   = text.slice(startIdx + START.length, endIdx).trim();
     const cleanText = (text.slice(0, startIdx) + text.slice(endIdx + END.length)).trim();
     try {
       return { cleanText, outputJson: JSON.parse(jsonStr) };
@@ -170,8 +120,6 @@ function extractJsonOutput(rawText) {
       console.warn('[extractJsonOutput] Delimiter JSON parse also failed:', e2.message);
     }
   }
-
-  // Nothing worked — return raw text, no JSON
   return { cleanText: rawText, outputJson: null };
 }
 
@@ -554,16 +502,11 @@ async function callClaudeOnce(apiKey, prompt, keySource) {
     throw Object.assign(new Error(msg), { isOverloaded });
   }
   const data = await res.json();
-  if (data.stop_reason === 'max_tokens') {
-    console.warn('[callClaude] WARNING: Listing Pricing Analysis truncated at max_tokens');
-  }
+  if (data.stop_reason === 'max_tokens') console.warn('[callClaude] WARNING: Analysis truncated at max_tokens');
   return {
     text: data.content?.[0]?.text || "",
     model,
-    usage: {
-      input_tokens:  data.usage?.input_tokens  || 0,
-      output_tokens: data.usage?.output_tokens || 0,
-    },
+    usage: { input_tokens: data.usage?.input_tokens || 0, output_tokens: data.usage?.output_tokens || 0 },
   };
 }
 
@@ -589,17 +532,11 @@ async function callOpenAI(apiKey, prompt) {
   const systemPrompt = getExpandedSystemPrompt(today);
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
+    headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       model: "gpt-4o",
       max_tokens: 16000,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: prompt }
-      ],
+      messages: [{ role: "system", content: systemPrompt }, { role: "user", content: prompt }],
     }),
   });
   if (!res.ok) {
@@ -607,16 +544,11 @@ async function callOpenAI(apiKey, prompt) {
     throw new Error(err.error?.message || `OpenAI API error ${res.status}`);
   }
   const data = await res.json();
-  if (data.choices?.[0]?.finish_reason === 'length') {
-    console.warn('[callOpenAI] WARNING: Analysis truncated at max_tokens');
-  }
+  if (data.choices?.[0]?.finish_reason === 'length') console.warn('[callOpenAI] WARNING: Analysis truncated at max_tokens');
   return {
     text: data.choices?.[0]?.message?.content || "",
     model: "gpt-4o",
-    usage: {
-      input_tokens:  data.usage?.prompt_tokens     || 0,
-      output_tokens: data.usage?.completion_tokens || 0,
-    },
+    usage: { input_tokens: data.usage?.prompt_tokens || 0, output_tokens: data.usage?.completion_tokens || 0 },
   };
 }
 
@@ -641,10 +573,7 @@ async function callGemini(apiKey, prompt) {
   return {
     text: data.candidates?.[0]?.content?.parts?.[0]?.text || "",
     model,
-    usage: {
-      input_tokens:  data.usageMetadata?.promptTokenCount     || 0,
-      output_tokens: data.usageMetadata?.candidatesTokenCount || 0,
-    },
+    usage: { input_tokens: data.usageMetadata?.promptTokenCount || 0, output_tokens: data.usageMetadata?.candidatesTokenCount || 0 },
   };
 }
 
@@ -654,17 +583,11 @@ async function callPerplexity(apiKey, prompt) {
   const systemPrompt = getExpandedSystemPrompt(today);
   const res = await fetch("https://api.perplexity.ai/chat/completions", {
     method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
+    headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       model,
       max_tokens: 16000,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: prompt }
-      ],
+      messages: [{ role: "system", content: systemPrompt }, { role: "user", content: prompt }],
     }),
   });
   if (!res.ok) {
@@ -675,10 +598,7 @@ async function callPerplexity(apiKey, prompt) {
   return {
     text: data.choices?.[0]?.message?.content || "",
     model,
-    usage: {
-      input_tokens:  data.usage?.prompt_tokens     || 0,
-      output_tokens: data.usage?.completion_tokens || 0,
-    },
+    usage: { input_tokens: data.usage?.prompt_tokens || 0, output_tokens: data.usage?.completion_tokens || 0 },
   };
 }
 
@@ -697,7 +617,6 @@ function parseAvmJson(text, source) {
   }
 }
 
-// Merge two AVM results — prefer non-null values, with source `a` taking priority
 function mergeAvmResults(a, b) {
   if (!a && !b) return null;
   if (!a) return b;
@@ -708,11 +627,11 @@ function mergeAvmResults(a, b) {
     const av = a[p] || {};
     const bv = b[p] || {};
     merged[p] = {
-      estimate:  av.estimate  ?? bv.estimate  ?? null,
-      range_low: av.range_low ?? bv.range_low ?? null,
-      range_high:av.range_high?? bv.range_high?? null,
-      trend:     av.trend     ?? bv.trend     ?? null,
-      as_of:     av.as_of     ?? bv.as_of     ?? null,
+      estimate:   av.estimate   ?? bv.estimate   ?? null,
+      range_low:  av.range_low  ?? bv.range_low  ?? null,
+      range_high: av.range_high ?? bv.range_high ?? null,
+      trend:      av.trend      ?? bv.trend      ?? null,
+      as_of:      av.as_of      ?? bv.as_of      ?? null,
     };
   }
   return merged;
@@ -748,15 +667,10 @@ async function callOpenAIAVM(apiKey, address) {
   const res = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'gpt-4o',
-      tools: [{ type: 'web_search_preview' }],
-      input: userPrompt,
-    }),
+    body: JSON.stringify({ model: 'gpt-4o', tools: [{ type: 'web_search_preview' }], input: userPrompt }),
   });
   if (!res.ok) throw new Error(`OpenAI AVM error ${res.status}`);
   const data = await res.json();
-  // Extract text from Responses API format
   let text = '';
   for (const item of (data.output || [])) {
     if (item.type === 'message') {
@@ -769,14 +683,11 @@ async function callOpenAIAVM(apiKey, address) {
   return parseAvmJson(text, 'openai');
 }
 
-// Fire Perplexity + GPT-4o in parallel, merge results for maximum coverage
 async function fetchAVMParallel(perpKey, openaiKey, address) {
-  const tasks = [];
-  if (perpKey) tasks.push(callPerplexityAVM(perpKey, address).catch(e => { console.warn('[AVM perplexity] failed:', e.message); return null; }));
-  else tasks.push(Promise.resolve(null));
-  if (openaiKey) tasks.push(callOpenAIAVM(openaiKey, address).catch(e => { console.warn('[AVM openai] failed:', e.message); return null; }));
-  else tasks.push(Promise.resolve(null));
-
+  const tasks = [
+    perpKey   ? callPerplexityAVM(perpKey, address).catch(e  => { console.warn('[AVM perplexity] failed:', e.message); return null; }) : Promise.resolve(null),
+    openaiKey ? callOpenAIAVM(openaiKey, address).catch(e => { console.warn('[AVM openai] failed:', e.message); return null; }) : Promise.resolve(null),
+  ];
   const [perpResult, openaiResult] = await Promise.all(tasks);
   console.log('[fetchAVMParallel] perplexity:', perpResult ? JSON.stringify(perpResult).slice(0, 150) : 'null');
   console.log('[fetchAVMParallel] openai:', openaiResult ? JSON.stringify(openaiResult).slice(0, 150) : 'null');
@@ -785,7 +696,188 @@ async function fetchAVMParallel(perpKey, openaiKey, address) {
   return merged;
 }
 
-// Wrap a promise with a timeout — rejects with a clear message if exceeded
+// ── Perplexity helper (generic JSON fetch) ────────────────────────────────────
+
+async function fetchPerplexityJson(perpKey, userContent, contextSize = 'low') {
+  const res = await fetch('https://api.perplexity.ai/chat/completions', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${perpKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'sonar-pro',
+      messages: [{ role: 'user', content: userContent }],
+      search_context_size: contextSize,
+    }),
+  });
+  if (!res.ok) throw new Error(`Perplexity ${res.status}`);
+  const data = await res.json();
+  return (data.choices?.[0]?.message?.content || '').trim();
+}
+
+function safeParseJson(text) {
+  try {
+    let clean = text.trim();
+    if (clean.startsWith('```')) clean = clean.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+    const match = clean.match(/\{[\s\S]*\}/);
+    return match ? JSON.parse(match[0]) : null;
+  } catch (e) { return null; }
+}
+
+// ── ALL enrichment in one parallel sweep ─────────────────────────────────────
+
+async function fetchAllEnrichment(analysis, perpKey, openaiKey) {
+  const addr = analysis.intake_data?.address || '';
+  const town = (addr.split(',')[1] || '').trim() || addr;
+  const assessmentType = analysis.assessment_type;
+  const currentYear = new Date().getFullYear();
+
+  const isAvmType        = ['listing_pricing', 'cma', 'client_portfolio'].includes(assessmentType);
+  const isNeighborhood   = ['listing_pricing', 'cma', 'client_portfolio', 'buyer_intelligence'].includes(assessmentType);
+  const isLocationCtx    = ['listing_pricing', 'cma', 'client_portfolio', 'buyer_intelligence', 'investment_analysis'].includes(assessmentType);
+  const isTownIntel      = assessmentType === 'client_portfolio';
+
+  const tasks = {
+    avm:          (isAvmType && addr && (perpKey || openaiKey))
+                    ? fetchAVMParallel(perpKey, openaiKey, addr).catch(e => { console.warn('[enrichment] AVM failed:', e.message); return null; })
+                    : Promise.resolve(null),
+
+    neighborhood: (isNeighborhood && perpKey && town)
+                    ? fetchPerplexityJson(perpKey,
+                        `For ${town}, Massachusetts real estate: What are the premium vs. average/below-average micro-neighborhoods, streets, or zones that affect single-family home values? Consider: MBTA/commuter rail proximity, school attendance zones within the town, historically desirable streets, commercial/highway noise zones, flood zones. Return ONLY valid JSON: {"median_ppsf": 625, "neighborhoods": [{"name": "area name", "premium_pct": 15, "tier": "premium", "reason": "brief reason"}]}`,
+                        'medium'
+                      ).catch(e => { console.warn('[enrichment] neighborhood failed:', e.message); return null; })
+                    : Promise.resolve(null),
+
+    walkability:  (isLocationCtx && perpKey && addr)
+                    ? fetchPerplexityJson(perpKey,
+                        `What is the Walk Score, Transit Score, and Bike Score for ${addr}? Search walkscore.com or any reliable source. Return ONLY valid JSON: {"walk_score": 72, "walk_label": "Very Walkable", "transit_score": 45, "transit_label": "Some Transit", "bike_score": 55, "bike_label": "Bikeable", "source": "Walk Score", "notes": "brief context"}`,
+                        'low'
+                      ).catch(e => { console.warn('[enrichment] walkability failed:', e.message); return null; })
+                    : Promise.resolve(null),
+
+    flood:        (isLocationCtx && perpKey && addr)
+                    ? fetchPerplexityJson(perpKey,
+                        `What is the FEMA flood zone designation for ${addr}? Search FEMA Flood Map Service Center (msc.fema.gov) or the local floodplain maps. Return ONLY valid JSON: {"flood_zone": "X", "flood_zone_description": "Minimal Flood Hazard", "panel_number": "25021C0234H", "effective_date": "2014-07-17", "insurance_required": false, "risk_level": "low", "notes": "brief context or caveats"}`,
+                        'low'
+                      ).catch(e => { console.warn('[enrichment] flood failed:', e.message); return null; })
+                    : Promise.resolve(null),
+
+    schools:      (isLocationCtx && perpKey && addr)
+                    ? fetchPerplexityJson(perpKey,
+                        `What are the assigned public schools (elementary, middle, high school) for a property at ${addr}? Also list any nearby highly-rated private or charter schools within 3 miles. Include GreatSchools ratings where available. Return ONLY valid JSON: {"assigned_schools": [{"name": "Lincoln Elementary", "type": "elementary", "grades": "K-5", "distance_miles": 0.4, "rating": 8, "rating_source": "GreatSchools"}], "nearby_notable": [{"name": "Brookline High", "type": "high", "grades": "9-12", "distance_miles": 1.2, "rating": 9, "rating_source": "GreatSchools", "public_private": "public"}]}`,
+                        'medium'
+                      ).catch(e => { console.warn('[enrichment] schools failed:', e.message); return null; })
+                    : Promise.resolve(null),
+
+    townIntel:    (isTownIntel && perpKey && town)
+                    ? fetchPerplexityJson(perpKey,
+                        `Research the following for ${town}, Massachusetts and Massachusetts statewide housing policy as of ${currentYear}:\n\n1. TOWN DEVELOPMENTS: What major development projects, infrastructure improvements, rezoning efforts, or town planning initiatives are recently approved, under construction, or proposed in ${town}, MA?\n\n2. MA HOUSING POLICY: What recent or upcoming Massachusetts state housing laws, policies, or mandates are affecting residential property owners and values?\n\nReturn ONLY valid JSON:\n{"town_developments":[{"project":"name","type":"infrastructure|commercial|rezoning|school|transit|park|employer|other","status":"approved|under_construction|proposed|completed","description":"2 sentence description","value_impact":"positive|negative|neutral|mixed","impact_reason":"1 sentence","timeline":"e.g. 2026","impact_magnitude":"high|medium|low"}],"ma_housing_policies":[{"policy":"name","category":"zoning|tax|rental|energy|adu|foreclosure|assessment|other","status":"enacted|pending|proposed","effective_date":"e.g. January 2025","description":"2 sentence plain-English explanation","owner_impact":"positive|negative|neutral|mixed","impact_reason":"1 sentence","action_required":true,"action_note":"what action or null"}],"overall_outlook":"bullish|cautious|neutral","outlook_summary":"2-3 sentence summary"}`,
+                        'medium'
+                      ).catch(e => { console.warn('[enrichment] townIntel failed:', e.message); return null; })
+                    : Promise.resolve(null),
+  };
+
+  console.log('[generateAnalysis] Starting parallel enrichment sweep:', Object.keys(tasks).filter(k => tasks[k] !== Promise.resolve(null)).join(', '));
+  const startEnrichment = Date.now();
+
+  const [avm, neighborhood, walkability, flood, schools, townIntel] = await Promise.all([
+    tasks.avm, tasks.neighborhood, tasks.walkability, tasks.flood, tasks.schools, tasks.townIntel,
+  ]);
+
+  console.log(`[generateAnalysis] Enrichment sweep complete in ${((Date.now() - startEnrichment)/1000).toFixed(1)}s`);
+
+  return { avm, neighborhood, walkability, flood, schools, townIntel };
+}
+
+// ── Build enrichment injection blocks from results ───────────────────────────
+
+function buildEnrichmentBlocks(enrichment, analysis) {
+  const { avm, neighborhood, walkability, flood, schools, townIntel } = enrichment;
+  const addr = analysis.intake_data?.address || '';
+  const town = (addr.split(',')[1] || '').trim() || addr;
+  let blocks = '';
+
+  // AVM
+  if (avm && ['listing_pricing', 'cma', 'client_portfolio'].includes(analysis.assessment_type)) {
+    blocks += `\n\nAVM PERCEPTION DATA (from live Perplexity search — use ONLY these values, do NOT invent or guess):\n${JSON.stringify(avm, null, 2)}\n\nBuild the avm_perception object in the output JSON from this data.`;
+  } else if (['listing_pricing', 'cma', 'client_portfolio'].includes(analysis.assessment_type)) {
+    blocks += `\n\nAVM PERCEPTION DATA: null (live search unavailable)\nSet avm_perception to null in the output JSON.`;
+  }
+
+  // Micro-neighborhood
+  const nJson = safeParseJson(neighborhood);
+  if (nJson?.neighborhoods?.length > 0) {
+    blocks += `\n\nMICRO-NEIGHBORHOOD INTELLIGENCE FOR ${town.toUpperCase()} (Perplexity research):
+Town median PPSF: ~$${nJson.median_ppsf || 'unknown'}/SF
+Neighborhood tiers:
+${nJson.neighborhoods.map(n => `  • ${n.name}: ${n.premium_pct > 0 ? '+' : ''}${n.premium_pct}% (${n.tier}) — ${n.reason}`).join('\n')}
+
+CRITICAL: Determine which micro-neighborhood the subject property at ${addr} is in. Apply the appropriate premium or discount to the PPSF when computing the implied value range. State the neighborhood tier in the valuation narrative.`;
+    console.log('[generateAnalysis] Micro-neighborhood injected:', nJson.neighborhoods.length, 'zones');
+  }
+
+  // Walkability
+  const wJson = safeParseJson(walkability);
+  if (wJson?.walk_score != null) {
+    blocks += `\n\nWALKABILITY SCORES:
+Walk Score: ${wJson.walk_score}/100 — ${wJson.walk_label || ''}
+Transit Score: ${wJson.transit_score != null ? wJson.transit_score + '/100' : 'N/A'} — ${wJson.transit_label || ''}
+Bike Score: ${wJson.bike_score != null ? wJson.bike_score + '/100' : 'N/A'} — ${wJson.bike_label || ''}
+${wJson.notes ? 'Notes: ' + wJson.notes : ''}
+Include in output JSON as: "property_context": { "walkability": { "walk_score": N, "walk_label": "...", "transit_score": N, "transit_label": "...", "bike_score": N, "bike_label": "...", "notes": "..." } }`;
+    console.log('[generateAnalysis] Walk Score injected:', wJson.walk_score);
+  }
+
+  // Flood zone
+  const fJson = safeParseJson(flood);
+  if (fJson?.flood_zone) {
+    blocks += `\n\nFEMA FLOOD ZONE DATA:
+Zone: ${fJson.flood_zone} — ${fJson.flood_zone_description || ''}
+Risk Level: ${fJson.risk_level || 'unknown'}
+Flood Insurance Required: ${fJson.insurance_required ? 'YES — mandatory for federally-backed mortgages' : 'No (standard zone)'}
+FIRM Panel: ${fJson.panel_number || 'unknown'} | Effective: ${fJson.effective_date || 'unknown'}
+${fJson.notes ? 'Notes: ' + fJson.notes : ''}
+Include in output JSON as: "property_context": { ..., "flood_zone": { "flood_zone": "X", "flood_zone_description": "...", "risk_level": "low|moderate|high", "insurance_required": false, "panel_number": "...", "effective_date": "...", "notes": "..." } }`;
+    console.log('[generateAnalysis] Flood zone injected:', fJson.flood_zone);
+  }
+
+  // Schools
+  const sJson = safeParseJson(schools);
+  if (sJson && (sJson.assigned_schools?.length > 0 || sJson.nearby_notable?.length > 0)) {
+    const assigned = sJson.assigned_schools || [];
+    const notable  = sJson.nearby_notable  || [];
+    const schoolLines = [
+      ...assigned.map(s => `  [ASSIGNED] ${s.name} (${s.type}, ${s.grades}) — ${s.distance_miles} mi${s.rating ? ' | GreatSchools: ' + s.rating + '/10' : ''}`),
+      ...notable.map(s  => `  [NEARBY] ${s.name} (${s.public_private || s.type}, ${s.grades}) — ${s.distance_miles} mi${s.rating ? ' | GreatSchools: ' + s.rating + '/10' : ''}`),
+    ];
+    blocks += `\n\nSCHOOL DISTRICT & NEARBY SCHOOLS:\n${schoolLines.join('\n')}
+Include in output JSON as: "property_context": { ..., "schools": { "assigned_schools": [...], "nearby_notable": [...] } }`;
+    console.log('[generateAnalysis] Schools injected:', assigned.length, 'assigned,', notable.length, 'notable');
+  }
+
+  // Town intelligence (client_portfolio only)
+  const tiJson = safeParseJson(townIntel);
+  if (tiJson && (tiJson.town_developments?.length > 0 || tiJson.ma_housing_policies?.length > 0)) {
+    const devLines    = (tiJson.town_developments || []).map(d => `  [${(d.status || 'PROJECT').toUpperCase()}] ${d.project} (${d.type}) — ${(d.value_impact || '').toUpperCase()} impact (${d.impact_magnitude}) — ${d.impact_reason} | Timeline: ${d.timeline || 'unknown'}`);
+    const policyLines = (tiJson.ma_housing_policies || []).map(p => `  [${(p.status || 'POLICY').toUpperCase()}] ${p.policy} (${p.category}) — ${(p.owner_impact || '').toUpperCase()} impact — ${p.impact_reason}${p.action_required ? ' ⚠ ACTION REQUIRED: ' + p.action_note : ''}`);
+    blocks += `\n\nTOWN DEVELOPMENT & MA HOUSING POLICY INTELLIGENCE (Perplexity live research for ${town}):
+
+ACTIVE & UPCOMING TOWN DEVELOPMENTS:
+${devLines.length ? devLines.join('\n') : '  No major developments found'}
+
+MASSACHUSETTS HOUSING POLICIES AFFECTING THIS OWNER:
+${policyLines.length ? policyLines.join('\n') : '  No major new policies found'}
+
+OVERALL OUTLOOK: ${(tiJson.overall_outlook || 'NEUTRAL').toUpperCase()} — ${tiJson.outlook_summary || ''}
+
+CRITICAL INSTRUCTION: Include a "local_impact" object in the output JSON with town, overall_outlook, outlook_summary, town_developments array, ma_housing_policies array, and agent_briefing (3-4 sentences).`;
+    console.log('[generateAnalysis] Town intelligence injected:', tiJson.town_developments?.length, 'developments,', tiJson.ma_housing_policies?.length, 'policies');
+  }
+
+  return blocks;
+}
+
+// ── Wrap with timeout ─────────────────────────────────────────────────────────
+
 function withTimeout(promise, ms, label) {
   let timer;
   const timeout = new Promise((_, reject) => {
@@ -803,316 +895,162 @@ Deno.serve(async (req) => {
     const { analysisId, orgId } = await req.json();
     if (!analysisId) return Response.json({ error: "analysisId required" }, { status: 400 });
 
-    // Load analysis
-    const records = await base44.asServiceRole.entities.Analysis.filter({ id: analysisId });
+    // Load analysis + PlatformConfig in parallel (single round-trip)
+    const [records, configs] = await Promise.all([
+      base44.asServiceRole.entities.Analysis.filter({ id: analysisId }),
+      base44.asServiceRole.entities.PlatformConfig.filter({}).catch(() => []),
+    ]);
+
     const analysis = records[0];
     if (!analysis) return Response.json({ error: "Analysis not found" }, { status: 404 });
 
-    // Ownership check
     if (analysis.run_by_email !== user.email && analysis.on_behalf_of_email !== user.email && user.role !== 'admin') {
       return Response.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // If already complete with output_text, return cached (don't re-run)
+    // Return cached result
     if (analysis.status === "complete" && analysis.output_text) {
       return Response.json({ output: analysis.output_text, model: analysis.ai_model, keySource: "cached", outputJson: !!analysis.output_json });
     }
 
-    // If already in progress (another call is running), return early — polling will catch completion
+    // Dedup guard
     if (analysis.status === "in_progress") {
       console.log('[generateAnalysis] Already in_progress — skipping duplicate run for:', analysisId);
       return Response.json({ status: "in_progress", message: "Analysis already running" });
     }
 
-    // Resolve API key inline (avoids sub-function auth issues)
-    const PLATFORM_ENV_VARS = { claude: "ANTHROPIC_API_KEY", chatgpt: "OPENAI_API_KEY", gemini: "GEMINI_API_KEY", perplexity: "PERPLEXITY_API_KEY", grok: "GROK_API_KEY" };
-    const PLATFORM_CONFIG_FIELDS = { claude: "anthropic_api_key", chatgpt: "openai_api_key", gemini: "google_api_key", perplexity: "perplexity_api_key", grok: "grok_api_key" };
-    let apiKey = null;
-    let keySource = 'env';
+    // Resolve keys from already-loaded PlatformConfig (no extra DB call)
+    const cfg = configs[0] || {};
+    const PLATFORM_ENV_VARS   = { claude: "ANTHROPIC_API_KEY", chatgpt: "OPENAI_API_KEY", gemini: "GEMINI_API_KEY", perplexity: "PERPLEXITY_API_KEY", grok: "GROK_API_KEY" };
+    const PLATFORM_CFG_FIELDS = { claude: "anthropic_api_key",  chatgpt: "openai_api_key",  gemini: "google_api_key",     perplexity: "perplexity_api_key", grok: "grok_api_key" };
+
     const aiPlatform = analysis.ai_platform || 'claude';
-    try {
-      const configs = await base44.asServiceRole.entities.PlatformConfig.filter({});
-      const cfg = configs[0];
-      const cfgField = PLATFORM_CONFIG_FIELDS[aiPlatform];
-      if (cfg && cfgField && cfg[cfgField]) { apiKey = cfg[cfgField]; keySource = 'sc_platform'; }
-    } catch (e) { console.warn('[generateAnalysis] PlatformConfig lookup failed:', e.message); }
-    if (!apiKey) {
-      const envVar = PLATFORM_ENV_VARS[aiPlatform];
-      apiKey = envVar ? Deno.env.get(envVar) : null;
-    }
+    const cfgField   = PLATFORM_CFG_FIELDS[aiPlatform];
+    let apiKey       = (cfgField && cfg[cfgField]) ? cfg[cfgField] : (Deno.env.get(PLATFORM_ENV_VARS[aiPlatform]) || null);
+    let keySource    = cfgField && cfg[cfgField] ? 'sc_platform' : 'env';
+
     if (!apiKey) return Response.json({ error: `No API key configured for platform: ${aiPlatform}` }, { status: 402 });
 
-    // Resolve AVM keys inline
-    const resolveAvmKeys = async () => {
-      let perpKey = null, openaiKey = null;
-      try {
-        const configs = await base44.asServiceRole.entities.PlatformConfig.filter({});
-        const cfg = configs[0];
-        if (cfg?.perplexity_api_key) perpKey = cfg.perplexity_api_key;
-        if (cfg?.openai_api_key) openaiKey = cfg.openai_api_key;
-      } catch (e) {}
-      if (!perpKey) perpKey = Deno.env.get("PERPLEXITY_API_KEY") || null;
-      if (!openaiKey) openaiKey = Deno.env.get("OPENAI_API_KEY") || null;
-      return { perpKey, openaiKey };
+    const perpKey   = cfg.perplexity_api_key || Deno.env.get("PERPLEXITY_API_KEY") || null;
+    const openaiKey = cfg.openai_api_key     || Deno.env.get("OPENAI_API_KEY")     || null;
+    const getKey    = (platform) => {
+      const cfgF = PLATFORM_CFG_FIELDS[platform];
+      return (cfgF && cfg[cfgF]) ? cfg[cfgF] : (Deno.env.get(PLATFORM_ENV_VARS[platform] || '') || null);
     };
 
-    // Assemble prompt inline (baseline — library prompts handled in pipeline path below)
-    const buildBaselinePrompt = (a) => {
-      const d = a.intake_data || {};
-      const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-      return `ASSESSMENT TYPE: ${a.assessment_type?.replace(/_/g, " ").toUpperCase()}\nPROPERTY TYPE: ${a.property_type?.replace(/_/g, " ")}\nADDRESS: ${d.address || "Not provided"}\nLOCATION CLASS: ${a.location_class || "unknown"}\nCLIENT RELATIONSHIP: ${d.client_relationship || "buyer's agent"}\nTODAY'S DATE: ${today}\n\nINTAKE DATA:\n${JSON.stringify(d, null, 2)}\n\nPerform a complete PropPrompt™ analysis for the above property. Follow the JSON schema and all instructions in the system prompt exactly. Return a single JSON object with all required fields populated with real, specific data for this property, location, and market conditions.`;
-    };
-
-    // Try to get assembled prompt from PromptLibrary (full_assembled / baseline)
-    let prompt = buildBaselinePrompt(analysis);
-    try {
-      const libraryPrompts = await base44.asServiceRole.entities.PromptLibrary.filter({ is_active: true, prompt_section: 'full_assembled' });
-      const match = libraryPrompts.find(p => p.ai_platform === aiPlatform && p.assessment_type === analysis.assessment_type)
-        || libraryPrompts.find(p => p.ai_platform === aiPlatform && p.property_type === 'all')
-        || libraryPrompts.find(p => p.ai_platform === 'generic');
-      if (match?.prompt_text && !match.prompt_text.startsWith('ENC:') && !match.prompt_text.startsWith('FILE:')) {
-        prompt = match.prompt_text;
-      }
-    } catch (e) { console.warn('[generateAnalysis] PromptLibrary lookup failed, using baseline:', e.message); }
-
-    // ── AUTO-FETCH COMPS if none were pre-loaded ────────────────────────────
+    // ── AUTO-FETCH COMPS (if none provided) + TIER LOOKUP + PROMPT LIBRARY — all parallel ──
     let agentComps = analysis.agent_comps || [];
     const needsComps = agentComps.length === 0 && analysis.intake_data?.address &&
       ['listing_pricing', 'cma', 'investment_analysis', 'client_portfolio'].includes(analysis.assessment_type);
 
-    if (needsComps) {
-      console.log('[generateAnalysis] No comps on analysis — auto-fetching inline for:', analysis.intake_data.address);
-      try {
-        const d = analysis.intake_data;
+    const [compsResult, subsResult, allLibraryPrompts] = await Promise.all([
+      // Auto-fetch comps if needed
+      needsComps ? (async () => {
         const rentcastKey = Deno.env.get('RENTCAST_API_KEY');
-        if (rentcastKey) {
-          const rcParams = new URLSearchParams({
-            address: d.address,
-            propertyType: { single_family: 'Single Family', condo: 'Condo', multi_family: 'Multi-Family', land: 'Land' }[analysis.property_type] || 'Single Family',
-            compCount: '10',
-            daysOld: '730',
-          });
-          if (d.bedrooms)  rcParams.set('bedrooms',      String(Number(d.bedrooms)));
-          if (d.bathrooms) rcParams.set('bathrooms',     String(Number(d.bathrooms)));
-          if (d.sqft)      rcParams.set('squareFootage', String(Number(d.sqft)));
+        if (!rentcastKey) return null;
+        const d = analysis.intake_data;
+        const rcParams = new URLSearchParams({
+          address: d.address,
+          propertyType: { single_family: 'Single Family', condo: 'Condo', multi_family: 'Multi-Family', land: 'Land' }[analysis.property_type] || 'Single Family',
+          compCount: '10',
+          daysOld: '730',
+        });
+        if (d.bedrooms)  rcParams.set('bedrooms',      String(Number(d.bedrooms)));
+        if (d.bathrooms) rcParams.set('bathrooms',     String(Number(d.bathrooms)));
+        if (d.sqft)      rcParams.set('squareFootage', String(Number(d.sqft)));
+        const rcRes = await fetch(`https://api.rentcast.io/v1/avm/value?${rcParams.toString()}`, {
+          headers: { 'X-Api-Key': rentcastKey, 'Accept': 'application/json' },
+        });
+        if (!rcRes.ok) { console.warn('[generateAnalysis] RentCast error:', rcRes.status); return null; }
+        const rcData = await rcRes.json();
+        return (rcData.comparables || []).filter(c => c.price && c.formattedAddress).map(c => {
+          const price = Number(c.price);
+          const sqftVal = Number(c.squareFootage) || null;
+          return {
+            address: c.formattedAddress, sale_price: price || null,
+            sale_date: (c.lastSaleDate || c.listedDate || '').slice(0, 10) || null,
+            sqft: sqftVal, bedrooms: c.bedrooms ? Number(c.bedrooms) : null,
+            bathrooms: c.bathrooms ? Number(c.bathrooms) : null,
+            price_per_sqft: (price && sqftVal) ? Math.round(price / sqftVal) : null,
+            source: 'rentcast', agent_excluded: false, agent_notes: '',
+          };
+        });
+      })().catch(e => { console.warn('[generateAnalysis] Comps fetch failed:', e.message); return null; })
+      : Promise.resolve(null),
 
-          const rcRes = await fetch(`https://api.rentcast.io/v1/avm/value?${rcParams.toString()}`, {
-            headers: { 'X-Api-Key': rentcastKey, 'Accept': 'application/json' },
-          });
-          if (rcRes.ok) {
-            const rcData = await rcRes.json();
-            const rawComps = rcData.comparables || [];
-            console.log(`[generateAnalysis] RentCast inline returned ${rawComps.length} comps`);
-            const fetchedComps = rawComps
-              .filter(c => c.price && c.formattedAddress)
-              .map(c => {
-                const price = Number(c.price);
-                const sqftVal = Number(c.squareFootage) || null;
-                return {
-                  address: c.formattedAddress,
-                  sale_price: price || null,
-                  sale_date: (c.lastSaleDate || c.listedDate || '').slice(0, 10) || null,
-                  sqft: sqftVal,
-                  bedrooms: c.bedrooms ? Number(c.bedrooms) : null,
-                  bathrooms: c.bathrooms ? Number(c.bathrooms) : null,
-                  price_per_sqft: (price && sqftVal) ? Math.round(price / sqftVal) : null,
-                  source: 'rentcast',
-                  agent_excluded: false,
-                  agent_notes: '',
-                };
-              });
+      // Tier lookup
+      base44.asServiceRole.entities.TerritorySubscription.filter({ user_id: user.id })
+        .catch(() => []),
 
-            if (fetchedComps.length > 0) {
-              agentComps = fetchedComps;
-              console.log(`[generateAnalysis] Auto-fetched ${agentComps.length} comps from RentCast`);
-              await base44.asServiceRole.entities.Analysis.update(analysisId, {
-                agent_comps: agentComps,
-                raw_batchdata_comps: agentComps,
-                comps_fetched_at: new Date().toISOString(),
-                comps_search_tier: 'rentcast',
-                comps_source: 'api_verified',
-              });
-            }
-          } else {
-            console.warn('[generateAnalysis] RentCast inline error:', rcRes.status);
-          }
-        }
-      } catch (compFetchErr) {
-        console.warn('[generateAnalysis] Auto comp fetch failed (non-fatal):', compFetchErr.message);
-      }
+      // PromptLibrary
+      base44.asServiceRole.entities.PromptLibrary.filter({ is_active: true })
+        .catch(() => []),
+    ]);
+
+    // Resolve comps
+    if (compsResult && compsResult.length > 0) {
+      agentComps = compsResult;
+      console.log(`[generateAnalysis] Auto-fetched ${agentComps.length} comps from RentCast`);
+      await base44.asServiceRole.entities.Analysis.update(analysisId, {
+        agent_comps: agentComps, raw_batchdata_comps: agentComps,
+        comps_fetched_at: new Date().toISOString(), comps_search_tier: 'rentcast', comps_source: 'api_verified',
+      }).catch(() => {});
     }
 
-    // Inject data quality flag based on comp count
-    const valuationConsistencyRule = `\n\nVALUATION ACCURACY RULES — CRITICAL — READ CAREFULLY:
-1. IMPLIED VALUE RANGE: Must be derived ONLY from Tier A (same-town) comps using their adjusted PPSF × subject square footage, with recency weighting applied. Tier C comps are REFERENCE ONLY — they must NEVER pull the implied_value_range down.
-2. DO NOT DISCOUNT FOR REPORT TYPE: A portfolio review MUST produce the same value range as a listing pricing analysis for the same property and comp set. Never apply a "conservative" or "ownership" discount just because this is a portfolio review.
-3. DO NOT INVENT DOWNWARD ADJUSTMENTS: Do not apply blanket discounts for age, vintage, or subjective condition without a specific comp-supported reason. The comps provided are the ground truth.
-4. AVM AS SANITY CHECK: If AVM data is provided, use it as a reasonableness check. If your implied_value_range is more than 10% below ALL available AVM estimates with no specific data-supported reason, you are undervaluing. Recalibrate.
-5. RECENCY ANCHOR: If there are Tier A comps from the last 6 months, the implied_value_range LOW must not be below the lowest recent Tier A comp's adjusted PPSF × subject sqft. Recent sales set the floor.
-6. STATED VALUE: If the agent has provided an "estimated_current_value" or "client_estimate" in the intake data, this is their professional opinion — treat it as a data point alongside the comps, not something to discount.`;
-    let dataQualityBlock = '';
-    if (agentComps.length >= 3) {
-      dataQualityBlock = `\n\nDATA QUALITY: green\nCOMPARABLE SALES SOURCE: Perplexity AI research (verified)\nCOMP COUNT: ${agentComps.length}\nSet data_quality_flag to 'green' in the output JSON.${valuationConsistencyRule}`;
-    } else if (agentComps.length > 0) {
-      dataQualityBlock = `\n\nDATA QUALITY: yellow\nCOMPARABLE SALES SOURCE: Perplexity AI research\nCOMP COUNT: ${agentComps.length}\nNote: Limited comp availability. Set confidence_level to 'low' in the output JSON. Note this limitation briefly in the valuation narrative.\nSet data_quality_flag to 'yellow'.${valuationConsistencyRule}`;
-    } else {
-      dataQualityBlock = `\n\nDATA QUALITY: red\nCOMPARABLE SALES: None provided.\n\n⚠️ CRITICAL INSTRUCTIONS FOR ZERO-COMP SCENARIO:\n- Set data_quality_flag to 'red' in the output JSON\n- Set implied_value_range to null\n- Set confidence_level to 'insufficient_data'\n- In the valuation.narrative field, clearly state that no comparable sales data was provided and a defensible valuation range cannot be established\n- Do NOT write speculative valuation language like "likely exceeds $X" or "suggests current market value"\n- Do NOT reference appreciation patterns or prior sale price as a proxy for current value\n- DO generate all other sections fully: market context, buyer archetypes, migration analysis, AVM analysis, pricing scenarios\n- The tiered_comps.comps array must be empty []\n- The report is still valuable for context — just not for valuation`;
-    }
-    prompt += dataQualityBlock;
+    // Resolve tier
+    let tier = 'starter';
+    try {
+      const activeSub = subsResult.find(s => s.status === 'active');
+      if (activeSub?.tier) tier = activeSub.tier;
+    } catch (e) { /* default */ }
+    if (user.role === 'platform_owner' || user.role === 'admin') tier = 'team';
+    const isPro = ['pro', 'team', 'broker', 'brokerage', 'enterprise'].includes(tier);
 
-    // Inject comp details if available
-    if (agentComps.length > 0) {
-      const compsRadius = analysis.comps_search_radius ? `${analysis.comps_search_radius} miles` : 'unknown';
-      prompt += `\n\nCOMPARABLE SALES DETAILS (Use ONLY these — do not invent or substitute):\nSearch radius: ${compsRadius}\n${JSON.stringify(agentComps, null, 2)}`;
-    }
+    // ── MARK IN_PROGRESS before starting AI work ─────────────────────────────
+    await base44.asServiceRole.entities.Analysis.update(analysisId, { status: "in_progress" });
 
-    // Inject prior sale history if present
-    if (analysis.prior_sale_price || analysis.prior_sale_year) {
-      prompt += `\n\nPRIOR SALE HISTORY:\n  Last known sale price: ${analysis.prior_sale_price ? '$' + analysis.prior_sale_price.toLocaleString() : 'unknown'}\n  Year of last sale: ${analysis.prior_sale_year || 'unknown'}\nUse this to cross-check valuation and flag anomalies.`;
-    }
+    // ── ALL ENRICHMENT IN PARALLEL (AVM + neighborhood + walk + flood + schools + town-intel) ──
+    const enrichmentTimeout = analysis.assessment_type === 'client_portfolio' ? 35000 : 25000;
+    const enrichment = await withTimeout(
+      fetchAllEnrichment(analysis, perpKey, openaiKey),
+      enrichmentTimeout,
+      'enrichment-sweep'
+    ).catch(e => {
+      console.warn('[generateAnalysis] Enrichment sweep timed out or failed:', e.message);
+      return { avm: null, neighborhood: null, walkability: null, flood: null, schools: null, townIntel: null };
+    });
 
-    // ── EQUITY OPTIONS INJECTION (client_portfolio only) ─────────────────────
-  if (analysis.assessment_type === 'client_portfolio') {
-    const d = analysis.intake_data || {};
-    prompt += `\n\nEQUITY OPTIONS ANALYSIS — REQUIRED FOR CLIENT PORTFOLIO:
-You MUST include an "equity_options" array in your output JSON with EXACTLY these 5 options, each customized to this property and seller's situation. Use the intake data (estimated value, mortgage balance, years owned, etc.) to make each option financially specific.
-
-Structure each option as:
-{
-  "id": "move_up|downsize|heloc|refinance|renovate",
-  "title": "Human-readable title",
-  "tagline": "One sentence hook",
-  "estimated_equity": <number or null>,
-  "option_summary": "2-3 sentence explanation of this path for this specific client",
-  "financial_snapshot": {
-    "estimated_home_value": <number or null>,
-    "estimated_mortgage_balance": <number or null>,
-    "estimated_gross_equity": <number or null>,
-    "closing_costs_estimate": <number or null>,
-    "net_equity_available": <number or null>,
-    "notes": "brief note on assumptions"
-  },
-  "pros": ["Pro 1", "Pro 2", "Pro 3"],
-  "cons": ["Con 1", "Con 2"],
-  "ideal_if": "One sentence describing the client profile for whom this is the best fit",
-  "market_timing": "favorable|neutral|unfavorable",
-  "market_timing_reason": "One sentence on why now is or isn't a good time for this option"
-}
-
-Option guidance:
-- move_up: "Move Up / Upgrade" — use equity as down payment on a larger/better home. Calculate purchasing power.
-- downsize: "Downsize & Cash Out" — sell, take equity, reduce housing costs. Quantify monthly savings potential.
-- heloc: "HELOC / Home Equity Line" — access equity without selling. Estimate available credit line at 80% LTV.
-- refinance: "Cash-Out Refinance" — pull equity via refi. Note current rate environment impact. Flag if rates are unfavorable.
-- renovate: "Renovate & Hold" — invest equity in improvements to increase value. Suggest highest-ROI projects for this property type and market.
-
-Set "market_timing" based on the current rate environment and local market conditions you've analyzed.
-Address ${d.address || 'this property'} specifically in each option narrative.`;
-  }
-
-  // ── DESIGN & RENOVATION TRENDS (client_portfolio only) ───────────────────
-  if (analysis.assessment_type === 'client_portfolio') {
-    const currentYear = new Date().getFullYear();
-    prompt += `\n\nDESIGN & RENOVATION TRENDS — REQUIRED FOR CLIENT PORTFOLIO:
-You MUST include a "design_trends" object in your output JSON. Use your knowledge of current design trends and real estate data for ${currentYear} to populate this. Make all recommendations specific to the New England / Northeast market and relevant to the property type and price point of this home.
-
-Structure:
-{
-  "trend_year": ${currentYear},
-  "intro": "1-2 sentence framing paragraph for the agent to introduce this section to the client",
-  "kitchen_styles": [
-    {
-      "trend": "Trend name (e.g. 'Warm Minimalism')",
-      "description": "2 sentences on what this looks like and why it's popular",
-      "roi_estimate": "e.g. '70-80% ROI on mid-range kitchen remodel'",
-      "cost_range": "e.g. '$18,000 – $45,000'",
-      "relevance_to_subject": "1 sentence on how relevant this is to THIS property"
-    }
-  ],
-  "paint_colors": [
-    {
-      "color_name": "Color name (e.g. 'Sherwin-Williams Alabaster')",
-      "brand_swatch": "Brand and collection (e.g. 'Sherwin-Williams 2025 Color of the Year')",
-      "hex_approx": "#hex value approximation",
-      "mood": "e.g. 'Warm, inviting, photogenic for listings'",
-      "best_for": "e.g. 'Living rooms, open-plan kitchens'",
-      "why_now": "1 sentence on why this color is trending in ${currentYear}"
-    }
-  ],
-  "popular_renovations": [
-    {
-      "renovation": "Renovation name",
-      "avg_cost": "e.g. '$8,000 – $20,000'",
-      "avg_roi": "e.g. '80%'",
-      "time_to_complete": "e.g. '2-4 weeks'",
-      "impact": "listing_appeal|value_add|both",
-      "description": "2 sentences on the renovation and its market impact in the Northeast",
-      "priority": "high|medium|low",
-      "relevant_to_subject": true
-    }
-  ],
-  "staging_tips": [
-    "Tip 1 specific to this property type and price point",
-    "Tip 2",
-    "Tip 3",
-    "Tip 4"
-  ],
-  "agent_talking_points": [
-    "Key talking point 1 the agent can use with this client about renovating vs. selling as-is",
-    "Key talking point 2"
-  ]
-}
-
-Include 2-3 kitchen styles, 4-6 paint colors, and 5-7 renovations ranked by ROI for this property type.
-Sort renovations by priority (high first). Mark relevant_to_subject=false for renovations that don't apply (e.g. deck addition for a condo).`;
-  }
-
-  // ── LISTING PHOTO ANALYSIS (vision) ─────────────────────────────────────
+    // ── PHOTO ANALYSIS (if photos provided) — run after enrichment since it uses base44 integration ──
+    let photoPromptBlock = '';
     const listingPhotos = analysis.listing_photos || analysis.intake_data?.listing_photos || [];
     const conditionOverride = analysis.condition_override || analysis.intake_data?.condition_override || null;
     if (listingPhotos.length > 0) {
-      console.log(`[generateAnalysis] Analyzing ${listingPhotos.length} listing photo(s) for condition scoring`);
+      console.log(`[generateAnalysis] Analyzing ${listingPhotos.length} listing photo(s)`);
       try {
         const photoAnalysis = await base44.integrations.Core.InvokeLLM({
-          prompt: `You are a professional real estate appraiser reviewing listing photos for ${analysis.intake_data?.address || 'this property'}.
-Analyze these listing photos and provide a condition assessment. Return ONLY valid JSON:
-{
-  "overall_condition": "excellent|good|average|below_average|poor",
-  "condition_vs_market": "superior|similar|inferior",
-  "renovation_level": "fully_renovated|updated|original_good|needs_updating|needs_work",
-  "finish_quality": "luxury|above_average|standard|below_standard",
-  "key_positives": ["list", "of", "positive", "features", "visible"],
-  "key_concerns": ["any", "visible", "issues"],
-  "ppsf_adjustment_recommendation": "A number between -15 and +20 representing the % adjustment vs a standard 'Similar' comp based on condition alone. E.g. 12 means this property likely commands 12% more per SF than average.",
-  "confidence": "high|medium|low",
-  "notes": "Brief summary for the agent"
-}`,
+          prompt: `You are a professional real estate appraiser reviewing listing photos for ${analysis.intake_data?.address || 'this property'}. Analyze these listing photos and provide a condition assessment. Return ONLY valid JSON: {"overall_condition":"excellent|good|average|below_average|poor","condition_vs_market":"superior|similar|inferior","renovation_level":"fully_renovated|updated|original_good|needs_updating|needs_work","finish_quality":"luxury|above_average|standard|below_standard","key_positives":["feature"],"key_concerns":["issue"],"ppsf_adjustment_recommendation":12,"confidence":"high|medium|low","notes":"Brief summary"}`,
           file_urls: listingPhotos.slice(0, 6),
           model: 'claude_sonnet_4_6',
           response_json_schema: {
             type: "object",
             properties: {
-              overall_condition: { type: "string" },
-              condition_vs_market: { type: "string" },
-              renovation_level: { type: "string" },
-              finish_quality: { type: "string" },
+              overall_condition: { type: "string" }, condition_vs_market: { type: "string" },
+              renovation_level: { type: "string" }, finish_quality: { type: "string" },
               key_positives: { type: "array", items: { type: "string" } },
               key_concerns: { type: "array", items: { type: "string" } },
               ppsf_adjustment_recommendation: { type: "number" },
-              confidence: { type: "string" },
-              notes: { type: "string" }
+              confidence: { type: "string" }, notes: { type: "string" },
             }
           }
         });
         if (photoAnalysis?.overall_condition) {
-          prompt += `\n\nLISTING PHOTO ANALYSIS (AI Vision — ${listingPhotos.length} photos analyzed):
+          photoPromptBlock = `\n\nLISTING PHOTO ANALYSIS (AI Vision — ${listingPhotos.length} photos analyzed):
 Condition: ${photoAnalysis.overall_condition} | vs Market: ${photoAnalysis.condition_vs_market} | Renovation: ${photoAnalysis.renovation_level} | Finish: ${photoAnalysis.finish_quality}
 Positives: ${(photoAnalysis.key_positives || []).join(', ')}
 Concerns: ${(photoAnalysis.key_concerns || []).join(', ') || 'None noted'}
 PPSF Adjustment Recommendation: ${photoAnalysis.ppsf_adjustment_recommendation > 0 ? '+' : ''}${photoAnalysis.ppsf_adjustment_recommendation}% vs similar comps
 Notes: ${photoAnalysis.notes}
-
-CRITICAL: Use this photo analysis to weight comparable sales. If condition_vs_market is 'superior', anchor toward the higher-PPSF comps and apply the recommended PPSF adjustment. If 'inferior', anchor toward lower-PPSF comps. Do not default all comps to 'Similar' — use the photo-derived condition assessment above.`;
+CRITICAL: Use this photo analysis to weight comparable sales appropriately.`;
           console.log('[generateAnalysis] Photo analysis complete:', photoAnalysis.condition_vs_market, 'adj:', photoAnalysis.ppsf_adjustment_recommendation);
         }
       } catch (photoErr) {
@@ -1121,314 +1059,74 @@ CRITICAL: Use this photo analysis to weight comparable sales. If condition_vs_ma
     } else if (conditionOverride) {
       const conditionMap = {
         fully_renovated: { label: 'Fully Renovated', adjustment: '+15%', comp_weight: 'Weight toward superior comps' },
-        updated: { label: 'Updated / Improved', adjustment: '+8%', comp_weight: 'Weight toward upper-middle comps' },
-        original_good: { label: 'Original — Good Condition', adjustment: '0%', comp_weight: 'Weight toward similar comps' },
-        needs_work: { label: 'Needs Work', adjustment: '-10%', comp_weight: 'Weight toward inferior comps' },
+        updated:         { label: 'Updated / Improved', adjustment: '+8%', comp_weight: 'Weight toward upper-middle comps' },
+        original_good:   { label: 'Original — Good Condition', adjustment: '0%', comp_weight: 'Weight toward similar comps' },
+        needs_work:      { label: 'Needs Work', adjustment: '-10%', comp_weight: 'Weight toward inferior comps' },
       };
       const cm = conditionMap[conditionOverride] || {};
-      prompt += `\n\nAGENT CONDITION OVERRIDE (no photos provided):
+      photoPromptBlock = `\n\nAGENT CONDITION OVERRIDE (no photos provided):
 Condition: ${cm.label || conditionOverride}
 Recommended PPSF adjustment: ${cm.adjustment || 'neutral'}
-Instruction: ${cm.comp_weight || 'Use agent-provided condition to weight comps appropriately.'}
-Apply this condition assessment when weighting comparable sales and setting implied value range.`;
+Instruction: ${cm.comp_weight || 'Use agent-provided condition to weight comps appropriately.'}`;
     }
 
-    // ── MICRO-NEIGHBORHOOD SCORING via Perplexity ────────────────────────────
-    const isNeighborhoodType = ['listing_pricing', 'cma', 'client_portfolio', 'buyer_intelligence'].includes(analysis.assessment_type);
-    if (isNeighborhoodType && analysis.intake_data?.address) {
-      const town = (analysis.intake_data.address.split(',')[1] || '').trim();
-      if (town) {
-        try {
-          const { perpKey } = await resolveAvmKeys();
-          if (perpKey) {
-            console.log('[generateAnalysis] Fetching micro-neighborhood data for:', town);
-            const neighborhoodRes = await fetch('https://api.perplexity.ai/chat/completions', {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${perpKey}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                model: 'sonar-pro',
-                messages: [{
-                  role: 'user',
-                  content: `For ${town}, Massachusetts real estate: What are the premium vs. average/below-average micro-neighborhoods, streets, or zones that affect single-family home values?
-Consider: MBTA/commuter rail proximity, school attendance zones within the town, historically desirable streets, commercial/highway noise zones, flood zones.
-Return ONLY valid JSON:
-{"median_ppsf": 625, "neighborhoods": [{"name": "area name", "premium_pct": 15, "tier": "premium", "reason": "brief reason"}, ...]}`
-                }],
-                search_context_size: 'medium',
-              }),
-            });
-            if (neighborhoodRes.ok) {
-              const nData = await neighborhoodRes.json();
-              const nText = (nData.choices?.[0]?.message?.content || '').trim();
-              let nJson = null;
-              try {
-                const match = nText.match(/\{[\s\S]*\}/);
-                if (match) nJson = JSON.parse(match[0]);
-              } catch (e) {}
-              if (nJson?.neighborhoods?.length > 0) {
-                prompt += `\n\nMICRO-NEIGHBORHOOD INTELLIGENCE FOR ${town.toUpperCase()} (Perplexity research):
-Town median PPSF: ~$${nJson.median_ppsf || 'unknown'}/SF
-Neighborhood tiers:
-${nJson.neighborhoods.map(n => `  • ${n.name}: ${n.premium_pct > 0 ? '+' : ''}${n.premium_pct}% (${n.tier}) — ${n.reason}`).join('\n')}
+    // ── BUILD BASELINE PROMPT ─────────────────────────────────────────────────
+    const d = analysis.intake_data || {};
+    const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+    let prompt = `ASSESSMENT TYPE: ${analysis.assessment_type?.replace(/_/g, " ").toUpperCase()}\nPROPERTY TYPE: ${analysis.property_type?.replace(/_/g, " ")}\nADDRESS: ${d.address || "Not provided"}\nLOCATION CLASS: ${analysis.location_class || "unknown"}\nCLIENT RELATIONSHIP: ${d.client_relationship || "buyer's agent"}\nTODAY'S DATE: ${today}\n\nINTAKE DATA:\n${JSON.stringify(d, null, 2)}\n\nPerform a complete PropPrompt™ analysis for the above property. Follow the JSON schema and all instructions in the system prompt exactly.`;
 
-CRITICAL: Determine which micro-neighborhood the subject property at ${analysis.intake_data.address} is in. Apply the appropriate premium or discount to the PPSF when computing the implied value range. Also apply micro-neighborhood adjustments to Tier C comps from adjacent towns. State the neighborhood tier determination in the valuation narrative.`;
-                console.log('[generateAnalysis] Micro-neighborhood data injected:', nJson.neighborhoods.length, 'zones');
-              }
-            }
-          }
-        } catch (nbErr) {
-          console.warn('[generateAnalysis] Micro-neighborhood fetch failed (non-fatal):', nbErr.message);
-        }
-      }
-    }
-
-    // ── WALKABILITY / FLOOD ZONE / SCHOOLS / TOWN INTELLIGENCE — parallel Perplexity lookups ────
-    const isLocationContextType = ['listing_pricing', 'cma', 'client_portfolio', 'buyer_intelligence', 'investment_analysis'].includes(analysis.assessment_type);
-    if (isLocationContextType && analysis.intake_data?.address) {
-      try {
-        const { perpKey } = await resolveAvmKeys();
-        if (perpKey) {
-          const addr = analysis.intake_data.address;
-          const town = (addr.split(',')[1] || '').trim() || addr;
-          console.log('[generateAnalysis] Fetching walkability/flood/schools/town-intelligence for:', addr);
-
-          const locResults = await withTimeout(Promise.allSettled([
-            // Walk Score + transit + bike
-            fetch('https://api.perplexity.ai/chat/completions', {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${perpKey}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                model: 'sonar-pro',
-                messages: [{ role: 'user', content: `What is the Walk Score, Transit Score, and Bike Score for ${addr}? Search walkscore.com or any reliable source. Return ONLY valid JSON: {"walk_score": 72, "walk_label": "Very Walkable", "transit_score": 45, "transit_label": "Some Transit", "bike_score": 55, "bike_label": "Bikeable", "source": "Walk Score", "notes": "brief context"}` }],
-                search_context_size: 'low',
-              }),
-            }).then(r => r.json()),
-
-            // FEMA flood zone
-            fetch('https://api.perplexity.ai/chat/completions', {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${perpKey}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                model: 'sonar-pro',
-                messages: [{ role: 'user', content: `What is the FEMA flood zone designation for ${addr}? Search FEMA Flood Map Service Center (msc.fema.gov) or the local floodplain maps. Return ONLY valid JSON: {"flood_zone": "X", "flood_zone_description": "Minimal Flood Hazard", "panel_number": "25021C0234H", "effective_date": "2014-07-17", "insurance_required": false, "risk_level": "low", "notes": "brief context or caveats"}` }],
-                search_context_size: 'low',
-              }),
-            }).then(r => r.json()),
-
-            // Nearby schools
-            fetch('https://api.perplexity.ai/chat/completions', {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${perpKey}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                model: 'sonar-pro',
-                messages: [{ role: 'user', content: `What are the assigned public schools (elementary, middle, high school) for a property at ${addr}? Also list any nearby highly-rated private or charter schools within 3 miles. Include GreatSchools ratings where available. Return ONLY valid JSON: {"assigned_schools": [{"name": "Lincoln Elementary", "type": "elementary", "grades": "K-5", "distance_miles": 0.4, "rating": 8, "rating_source": "GreatSchools"}], "nearby_notable": [{"name": "Brookline High", "type": "high", "grades": "9-12", "distance_miles": 1.2, "rating": 9, "rating_source": "GreatSchools", "public_private": "public"}]}` }],
-                search_context_size: 'medium',
-              }),
-            }).then(r => r.json()),
-
-            // Town development & MA housing policy intelligence (client_portfolio only)
-            analysis.assessment_type === 'client_portfolio'
-              ? fetch('https://api.perplexity.ai/chat/completions', {
-                  method: 'POST',
-                  headers: { 'Authorization': `Bearer ${perpKey}`, 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    model: 'sonar',
-                    messages: [{ role: 'user', content: `Research the following for ${town}, Massachusetts and Massachusetts statewide housing policy as of ${new Date().getFullYear()}:
-
-1. TOWN DEVELOPMENTS: What major development projects, infrastructure improvements, rezoning efforts, or town planning initiatives are recently approved, under construction, or proposed in ${town}, MA? Include projects like new commercial developments, transit improvements, school construction, park improvements, downtown revitalization, or major employer relocations. Note whether each is likely to positively or negatively affect residential home values and in what timeframe.
-
-2. MA HOUSING POLICY: What recent or upcoming Massachusetts state housing laws, policies, or mandates are affecting residential property owners and values? Include things like: the MBTA Communities Act/zoning mandates, short-term rental regulations, property tax relief programs, climate/energy compliance requirements, ADU legislation, foreclosure moratoriums, or any new assessor valuation rules.
-
-Return ONLY valid JSON:
-{
-  "town_developments": [
-    {
-      "project": "project name",
-      "type": "infrastructure|commercial|rezoning|school|transit|park|employer|other",
-      "status": "approved|under_construction|proposed|completed",
-      "description": "2 sentence description of the project",
-      "value_impact": "positive|negative|neutral|mixed",
-      "impact_reason": "1 sentence on why this affects home values",
-      "timeline": "e.g. 'Completion expected 2026'",
-      "impact_magnitude": "high|medium|low"
-    }
-  ],
-  "ma_housing_policies": [
-    {
-      "policy": "policy name",
-      "category": "zoning|tax|rental|energy|adu|foreclosure|assessment|other",
-      "status": "enacted|pending|proposed",
-      "effective_date": "e.g. 'January 2025' or null",
-      "description": "2 sentence plain-English explanation for a homeowner",
-      "owner_impact": "positive|negative|neutral|mixed",
-      "impact_reason": "1 sentence on how this affects this homeowner specifically",
-      "action_required": true or false,
-      "action_note": "What action the homeowner may need to take, or null"
-    }
-  ],
-  "overall_outlook": "bullish|cautious|neutral",
-  "outlook_summary": "2-3 sentence summary of the combined development and policy environment for ${town} homeowners right now"
-}` }],
-                    search_context_size: 'medium',
-                  }),
-                }).then(r => r.json())
-              : Promise.resolve(null),
-          ]), 15000, 'loc-enrichment').catch(() => null);
-          const [walkRes, floodRes, schoolsRes, townIntelRes] = locResults || [{status:'rejected'},{status:'rejected'},{status:'rejected'},{status:'rejected'}];
-
-          // Parse town intelligence (client_portfolio only)
-          if (townIntelRes && townIntelRes.status === 'fulfilled' && townIntelRes.value) {
-            const tiText = (townIntelRes.value?.choices?.[0]?.message?.content || '').trim();
-            try {
-              const tiMatch = tiText.match(/\{[\s\S]*\}/);
-              const tiJson = tiMatch ? JSON.parse(tiMatch[0]) : null;
-              if (tiJson && (tiJson.town_developments?.length > 0 || tiJson.ma_housing_policies?.length > 0)) {
-                const devLines = (tiJson.town_developments || []).map(d =>
-                  `  [${d.status?.toUpperCase() || 'PROJECT'}] ${d.project} (${d.type}) — ${d.value_impact?.toUpperCase()} impact (${d.impact_magnitude}) — ${d.impact_reason} | Timeline: ${d.timeline || 'unknown'}`
-                );
-                const policyLines = (tiJson.ma_housing_policies || []).map(p =>
-                  `  [${p.status?.toUpperCase() || 'POLICY'}] ${p.policy} (${p.category}) — ${p.owner_impact?.toUpperCase()} impact — ${p.impact_reason}${p.action_required ? ' ⚠ ACTION REQUIRED: ' + p.action_note : ''}`
-                );
-                prompt += `\n\nTOWN DEVELOPMENT & MA HOUSING POLICY INTELLIGENCE (Perplexity live research for ${town}):
-
-ACTIVE & UPCOMING TOWN DEVELOPMENTS:
-${devLines.length ? devLines.join('\n') : '  No major developments found'}
-
-MASSACHUSETTS HOUSING POLICIES AFFECTING THIS OWNER:
-${policyLines.length ? policyLines.join('\n') : '  No major new policies found'}
-
-OVERALL OUTLOOK: ${tiJson.overall_outlook?.toUpperCase() || 'NEUTRAL'} — ${tiJson.outlook_summary || ''}
-
-CRITICAL INSTRUCTION: You MUST include a "local_impact" object in the output JSON with this exact structure:
-{
-  "local_impact": {
-    "town": "${town}",
-    "overall_outlook": "${tiJson.overall_outlook || 'neutral'}",
-    "outlook_summary": "...",
-    "town_developments": [ ...same array from research above... ],
-    "ma_housing_policies": [ ...same array from research above... ],
-    "agent_briefing": "3-4 sentence briefing the agent can read aloud to the client summarizing what's happening in ${town} and statewide that directly affects this home's value trajectory"
-  }
-}
-This section should feel like a local market intelligence briefing — specific, current, and actionable. Reference actual project names and policy names. Do NOT genericize.`;
-                console.log('[generateAnalysis] Town intelligence injected:', tiJson.town_developments?.length, 'developments,', tiJson.ma_housing_policies?.length, 'policies');
-              }
-            } catch (e) { console.warn('[generateAnalysis] Town intelligence parse failed:', e.message); }
-          }
-
-          // Parse walk score
-          if (walkRes.status === 'fulfilled') {
-            const wText = (walkRes.value?.choices?.[0]?.message?.content || '').trim();
-            try {
-              const wMatch = wText.match(/\{[\s\S]*\}/);
-              const wJson = wMatch ? JSON.parse(wMatch[0]) : null;
-              if (wJson?.walk_score != null) {
-                prompt += `\n\nWALKABILITY SCORES (Walk Score research):
-Walk Score: ${wJson.walk_score}/100 — ${wJson.walk_label || ''}
-Transit Score: ${wJson.transit_score != null ? wJson.transit_score + '/100' : 'N/A'} — ${wJson.transit_label || ''}
-Bike Score: ${wJson.bike_score != null ? wJson.bike_score + '/100' : 'N/A'} — ${wJson.bike_label || ''}
-${wJson.notes ? 'Notes: ' + wJson.notes : ''}
-Include these scores in the output JSON as: "property_context": { "walkability": { "walk_score": N, "walk_label": "...", "transit_score": N, "transit_label": "...", "bike_score": N, "bike_label": "...", "notes": "..." } }. Reference them in buyer archetype language when relevant (e.g. walkability matters to urban downsizers; transit score matters to commuters).`;
-                console.log('[generateAnalysis] Walk Score injected:', wJson.walk_score);
-              }
-            } catch (e) { console.warn('[generateAnalysis] Walk Score parse failed:', e.message); }
-          }
-
-          // Parse flood zone
-          if (floodRes.status === 'fulfilled') {
-            const fText = (floodRes.value?.choices?.[0]?.message?.content || '').trim();
-            try {
-              const fMatch = fText.match(/\{[\s\S]*\}/);
-              const fJson = fMatch ? JSON.parse(fMatch[0]) : null;
-              if (fJson?.flood_zone) {
-                prompt += `\n\nFEMA FLOOD ZONE DATA:
-Zone: ${fJson.flood_zone} — ${fJson.flood_zone_description || ''}
-Risk Level: ${fJson.risk_level || 'unknown'}
-Flood Insurance Required: ${fJson.insurance_required ? 'YES — mandatory for federally-backed mortgages' : 'No (standard zone)'}
-FIRM Panel: ${fJson.panel_number || 'unknown'} | Effective: ${fJson.effective_date || 'unknown'}
-${fJson.notes ? 'Notes: ' + fJson.notes : ''}
-Include this in the output JSON as: "property_context": { ..., "flood_zone": { "flood_zone": "X", "flood_zone_description": "...", "risk_level": "low|moderate|high", "insurance_required": false, "panel_number": "...", "effective_date": "...", "notes": "..." } }. If insurance_required is true, flag this as a risk factor and include an estimated annual premium range in the net proceeds section.`;
-                console.log('[generateAnalysis] Flood zone injected:', fJson.flood_zone);
-              }
-            } catch (e) { console.warn('[generateAnalysis] Flood zone parse failed:', e.message); }
-          }
-
-          // Parse schools
-          if (schoolsRes.status === 'fulfilled') {
-            const sText = (schoolsRes.value?.choices?.[0]?.message?.content || '').trim();
-            try {
-              const sMatch = sText.match(/\{[\s\S]*\}/);
-              const sJson = sMatch ? JSON.parse(sMatch[0]) : null;
-              const assigned = sJson?.assigned_schools || [];
-              const notable = sJson?.nearby_notable || [];
-              if (assigned.length > 0 || notable.length > 0) {
-                const schoolLines = [
-                  ...assigned.map(s => `  [ASSIGNED] ${s.name} (${s.type}, ${s.grades}) — ${s.distance_miles} mi${s.rating ? ' | GreatSchools: ' + s.rating + '/10' : ''}`),
-                  ...notable.map(s => `  [NEARBY] ${s.name} (${s.public_private || s.type}, ${s.grades}) — ${s.distance_miles} mi${s.rating ? ' | GreatSchools: ' + s.rating + '/10' : ''}`),
-                ];
-                prompt += `\n\nSCHOOL DISTRICT & NEARBY SCHOOLS:
-${schoolLines.join('\n')}
-Include this in the output JSON as: "property_context": { ..., "schools": { "assigned_schools": [...], "nearby_notable": [...] } }. Reference top-rated schools in buyer archetype language for family-oriented buyers. If any assigned school has a GreatSchools rating ≥ 8, call it out as a key selling point in the executive summary.`;
-                console.log('[generateAnalysis] Schools injected:', assigned.length, 'assigned,', notable.length, 'notable');
-              }
-            } catch (e) { console.warn('[generateAnalysis] Schools parse failed:', e.message); }
-          }
-        }
-      } catch (locErr) {
-        console.warn('[generateAnalysis] Walk/Flood/Schools fetch failed (non-fatal):', locErr.message);
-      }
-    }
-
-    // AVM lookup via Perplexity + GPT-4o in parallel for listing_pricing, cma, and client_portfolio
-    if (['listing_pricing', 'cma', 'client_portfolio'].includes(analysis.assessment_type)) {
-      const address = analysis.intake_data?.address || '';
-      let avmResult = null;
-      try {
-        const { perpKey, openaiKey } = await resolveAvmKeys();
-        if (address && (perpKey || openaiKey)) {
-          console.log('[generateAnalysis] Fetching AVM data (parallel Perplexity+GPT-4o) for:', address);
-          avmResult = await withTimeout(fetchAVMParallel(perpKey, openaiKey, address), 12000, 'AVM-parallel');
-          console.log('[generateAnalysis] AVM merged result:', avmResult ? Object.keys(avmResult).join(',') : 'null');
-        } else {
-          console.warn('[generateAnalysis] No AVM keys available for lookup');
-        }
-      } catch (avmErr) {
-        console.warn('[generateAnalysis] AVM lookup failed (non-fatal):', avmErr.message);
-      }
-
-      if (avmResult) {
-        prompt += `\n\nAVM PERCEPTION DATA (from live Perplexity search — use ONLY these values, do NOT invent or guess):\n${JSON.stringify(avmResult, null, 2)}\n\nBuild the avm_perception object in the output JSON from this data. Structure:\n{\n  "platforms": [{"name": "Zillow", "estimate": "$X or null", "range_low": "$X or null", "range_high": "$X or null", "trend": "rising/stable/falling or null", "as_of": "Month YYYY or null"}, ...],\n  "composite_average": "average of all non-null estimates as currency string, or null",\n  "avm_vs_professional_gap": "gap between composite and implied_value_range midpoint as currency string, or null",\n  "gap_direction": "professional_higher | avm_higher | aligned",\n  "gap_percent": "e.g. 4.2%",\n  "alignment_narrative": "one sentence explaining gap in plain English for the agent"\n}`;
-      } else {
-        prompt += `\n\nAVM PERCEPTION DATA: null (live search unavailable)\nSet avm_perception to null in the output JSON. Do NOT attempt to search, estimate, look up, or generate any AVM platform values.`;
-      }
-    }
-
-    // Mark as in_progress
-    await base44.asServiceRole.entities.Analysis.update(analysisId, { status: "in_progress" });
-
-    // ── TIER-BASED ROUTING ──────────────────────────────────────────────────
-    let tier = 'starter';
+    // Try PromptLibrary override
     try {
-      const subs = await base44.asServiceRole.entities.TerritorySubscription.filter({ user_id: user.id });
-      const activeSub = subs.find(s => s.status === 'active');
-      if (activeSub?.tier) tier = activeSub.tier;
-      else {
-        const orgs = await base44.asServiceRole.entities.Organization.filter({ id: analysis.org_id });
-        tier = orgs[0]?.subscription_plan || 'starter';
+      const match = allLibraryPrompts.find(p => p.ai_platform === aiPlatform && p.assessment_type === analysis.assessment_type && p.prompt_section === 'full_assembled')
+        || allLibraryPrompts.find(p => p.ai_platform === aiPlatform && p.prompt_section === 'full_assembled')
+        || allLibraryPrompts.find(p => p.ai_platform === 'generic');
+      if (match?.prompt_text && !match.prompt_text.startsWith('ENC:') && !match.prompt_text.startsWith('FILE:')) {
+        prompt = match.prompt_text;
       }
-    } catch (e) {
-      console.warn('[generateAnalysis] tier lookup failed, defaulting to starter:', e.message);
+    } catch (e) { /* use baseline */ }
+
+    // ── DATA QUALITY + COMP INJECTION ────────────────────────────────────────
+    const valuationConsistencyRule = `\n\nVALUATION ACCURACY RULES — CRITICAL:
+1. IMPLIED VALUE RANGE: Must be derived ONLY from Tier A (same-town) comps using adjusted PPSF × subject sqft, with recency weighting. Tier C comps are REFERENCE ONLY.
+2. DO NOT DISCOUNT FOR REPORT TYPE: A portfolio review MUST produce the same value range as a listing pricing analysis for the same property and comp set.
+3. DO NOT INVENT DOWNWARD ADJUSTMENTS without comp-supported reason.
+4. AVM AS SANITY CHECK: If your implied_value_range is more than 10% below ALL AVM estimates with no data-supported reason, you are undervaluing. Recalibrate.
+5. RECENCY ANCHOR: Recent Tier A comps (last 6 months) set the floor for implied_value_range.`;
+
+    if (agentComps.length >= 3) {
+      prompt += `\n\nDATA QUALITY: green\nCOMP COUNT: ${agentComps.length}\nSet data_quality_flag to 'green'.${valuationConsistencyRule}`;
+    } else if (agentComps.length > 0) {
+      prompt += `\n\nDATA QUALITY: yellow\nCOMP COUNT: ${agentComps.length}\nNote: Limited comps. Set confidence_level to 'low'. Set data_quality_flag to 'yellow'.${valuationConsistencyRule}`;
+    } else {
+      prompt += `\n\nDATA QUALITY: red\n⚠️ ZERO COMPS — Set data_quality_flag to 'red', implied_value_range to null, confidence_level to 'insufficient_data'. Do NOT write speculative valuation language. Generate all other sections fully.`;
     }
 
-    // Platform owner and admin always get pro-tier routing
-    if (user.role === 'platform_owner' || user.role === 'admin') {
-      tier = 'team';
+    if (agentComps.length > 0) {
+      prompt += `\n\nCOMPARABLE SALES (Use ONLY these — do not invent or substitute):\n${JSON.stringify(agentComps, null, 2)}`;
     }
 
-    const isPro = tier === 'pro' || tier === 'team' || tier === 'broker' || tier === 'brokerage' || tier === 'enterprise';
+    if (analysis.prior_sale_price || analysis.prior_sale_year) {
+      prompt += `\n\nPRIOR SALE HISTORY:\n  Last known sale price: ${analysis.prior_sale_price ? '$' + Number(analysis.prior_sale_price).toLocaleString() : 'unknown'}\n  Year of last sale: ${analysis.prior_sale_year || 'unknown'}\nUse this to cross-check valuation.`;
+    }
 
-    // Fetch PromptLibrary pipeline prompts if pro+
-    const allLibraryPrompts = await base44.asServiceRole.entities.PromptLibrary.filter({ is_active: true });
+    // ── EQUITY OPTIONS (client_portfolio) ────────────────────────────────────
+    if (analysis.assessment_type === 'client_portfolio') {
+      prompt += `\n\nEQUITY OPTIONS ANALYSIS — REQUIRED FOR CLIENT PORTFOLIO:
+You MUST include an "equity_options" array with EXACTLY these 5 options, each customized to this property:
+move_up (Move Up/Upgrade), downsize (Downsize & Cash Out), heloc (HELOC/Home Equity Line), refinance (Cash-Out Refinance), renovate (Renovate & Hold).
+Each option must include: id, title, tagline, estimated_equity, option_summary, financial_snapshot (with estimated_home_value, estimated_mortgage_balance, estimated_gross_equity, closing_costs_estimate, net_equity_available, notes), pros, cons, ideal_if, market_timing (favorable|neutral|unfavorable), market_timing_reason.
+Address ${d.address || 'this property'} specifically in each option narrative.`;
+
+      const currentYear = new Date().getFullYear();
+      prompt += `\n\nDESIGN & RENOVATION TRENDS — REQUIRED FOR CLIENT PORTFOLIO:
+Include a "design_trends" object with: trend_year (${currentYear}), intro, kitchen_styles (2-3 items with trend/description/roi_estimate/cost_range/relevance_to_subject), paint_colors (4-6 items with color_name/brand_swatch/hex_approx/mood/best_for/why_now), popular_renovations (5-7 items ranked by ROI with renovation/avg_cost/avg_roi/time_to_complete/impact/description/priority/relevant_to_subject), staging_tips (4 items), agent_talking_points (2 items). Make all recommendations specific to New England/Northeast market.`;
+    }
+
+    // ── INJECT ENRICHMENT BLOCKS ──────────────────────────────────────────────
+    prompt += photoPromptBlock;
+    prompt += buildEnrichmentBlocks(enrichment, analysis);
+
+    // ── PIPELINE PATH (Pro/Team) ──────────────────────────────────────────────
     const pipelinePrompts = allLibraryPrompts
       .filter(p => p.ensemble_order != null && p.assessment_type === (analysis.assessment_type || 'listing_pricing'))
       .sort((a, b) => a.ensemble_order - b.ensemble_order);
@@ -1436,28 +1134,15 @@ Include this in the output JSON as: "property_context": { ..., "schools": { "ass
     const hasPipeline = pipelinePrompts.length > 0;
 
     if (isPro && hasPipeline) {
-      // ── PRO/TEAM: PromptLibrary ensemble pipeline ─────────────────────────
       console.log(`[generateAnalysis] Running ${tier} pipeline with ${pipelinePrompts.length} steps`);
       const startTime = Date.now();
 
-      const getKey = async (platform) => {
-        const envVars = { claude: "ANTHROPIC_API_KEY", chatgpt: "OPENAI_API_KEY", gemini: "GEMINI_API_KEY", perplexity: "PERPLEXITY_API_KEY", grok: "GROK_API_KEY" };
-        const cfgFields = { claude: "anthropic_api_key", chatgpt: "openai_api_key", gemini: "google_api_key", perplexity: "perplexity_api_key", grok: "grok_api_key" };
-        try {
-          const cfgs = await base44.asServiceRole.entities.PlatformConfig.filter({});
-          const c = cfgs[0];
-          const field = cfgFields[platform];
-          if (c && field && c[field]) return c[field];
-        } catch (e) {}
-        return Deno.env.get(envVars[platform] || '') || null;
-      };
-
       const callProvider = async (platform, key, p) => {
         if (!key) throw new Error(`No API key for ${platform}`);
-        if (platform === 'claude') return callClaude(key, p, 'platform');
-        if (platform === 'chatgpt') return callOpenAI(key, p);
-        if (platform === 'gemini') return callGemini(key, p);
-        if (platform === 'perplexity') return callPerplexity(key, p);
+        if (platform === 'claude')      return callClaude(key, p, 'platform');
+        if (platform === 'chatgpt')     return callOpenAI(key, p);
+        if (platform === 'gemini')      return callGemini(key, p);
+        if (platform === 'perplexity')  return callPerplexity(key, p);
         return callClaude(key, p, 'platform');
       };
 
@@ -1465,94 +1150,51 @@ Include this in the output JSON as: "property_context": { ..., "schools": { "ass
       const sectionOutputs = {};
 
       await base44.asServiceRole.entities.Analysis.update(analysisId, {
-        ensemble_mode_used: true,
-        assembly_status: 'in_progress',
-        sections_total: pipelinePrompts.length,
+        ensemble_mode_used: true, assembly_status: 'in_progress', sections_total: pipelinePrompts.length,
       });
-
-      // Start AVM lookup in parallel with pipeline step 1 (Perplexity + GPT-4o simultaneously)
-      const isAvmType = ['listing_pricing', 'cma', 'client_portfolio', 'buyer_intelligence'].includes(analysis.assessment_type);
-      let avmDataPromise = null;
-      if (isAvmType) {
-        try {
-          const [perpAvmKey, openaiAvmKey] = await Promise.all([getKey('perplexity'), getKey('chatgpt')]);
-          const avmAddress = analysis.intake_data?.address || '';
-          if (avmAddress && (perpAvmKey || openaiAvmKey)) {
-            console.log('[generateAnalysis] Starting parallel AVM lookup (Perplexity+GPT-4o) for:', avmAddress);
-            avmDataPromise = fetchAVMParallel(perpAvmKey, openaiAvmKey, avmAddress);
-          } else {
-            console.warn('[generateAnalysis] No AVM keys available — lookup skipped');
-          }
-        } catch (avmInitErr) {
-          console.warn('[generateAnalysis] Could not start AVM lookup:', avmInitErr.message);
-        }
-      }
 
       for (const promptRecord of pipelinePrompts) {
         const section = promptRecord.prompt_section;
         console.log(`[pipeline] step ${promptRecord.ensemble_order}: ${section} via ${promptRecord.ai_platform}`);
 
-        let stepPrompt = promptRecord.prompt_text || '';
-        const d = analysis.intake_data || {};
-        stepPrompt = stepPrompt
-          .replace(/\[ADDRESS\]/g, d.address || '')
-          .replace(/\[PROPERTY_TYPE\]/g, analysis.property_type || '')
-          .replace(/\[ASSESSMENT_TYPE\]/g, analysis.assessment_type || '')
-          .replace(/\[LOCATION_CLASS\]/g, analysis.location_class || '')
+        let stepPrompt = (promptRecord.prompt_text || '')
+          .replace(/\[ADDRESS\]/g,           d.address || '')
+          .replace(/\[PROPERTY_TYPE\]/g,     analysis.property_type || '')
+          .replace(/\[ASSESSMENT_TYPE\]/g,   analysis.assessment_type || '')
+          .replace(/\[LOCATION_CLASS\]/g,    analysis.location_class || '')
           .replace(/\[CLIENT_RELATIONSHIP\]/g, d.client_relationship || '')
-          .replace(/\[OUTPUT_FORMAT\]/g, analysis.output_format || 'narrative')
-          .replace(/\[AGENT_EMAIL\]/g, analysis.run_by_email || '')
-          .replace(/\[INTAKE_JSON\]/g, JSON.stringify(d, null, 2))
-          .replace(/\[PERPLEXITY_DATA\]/g, extras.perplexity_data ? JSON.stringify(extras.perplexity_data, null, 2) : '(not yet available)')
-          .replace(/\[GEMINI_DATA\]/g, extras.gemini_data ? JSON.stringify(extras.gemini_data, null, 2) : '(not yet available)')
-          .replace(/\[REGISTRY_DATA\]/g, extras.registry_data ? JSON.stringify(extras.registry_data, null, 2) : '(not yet available)');
+          .replace(/\[OUTPUT_FORMAT\]/g,     analysis.output_format || 'narrative')
+          .replace(/\[AGENT_EMAIL\]/g,       analysis.run_by_email || '')
+          .replace(/\[INTAKE_JSON\]/g,       JSON.stringify(d, null, 2))
+          .replace(/\[PERPLEXITY_DATA\]/g,   extras.perplexity_data ? JSON.stringify(extras.perplexity_data, null, 2) : '(not yet available)')
+          .replace(/\[GEMINI_DATA\]/g,       extras.gemini_data     ? JSON.stringify(extras.gemini_data, null, 2)     : '(not yet available)')
+          .replace(/\[REGISTRY_DATA\]/g,     extras.registry_data   ? JSON.stringify(extras.registry_data, null, 2)   : '(not yet available)');
 
-        // For report_assembly step: await AVM data (was started in parallel) and inject
-        if (section === 'report_assembly' && isAvmType) {
-          let avmResult = null;
-          if (avmDataPromise) {
-            try {
-              avmResult = await avmDataPromise;
-              console.log('[generateAnalysis] AVM data received for synthesis. Platforms:', avmResult ? Object.keys(avmResult).join(',') : 'none');
-            } catch (avmWaitErr) {
-              console.warn('[generateAnalysis] AVM lookup failed:', avmWaitErr.message);
-            }
-          }
-          const avmInjectBlock = avmResult
-            ? `\n\nAVM PERCEPTION DATA (from live Perplexity search — use ONLY these values, do NOT invent or guess):\n${JSON.stringify(avmResult, null, 2)}\n\nBuild the avm_perception object in the output JSON from this data. Structure:\n{\n  "platforms": [{"name": "Zillow", "estimate": "$X or null", "range_low": "$X or null", "range_high": "$X or null", "trend": "rising/stable/falling or null", "as_of": "Month YYYY or null"}, ...],\n  "composite_average": "average of all non-null estimates as currency string, or null",\n  "avm_vs_professional_gap": "gap between composite and implied_value_range midpoint as currency string (positive = professional higher), or null",\n  "gap_direction": "professional_higher | avm_higher | aligned (aligned if < 3%)",\n  "gap_percent": "e.g. 4.2%",\n  "alignment_narrative": "one sentence explaining gap in plain English for the agent"\n}`
-            : `\n\nAVM PERCEPTION DATA: null (Perplexity lookup unavailable or returned no data)\nSet avm_perception to null in the output JSON.`;
-          stepPrompt += avmInjectBlock;
+        // Inject enrichment into report_assembly step
+        if (section === 'report_assembly') {
+          stepPrompt += buildEnrichmentBlocks(enrichment, analysis);
         }
 
         try {
-          const stepKey = await getKey(promptRecord.ai_platform);
+          const stepKey    = getKey(promptRecord.ai_platform);
           const stepResult = await callProvider(promptRecord.ai_platform, stepKey, stepPrompt);
           sectionOutputs[section] = stepResult.text;
-          if (section === 'market_research') extras.perplexity_data = stepResult.text;
-          if (section === 'neighborhood_snapshot') extras.gemini_data = stepResult.text;
-          // Log token usage — fail silently
+          if (section === 'market_research')      extras.perplexity_data = stepResult.text;
+          if (section === 'neighborhood_snapshot') extras.gemini_data    = stepResult.text;
+
           try {
             const stepUsage = stepResult.usage || {};
+            const prov = promptRecord.ai_platform === 'chatgpt' ? 'openai' : promptRecord.ai_platform === 'gemini' ? 'google' : promptRecord.ai_platform;
             await createAITokenLog(base44, {
-              analysis_id:   analysisId,
-              agent_id:      user?.id || null,
-              provider:      promptRecord.ai_platform === 'chatgpt' ? 'openai' : promptRecord.ai_platform === 'gemini' ? 'google' : promptRecord.ai_platform,
-              model:         stepResult.model || '',
-              task:          SECTION_TO_TASK[section] || 'other',
-              report_type:   analysis.assessment_type || null,
-              input_tokens:  stepUsage.input_tokens  || 0,
-              output_tokens: stepUsage.output_tokens || 0,
-              cost_cents:    calculateCostCents(
-                promptRecord.ai_platform === 'chatgpt' ? 'openai' : promptRecord.ai_platform === 'gemini' ? 'google' : promptRecord.ai_platform,
-                stepResult.model || '',
-                stepUsage.input_tokens  || 0,
-                stepUsage.output_tokens || 0
-              ),
+              analysis_id: analysisId, agent_id: user?.id || null, provider: prov,
+              model: stepResult.model || '', task: SECTION_TO_TASK[section] || 'other',
+              report_type: analysis.assessment_type || null,
+              input_tokens: stepUsage.input_tokens || 0, output_tokens: stepUsage.output_tokens || 0,
+              cost_cents: calculateCostCents(prov, stepResult.model || '', stepUsage.input_tokens || 0, stepUsage.output_tokens || 0),
               agent_tier: tier,
             });
-          } catch (logError) {
-            console.warn('[generateAnalysis] AITokenLog (pipeline step) failed silently:', logError.message);
-          }
+          } catch (logError) { console.warn('[generateAnalysis] AITokenLog failed:', logError.message); }
+
           await base44.asServiceRole.entities.Analysis.update(analysisId, {
             sections_completed: Object.keys(sectionOutputs).length,
             ensemble_section_outputs: { ...sectionOutputs },
@@ -1563,56 +1205,36 @@ Include this in the output JSON as: "property_context": { ..., "schools": { "ass
         }
       }
 
-      const rawFinalOutput = sectionOutputs['report_assembly']
-        || sectionOutputs['narrative_layer']
-        || Object.values(sectionOutputs).join('\n\n---\n\n');
-
-      // Try to extract structured JSON from pipeline final output
+      const rawFinalOutput = sectionOutputs['report_assembly'] || sectionOutputs['narrative_layer'] || Object.values(sectionOutputs).join('\n\n---\n\n');
       const { cleanText: pipelineCleanText, outputJson: pipelineOutputJson } = extractJsonOutput(rawFinalOutput);
       const finalOutput = pipelineCleanText || rawFinalOutput;
-      console.log('[generateAnalysis] pipeline output_json populated:', !!pipelineOutputJson, '| output length:', rawFinalOutput.length);
 
-      const generationEnd = Date.now();
+      const generationEnd  = Date.now();
       const generationTime = generationEnd - startTime;
       const durationSeconds = Math.round(generationTime / 10) / 100;
-      const tierThresholds = { starter: 30, pro: 45, team: 45, broker: 60 };
-      const tierThreshold = tierThresholds[tier] ?? 60;
+      console.log('[PropPrompt Timing]', { analysis_id: analysisId, tier, report_type: analysis.assessment_type, duration_s: durationSeconds });
+
       try {
         await base44.asServiceRole.entities.GenerationTimingLog.create({
-          analysis_id: analysisId,
-          report_type: analysis.assessment_type || 'unknown',
+          analysis_id: analysisId, report_type: analysis.assessment_type || 'unknown',
           subscription_tier: tier,
-          generation_start: new Date(startTime).toISOString(),
-          generation_end: new Date(generationEnd).toISOString(),
-          duration_ms: generationTime,
-          duration_seconds: durationSeconds,
-          threshold_exceeded: durationSeconds > tierThreshold,
-          alert_sent: false,
-          model_pipeline: 'ensemble-5model',
+          generation_start: new Date(startTime).toISOString(), generation_end: new Date(generationEnd).toISOString(),
+          duration_ms: generationTime, duration_seconds: durationSeconds,
+          threshold_exceeded: durationSeconds > 60, alert_sent: false, model_pipeline: 'ensemble-pipeline',
         });
-      } catch (timingErr) { console.warn('[generateAnalysis] ProTimingLog failed:', timingErr.message); }
-      console.log('[PropPrompt Timing]', { analysis_id: analysisId, tier, report_type: analysis.assessment_type, duration_s: durationSeconds, threshold_s: tierThreshold, exceeded: durationSeconds > tierThreshold });
+      } catch (e) { console.warn('[generateAnalysis] TimingLog failed:', e.message); }
 
-      // Valuation sanity check on pipeline output too
       if (pipelineOutputJson) {
-        const pipelineValidation = runValidation({
-          reportJSON: pipelineOutputJson,
-          prior_sale_price: analysis.prior_sale_price ?? null,
-          prior_sale_year: analysis.prior_sale_year ?? null,
-        });
-        console.log('[generateAnalysis] pipeline validation result:', JSON.stringify(pipelineValidation));
+        const pipelineValidation = runValidation({ reportJSON: pipelineOutputJson, prior_sale_price: analysis.prior_sale_price ?? null, prior_sale_year: analysis.prior_sale_year ?? null });
         if (!pipelineValidation.valid) {
           await base44.asServiceRole.entities.Analysis.update(analysisId, {
-            status: 'anomaly_flagged',
-            valuation_anomaly: pipelineValidation,
-            output_json: pipelineOutputJson,
-            output_text: finalOutput,
+            status: 'anomaly_flagged', valuation_anomaly: pipelineValidation,
+            output_json: pipelineOutputJson, output_text: finalOutput,
           });
           return Response.json({ anomaly: pipelineValidation, model: `pipeline-${tier}` });
         }
       }
 
-      // Upload large pipeline output as file if needed
       let pipelineOutputText = finalOutput;
       if (finalOutput && finalOutput.length > 15000) {
         try {
@@ -1620,138 +1242,81 @@ Include this in the output JSON as: "property_context": { ..., "schools": { "ass
           const file = new File([blob], `analysis_${analysisId}_pipeline.txt`, { type: 'text/plain' });
           const uploadRes = await base44.asServiceRole.integrations.Core.UploadFile({ file });
           pipelineOutputText = uploadRes?.file_url || finalOutput.slice(0, 15000);
-          console.log('[generateAnalysis] pipeline output_text uploaded as file:', pipelineOutputText);
         } catch (uploadErr) {
-          console.warn('[generateAnalysis] pipeline output_text upload failed, truncating:', uploadErr.message);
           pipelineOutputText = finalOutput.slice(0, 15000);
         }
       }
+
       const pipelineSaveData = {
-        status: 'complete',
-        output_text: pipelineOutputText,
-        completed_at: new Date().toISOString(),
-        ai_model: `pipeline-${tier}`,
-        assembly_status: 'complete',
-        sections_completed: Object.keys(sectionOutputs).length,
-        ensemble_mode_used: true,
+        status: 'complete', output_text: pipelineOutputText, completed_at: new Date().toISOString(),
+        ai_model: `pipeline-${tier}`, assembly_status: 'complete',
+        sections_completed: Object.keys(sectionOutputs).length, ensemble_mode_used: true,
         generation_time_ms: generationTime,
       };
       if (pipelineOutputJson) pipelineSaveData.output_json = pipelineOutputJson;
       await base44.asServiceRole.entities.Analysis.update(analysisId, pipelineSaveData);
 
-      try {
-        await base44.functions.invoke('deductAnalysisQuota', { analysisId, orgId: analysis.org_id });
-      } catch (e) {
-        console.warn('[generateAnalysis] quota deduction failed:', e.message);
-      }
-
-      // Calculate net proceeds server-side (listing_pricing only, best-effort)
+      try { await base44.functions.invoke('deductAnalysisQuota', { analysisId, orgId: analysis.org_id }); } catch (e) { console.warn('[generateAnalysis] quota deduction failed:', e.message); }
       if (analysis.assessment_type === 'listing_pricing' && pipelineOutputJson) {
-        try {
-          await base44.functions.invoke('calculateNetProceeds', { analysisId });
-        } catch (e) {
-          console.warn('[generateAnalysis] calculateNetProceeds (pipeline) failed:', e.message);
-        }
+        try { await base44.functions.invoke('calculateNetProceeds', { analysisId }); } catch (e) { /* non-fatal */ }
       }
 
-      return Response.json({
-        output: finalOutput,
-        outputJson: !!pipelineOutputJson,
-        model: `pipeline-${tier}`,
-        keySource: 'platform',
-        sectionsCompleted: Object.keys(sectionOutputs).length,
-        generationTimeMs: generationTime,
-      });
+      return Response.json({ output: finalOutput, outputJson: !!pipelineOutputJson, model: `pipeline-${tier}`, keySource: 'platform', sectionsCompleted: Object.keys(sectionOutputs).length, generationTimeMs: generationTime });
     }
 
-    // ── STARTER / FALLBACK: Single-model path ────────────────────────────────
+    // ── STARTER / FALLBACK: Single-model path ─────────────────────────────────
     const starterGenStart = Date.now();
     let result;
     const platform = analysis.ai_platform;
-    if (platform === "claude") {
-      result = await callClaude(apiKey, prompt, keySource);
-    } else if (platform === "chatgpt") {
-      result = await callOpenAI(apiKey, prompt);
-    } else if (platform === "gemini") {
-      result = await callGemini(apiKey, prompt);
-    } else if (platform === "perplexity") {
-      result = await callPerplexity(apiKey, prompt);
-    } else {
-      result = await callClaude(apiKey, prompt, keySource);
-    }
+    if      (platform === "claude")      result = await callClaude(apiKey, prompt, keySource);
+    else if (platform === "chatgpt")     result = await callOpenAI(apiKey, prompt);
+    else if (platform === "gemini")      result = await callGemini(apiKey, prompt);
+    else if (platform === "perplexity")  result = await callPerplexity(apiKey, prompt);
+    else                                 result = await callClaude(apiKey, prompt, keySource);
 
-    // Truncation check
     const lastChar = result.text.trim().slice(-1);
-    const looksComplete = lastChar === '}' || lastChar === '"';
-    if (!looksComplete) {
-      console.warn('[generateAnalysis] WARNING: response may be truncated. Last char:', JSON.stringify(lastChar), '| length:', result.text.length);
+    if (lastChar !== '}' && lastChar !== '"') {
+      console.warn('[generateAnalysis] WARNING: response may be truncated. Last char:', JSON.stringify(lastChar));
     }
 
-    // Log token usage for Starter single-model call — fail silently
+    const providerKey = platform === 'chatgpt' ? 'openai' : platform === 'gemini' ? 'google' : platform;
     try {
       const resultUsage = result.usage || {};
-      const providerKey = platform === 'chatgpt' ? 'openai' : platform === 'gemini' ? 'google' : platform;
       await createAITokenLog(base44, {
-        analysis_id:   analysisId,
-        agent_id:      user?.id || null,
-        provider:      providerKey,
-        model:         result.model || '',
-        task:          'other',
-        report_type:   analysis.assessment_type || null,
-        input_tokens:  resultUsage.input_tokens  || 0,
-        output_tokens: resultUsage.output_tokens || 0,
-        cost_cents:    calculateCostCents(providerKey, result.model || '', resultUsage.input_tokens || 0, resultUsage.output_tokens || 0),
-        agent_tier:    tier,
+        analysis_id: analysisId, agent_id: user?.id || null, provider: providerKey,
+        model: result.model || '', task: 'other', report_type: analysis.assessment_type || null,
+        input_tokens: resultUsage.input_tokens || 0, output_tokens: resultUsage.output_tokens || 0,
+        cost_cents: calculateCostCents(providerKey, result.model || '', resultUsage.input_tokens || 0, resultUsage.output_tokens || 0),
+        agent_tier: tier,
       });
-    } catch (logError) {
-      console.warn('[generateAnalysis] AITokenLog (starter) failed silently:', logError.message);
-    }
+    } catch (logError) { console.warn('[generateAnalysis] AITokenLog failed:', logError.message); }
 
-    // Record timing for Starter path
-    const starterGenEnd = Date.now();
-    const starterDurationMs = starterGenEnd - starterGenStart;
+    const starterGenEnd   = Date.now();
+    const starterDurationMs  = starterGenEnd - starterGenStart;
     const starterDurationSec = Math.round(starterDurationMs / 10) / 100;
-    const starterThresholds = { starter: 30, pro: 45, team: 45, broker: 60 };
-    const starterThreshold = starterThresholds[tier] ?? 60;
+    console.log('[PropPrompt Timing]', { analysis_id: analysisId, tier, report_type: analysis.assessment_type, duration_s: starterDurationSec });
     try {
       await base44.asServiceRole.entities.GenerationTimingLog.create({
-        analysis_id: analysisId,
-        report_type: analysis.assessment_type || 'unknown',
-        subscription_tier: tier,
-        generation_start: new Date(starterGenStart).toISOString(),
+        analysis_id: analysisId, report_type: analysis.assessment_type || 'unknown',
+        subscription_tier: tier, generation_start: new Date(starterGenStart).toISOString(),
         generation_end: new Date(starterGenEnd).toISOString(),
-        duration_ms: starterDurationMs,
-        duration_seconds: starterDurationSec,
-        threshold_exceeded: starterDurationSec > starterThreshold,
-        alert_sent: false,
-        model_pipeline: 'claude+gpt4o',
+        duration_ms: starterDurationMs, duration_seconds: starterDurationSec,
+        threshold_exceeded: starterDurationSec > 45, alert_sent: false, model_pipeline: 'single-model',
       });
-    } catch (timingErr) { console.warn('[generateAnalysis] StarterTimingLog failed:', timingErr.message); }
-    console.log('[PropPrompt Timing]', { analysis_id: analysisId, tier, report_type: analysis.assessment_type, duration_s: starterDurationSec, threshold_s: starterThreshold, exceeded: starterDurationSec > starterThreshold });
+    } catch (e) { console.warn('[generateAnalysis] TimingLog failed:', e.message); }
 
-    // Extract structured JSON from AI response
     const { cleanText, outputJson } = extractJsonOutput(result.text);
-    console.log('[generateAnalysis] output_json populated:', !!outputJson, '| response length:', result.text.length);
 
-    // ── VALUATION SANITY CHECK ──────────────────────────────────────────────
     if (outputJson) {
-      const validationResult = runValidation({
-        reportJSON: outputJson,
-        prior_sale_price: analysis.prior_sale_price ?? null,
-        prior_sale_year: analysis.prior_sale_year ?? null,
-      });
-      console.log('[generateAnalysis] validation result:', JSON.stringify(validationResult));
+      const validationResult = runValidation({ reportJSON: outputJson, prior_sale_price: analysis.prior_sale_price ?? null, prior_sale_year: analysis.prior_sale_year ?? null });
       if (!validationResult.valid) {
         await base44.asServiceRole.entities.Analysis.update(analysisId, {
-          status: 'anomaly_flagged',
-          valuation_anomaly: validationResult,
-          output_json: outputJson,
+          status: 'anomaly_flagged', valuation_anomaly: validationResult, output_json: outputJson,
         });
         return Response.json({ anomaly: validationResult, model: result.model });
       }
     }
 
-    // Persist output — upload large output_text as file to avoid 400 field size limit
     let outputTextToSave = cleanText;
     if (cleanText && cleanText.length > 15000) {
       try {
@@ -1759,35 +1324,18 @@ Include this in the output JSON as: "property_context": { ..., "schools": { "ass
         const file = new File([blob], `analysis_${analysisId}.txt`, { type: 'text/plain' });
         const uploadRes = await base44.asServiceRole.integrations.Core.UploadFile({ file });
         outputTextToSave = uploadRes?.file_url || cleanText.slice(0, 15000);
-        console.log('[generateAnalysis] output_text uploaded as file:', outputTextToSave);
       } catch (uploadErr) {
-        console.warn('[generateAnalysis] output_text upload failed, truncating:', uploadErr.message);
         outputTextToSave = cleanText.slice(0, 15000);
       }
     }
-    const saveData = {
-      status: "complete",
-      output_text: outputTextToSave,
-      completed_at: new Date().toISOString(),
-      ai_model: result.model,
-    };
+
+    const saveData = { status: "complete", output_text: outputTextToSave, completed_at: new Date().toISOString(), ai_model: result.model };
     if (outputJson) saveData.output_json = outputJson;
     await base44.asServiceRole.entities.Analysis.update(analysisId, saveData);
 
-    // Deduct quota (best-effort)
-    try {
-      await base44.functions.invoke("deductAnalysisQuota", { analysisId, orgId: analysis.org_id });
-    } catch (e) {
-      console.warn("[generateAnalysis] quota deduction failed:", e.message);
-    }
-
-    // Calculate net proceeds server-side (listing_pricing only, best-effort)
+    try { await base44.functions.invoke("deductAnalysisQuota", { analysisId, orgId: analysis.org_id }); } catch (e) { console.warn("[generateAnalysis] quota deduction failed:", e.message); }
     if (analysis.assessment_type === 'listing_pricing' && outputJson) {
-      try {
-        await base44.functions.invoke('calculateNetProceeds', { analysisId });
-      } catch (e) {
-        console.warn('[generateAnalysis] calculateNetProceeds failed:', e.message);
-      }
+      try { await base44.functions.invoke('calculateNetProceeds', { analysisId }); } catch (e) { /* non-fatal */ }
     }
 
     return Response.json({ output: cleanText, outputJson: !!outputJson, model: result.model, keySource });
