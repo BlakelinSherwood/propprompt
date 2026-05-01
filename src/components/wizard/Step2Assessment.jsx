@@ -89,7 +89,8 @@ export default function Step2Assessment({ intake, update, onNext, onBack, userTi
   const isPortfolioOnly = ['team_admin', 'team_agent'].includes(user?.role);
 
   // Non-platform-owners see all types but restricted ones are greyed out (coming soon)
-  const availableTypes = ASSESSMENT_TYPES.filter(a => !a.proOnly || !isStarter);
+  // portfolioOnly users always see client_portfolio even if starter tier
+  const availableTypes = ASSESSMENT_TYPES.filter(a => !a.proOnly || !isStarter || (isPortfolioOnly && a.id === 'client_portfolio'));
   const lockedTypes = isStarter ? ASSESSMENT_TYPES.filter(a => a.proOnly) : [];
   const standardTypes = availableTypes.filter(a => a.id !== 'custom');
   const customType = availableTypes.find(a => a.id === 'custom');
