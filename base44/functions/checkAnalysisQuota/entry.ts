@@ -43,10 +43,34 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    // admin and platform_owner always get unlimited access
-    const UNLIMITED_ROLES = ['platform_owner', 'admin', 'brokerage_admin', 'team_lead', 'team_agent', 'team_admin'];
-    if (UNLIMITED_ROLES.includes(user.role)) {
+    // platform_owner and admin always get unlimited access
+    const ALWAYS_UNLIMITED = ['platform_owner', 'admin'];
+    if (ALWAYS_UNLIMITED.includes(user.role)) {
       return Response.json({ allowed: true, unlimited: true, analyses_cap: 9999, analyses_used_this_month: 0 });
+    }
+
+    // team_agent / team_admin get unlimited only if their org is owned by a platform_owner or admin
+    if (['team_agent', 'team_admin', 'brokerage_admin', 'team_lead'].includes(user.role)) {
+      const memberships = await base44.asServiceRole.entities.OrgMembership.filter({ user_email: user.email, status: 'active' });
+      if (memberships.length > 0) {
+        const orgIds = memberships.map(m => m.org_id);
+        // Check if any of these orgs is owned by a platform_owner/admin
+        const orgs = await Promise.all(orgIds.map(id => base44.asServiceRole.entities.Organization.filter({ id })));
+        const flatOrgs = orgs.flat();
+        const owners = flatOrgs.map(o => o.owner_email).filter(Boolean);
+        if (owners.length > 0) {
+          const ownerUsers = await Promise.all(owners.map(email => base44.asServiceRole.entities.User.filter({ email })));
+          const flatOwners = ownerUsers.flat();
+          const isPlatformTeam = flatOwners.some(u => ['platform_owner', 'admin'].includes(u.role));
+          if (isPlatformTeam) {
+            return Response.json({ allowed: true, unlimited: true, analyses_cap: 9999, analyses_used_this_month: 0 });
+          }
+        }
+      }
+      // brokerage_admin and team_lead without a platform org still get unlimited (original behavior)
+      if (['brokerage_admin', 'team_lead'].includes(user.role)) {
+        return Response.json({ allowed: true, unlimited: true, analyses_cap: 9999, analyses_used_this_month: 0 });
+      }
     }
 
     let user_id;
