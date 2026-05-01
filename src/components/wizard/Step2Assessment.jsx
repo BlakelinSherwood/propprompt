@@ -82,8 +82,11 @@ const ASSESSMENT_TYPES = [
   },
 ];
 
-export default function Step2Assessment({ intake, update, onNext, onBack, userTier, isPlatformOwner }) {
+export default function Step2Assessment({ intake, update, onNext, onBack, userTier, isPlatformOwner, user }) {
   const isStarter = !userTier || userTier === 'starter';
+
+  // team_admin and team_agent can only run client_portfolio
+  const isPortfolioOnly = ['team_admin', 'team_agent'].includes(user?.role);
 
   // Non-platform-owners see all types but restricted ones are greyed out (coming soon)
   const availableTypes = ASSESSMENT_TYPES.filter(a => !a.proOnly || !isStarter);
@@ -106,13 +109,15 @@ export default function Step2Assessment({ intake, update, onNext, onBack, userTi
           {standardTypes.map((a) => {
             const selected = intake.assessment_type === a.id;
             const comingSoon = !isPlatformOwner && PLATFORM_OWNER_ONLY_IDS.includes(a.id);
+            const roleRestricted = isPortfolioOnly && a.id !== 'client_portfolio';
+            const isDisabled = comingSoon || roleRestricted;
             return (
               <button
                 key={a.id}
-                onClick={() => !comingSoon && update({ assessment_type: a.id })}
-                disabled={comingSoon}
+                onClick={() => !isDisabled && update({ assessment_type: a.id })}
+                disabled={isDisabled}
                 className={`text-left rounded-xl border-2 p-4 transition-all relative
-                  ${comingSoon ? "border-[#1A3226]/8 bg-[#1A3226]/[0.02] opacity-50 cursor-not-allowed" :
+                  ${isDisabled ? "border-[#1A3226]/8 bg-[#1A3226]/[0.02] opacity-40 cursor-not-allowed" :
                     selected ? "border-[#1A3226] bg-[#1A3226]/5" : "border-[#1A3226]/10 hover:border-[#1A3226]/20"}`}
               >
                 {comingSoon && (
@@ -167,12 +172,13 @@ export default function Step2Assessment({ intake, update, onNext, onBack, userTi
           <div className="mb-8">
             {(() => {
               const comingSoon = !isPlatformOwner && PLATFORM_OWNER_ONLY_IDS.includes('custom');
+              const isDisabledCustom = comingSoon || isPortfolioOnly;
               return (
             <button
-              onClick={() => !comingSoon && update({ assessment_type: 'custom' })}
-              disabled={comingSoon}
+              onClick={() => !isDisabledCustom && update({ assessment_type: 'custom' })}
+              disabled={isDisabledCustom}
               className={`w-full text-left rounded-xl border-2 p-4 transition-all relative
-                ${comingSoon ? "border-[#1A3226]/8 bg-[#1A3226]/[0.02] opacity-50 cursor-not-allowed" :
+                ${isDisabledCustom ? "border-[#1A3226]/8 bg-[#1A3226]/[0.02] opacity-40 cursor-not-allowed" :
                   intake.assessment_type === 'custom' ? "border-[#1A3226] bg-[#1A3226]/5" : "border-[#1A3226]/10 hover:border-[#1A3226]/20"}`}
               >
                 {comingSoon && (
