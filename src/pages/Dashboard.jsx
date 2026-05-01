@@ -202,7 +202,7 @@ export default function Dashboard() {
               </Link>
             )}
             <Link
-              to="/NewAnalysis"
+              to="/AnalysisWizard"
               className="group flex items-start gap-4 p-4 rounded-xl border border-[#1A3226]/10 hover:border-[#B8982F]/40 hover:bg-[#B8982F]/5 transition-all"
             >
               <div className="w-10 h-10 rounded-lg bg-[#1A3226]/5 flex items-center justify-center flex-shrink-0">

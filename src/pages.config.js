@@ -62,7 +62,7 @@ import ClaimSubmitted from './pages/ClaimSubmitted';
 import Dashboard from './pages/Dashboard';
 import Landing from './pages/Landing';
 import Members from './pages/Members';
-import NewAnalysis from './pages/NewAnalysis';
+import AnalysisWizard from './pages/AnalysisWizard';
 import PlatformAdmin from './pages/PlatformAdmin';
 import PoolManagement from './pages/PoolManagement';
 import PricingAdmin from './pages/PricingAdmin';
@@ -98,7 +98,7 @@ export const PAGES = {
     "Dashboard": Dashboard,
     "Landing": Landing,
     "Members": Members,
-    "NewAnalysis": NewAnalysis,
+    "AnalysisWizard": AnalysisWizard,
     "PlatformAdmin": PlatformAdmin,
     "PoolManagement": PoolManagement,
     "PricingAdmin": PricingAdmin,

@@ -62,7 +62,7 @@ const INITIAL_INTAKE = {
   key_selling_attributes: [],
 };
 
-export default function NewAnalysis() {
+export default function AnalysisWizard() {
   const { user, isLoadingAuth } = useAuth();
   const [searchParams] = useSearchParams();
   const [step, setStep] = useState(1);

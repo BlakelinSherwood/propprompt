@@ -10,7 +10,7 @@ import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
 import Members from "./pages/Members";
 import PlatformAdmin from "./pages/PlatformAdmin";
-import NewAnalysis from "./pages/NewAnalysis";
+import AnalysisWizard from "./pages/AnalysisWizard";
 import AnalysisDetail from "./pages/AnalysisDetail";
 import AnalysisRun from "./pages/AnalysisRun";
 import Analyses from "./pages/Analyses";
@@ -79,7 +79,7 @@ function AuthenticatedApp() {
         <Route path="/Dashboard" element={<ProtectedRoute element={<Dashboard />} />} />
         <Route path="/Members" element={<ProtectedRoute element={<Members />} requiresSubscription />} />
         <Route path="/PlatformAdmin" element={<ProtectedRoute element={<PlatformAdmin />} />} />
-        <Route path="/NewAnalysis" element={<ProtectedRoute element={<NewAnalysis />} requiresSubscription />} />
+        <Route path="/AnalysisWizard" element={<ProtectedRoute element={<AnalysisWizard />} requiresSubscription />} />
         <Route path="/Analysis/:id" element={<ProtectedRoute element={<AnalysisDetail />} requiresSubscription />} />
         <Route path="/AnalysisRun" element={<ProtectedRoute element={<AnalysisRun />} requiresSubscription />} />
         <Route path="/Analyses" element={<ProtectedRoute element={<Analyses />} requiresSubscription />} />

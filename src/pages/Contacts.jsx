@@ -208,7 +208,7 @@ export default function Contacts() {
                       }}
                       onDelete={handleDeleteContact}
                       onStartAnalysis={() =>
-                        navigate(`/NewAnalysis?contactId=${contact.id}&orgId=${orgId}`)
+                        navigate(`/AnalysisWizard?contactId=${contact.id}&orgId=${orgId}`)
                       }
                     />
                   ))}
@@ -236,7 +236,7 @@ export default function Contacts() {
                       }}
                       onDelete={handleDeleteContact}
                       onStartAnalysis={() =>
-                        navigate(`/NewAnalysis?contactId=${contact.id}&orgId=${orgId}`)
+                        navigate(`/AnalysisWizard?contactId=${contact.id}&orgId=${orgId}`)
                       }
                     />
                   ))}

@@ -35,7 +35,7 @@ const ROLE_LABELS = {
 };
 
 // Tab roots for stack preservation
-const TAB_ROOTS = ["/Dashboard", "/NewAnalysis", "/Analyses", "/Contacts", "/training", "/AccountSettings"];
+const TAB_ROOTS = ["/Dashboard", "/AnalysisWizard", "/Analyses", "/Contacts", "/training", "/AccountSettings"];
 
 function getTabRoot(pathname) {
   return TAB_ROOTS.find(r => pathname === r || pathname.startsWith(r + "/")) || null;
@@ -71,7 +71,7 @@ export default function Layout() {
 
   const navItems = [
     { label: "Dashboard", path: "/Dashboard", icon: LayoutDashboard },
-    { label: "New Analysis", path: "/NewAnalysis", icon: PlusCircle },
+    { label: "New Analysis", path: "/AnalysisWizard", icon: PlusCircle },
     { label: "Analyses", path: "/Analyses", icon: FileText },
     { label: "Contacts", path: "/Contacts", icon: BookOpen },
     ...(isAdmin ? [{ label: "Members", path: "/Members", icon: Users }] : []),
@@ -235,7 +235,7 @@ export default function Layout() {
         <div className="flex items-center justify-around">
           {[
             { label: "Home", path: "/Dashboard", icon: LayoutDashboard },
-            { label: "New", path: "/NewAnalysis", icon: PlusCircle },
+            { label: "New", path: "/AnalysisWizard", icon: PlusCircle },
             { label: "Analyses", path: "/Analyses", icon: FileText },
             { label: "Training", path: "/training", icon: GraduationCap },
             { label: "Account", path: "/AccountSettings", icon: Settings },
