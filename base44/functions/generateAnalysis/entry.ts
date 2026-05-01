@@ -818,6 +818,12 @@ Deno.serve(async (req) => {
       return Response.json({ output: analysis.output_text, model: analysis.ai_model, keySource: "cached", outputJson: !!analysis.output_json });
     }
 
+    // If already in progress (another call is running), return early — polling will catch completion
+    if (analysis.status === "in_progress") {
+      console.log('[generateAnalysis] Already in_progress — skipping duplicate run for:', analysisId);
+      return Response.json({ status: "in_progress", message: "Analysis already running" });
+    }
+
     // Resolve API key inline (avoids sub-function auth issues)
     const PLATFORM_ENV_VARS = { claude: "ANTHROPIC_API_KEY", chatgpt: "OPENAI_API_KEY", gemini: "GEMINI_API_KEY", perplexity: "PERPLEXITY_API_KEY", grok: "GROK_API_KEY" };
     const PLATFORM_CONFIG_FIELDS = { claude: "anthropic_api_key", chatgpt: "openai_api_key", gemini: "google_api_key", perplexity: "perplexity_api_key", grok: "grok_api_key" };
