@@ -165,11 +165,15 @@ export default function CompsMapWithHeat({ subjectAddress, comps, selected, onTo
     visibleComps.forEach((comp, i) => {
       const isSelected = selected.has(comp.address);
       const ppsf = comp.price_per_sqft;
-      const color = showHeat && ppsf ? ppsfToColor(ppsf, minPpsf, maxPpsf) : (isSelected ? "#B8982F" : "#94a3b8");
+      // In heat mode: show heat color if selected, grey if deselected. In normal mode: gold=selected, grey=excluded.
+      const color = showHeat
+        ? (isSelected && ppsf ? ppsfToColor(ppsf, minPpsf, maxPpsf) : "#cbd5e1")
+        : (isSelected ? "#B8982F" : "#94a3b8");
       colorMap[comp.address] = color;
 
+      const opacity = (showHeat && !isSelected) ? "0.45" : "1";
       const el = document.createElement("div");
-      el.style.cssText = `width:22px;height:22px;background:${color};border:2px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:white;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.3);`;
+      el.style.cssText = `width:22px;height:22px;background:${color};border:2px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:white;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.3);opacity:${opacity};`;
       el.textContent = i + 1;
       el.onclick = () => onToggle(comp.address);
 
@@ -259,12 +263,15 @@ Return ONLY JSON: {"town": "...", "median_ppsf": 625, "neighborhoods": [{"name":
           <div className="absolute bottom-3 left-3 z-10 bg-white/95 rounded-lg px-3 py-2 shadow text-xs">
             <div className="font-medium text-[#1A3226] mb-1">$/SF Range</div>
             <div className="flex items-center gap-2">
-              {/* Gradient matches ppsfToColor: blue → yellow → red */}
               <div style={{ width: 80, height: 8, borderRadius: 4, background: "linear-gradient(to right, rgb(0,130,200), rgb(255,200,0), rgb(255,60,20))" }} />
             </div>
             <div className="flex justify-between text-[#1A3226]/50 mt-0.5" style={{ width: 80 }}>
               <span>${minPpsf}</span>
               <span>${maxPpsf}</span>
+            </div>
+            <div className="flex items-center gap-1.5 mt-1.5 pt-1.5 border-t border-[#1A3226]/10">
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#cbd5e1", opacity: 0.45 }} />
+              <span className="text-[#1A3226]/50">Excluded</span>
             </div>
           </div>
         )}

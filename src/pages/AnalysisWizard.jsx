@@ -31,6 +31,17 @@ function getMaxStep(assessmentType) {
   return labels.length;
 }
 
+const STORAGE_KEY = "wizard_draft";
+function loadDraft() {
+  try { const r = sessionStorage.getItem(STORAGE_KEY); return r ? JSON.parse(r) : null; } catch { return null; }
+}
+function saveDraft(step, intake) {
+  try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ step, intake })); } catch {}
+}
+function clearDraft() {
+  try { sessionStorage.removeItem(STORAGE_KEY); } catch {}
+}
+
 const INITIAL_INTAKE = {
   ai_platform: "claude",
   assessment_type: "",
@@ -65,8 +76,9 @@ const INITIAL_INTAKE = {
 export default function AnalysisWizard() {
   const { user, isLoadingAuth } = useAuth();
   const [searchParams] = useSearchParams();
-  const [step, setStep] = useState(1);
-  const [intake, setIntake] = useState(INITIAL_INTAKE);
+  const _draft = loadDraft();
+  const [step, setStep] = useState(_draft?.step || 1);
+  const [intake, setIntake] = useState(_draft?.intake || INITIAL_INTAKE);
   const [orgMembers, setOrgMembers] = useState([]);
   const [userTier, setUserTier] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -121,17 +133,25 @@ export default function AnalysisWizard() {
   }, [user, searchParams]);
 
   function update(fields) {
-    setIntake((prev) => ({ ...prev, ...fields }));
+    setIntake((prev) => {
+      const next = { ...prev, ...fields };
+      saveDraft(step, next);
+      return next;
+    });
   }
 
   function next() {
     const maxStep = getMaxStep(intake.assessment_type);
-    setStep((s) => Math.min(s + 1, maxStep));
+    const nextStep = Math.min(step + 1, maxStep);
+    setStep(nextStep);
+    saveDraft(nextStep, intake);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function back() {
-    setStep((s) => Math.max(s - 1, 1));
+    const prevStep = Math.max(step - 1, 1);
+    setStep(prevStep);
+    saveDraft(prevStep, intake);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -240,6 +260,7 @@ export default function AnalysisWizard() {
       if (user.org_id) analysisData.org_id = user.org_id;
       if (intake.ai_model) analysisData.ai_model = intake.ai_model;
       const analysis = await base44.entities.Analysis.create(analysisData);
+      clearDraft();
       navigate(`/AnalysisRun?id=${analysis.id}`);
     } catch (err) {
       console.error("Failed to create analysis:", err);
