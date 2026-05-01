@@ -725,8 +725,10 @@ function safeParseJson(text) {
 // ── ALL enrichment in one parallel sweep ─────────────────────────────────────
 
 async function fetchAllEnrichment(analysis, perpKey, openaiKey) {
-  const addr = analysis.intake_data?.address || '';
-  const town = (addr.split(',')[1] || '').trim() || addr;
+  const baseAddr = analysis.intake_data?.address || '';
+  const unitNum = analysis.intake_data?.unit_number || '';
+  const addr = unitNum ? `${baseAddr} ${unitNum}` : baseAddr;
+  const town = (baseAddr.split(',')[1] || '').trim() || baseAddr;
   const assessmentType = analysis.assessment_type;
   const currentYear = new Date().getFullYear();
 
@@ -1073,7 +1075,8 @@ Instruction: ${cm.comp_weight || 'Use agent-provided condition to weight comps a
     // ── BUILD BASELINE PROMPT ─────────────────────────────────────────────────
     const d = analysis.intake_data || {};
     const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-    let prompt = `ASSESSMENT TYPE: ${analysis.assessment_type?.replace(/_/g, " ").toUpperCase()}\nPROPERTY TYPE: ${analysis.property_type?.replace(/_/g, " ")}\nADDRESS: ${d.address || "Not provided"}\nLOCATION CLASS: ${analysis.location_class || "unknown"}\nCLIENT RELATIONSHIP: ${d.client_relationship || "buyer's agent"}\nTODAY'S DATE: ${today}\n\nINTAKE DATA:\n${JSON.stringify(d, null, 2)}\n\nPerform a complete PropPrompt™ analysis for the above property. Follow the JSON schema and all instructions in the system prompt exactly.`;
+    const addressWithUnit = d.unit_number ? `${d.address} ${d.unit_number}` : (d.address || "Not provided");
+    let prompt = `ASSESSMENT TYPE: ${analysis.assessment_type?.replace(/_/g, " ").toUpperCase()}\nPROPERTY TYPE: ${analysis.property_type?.replace(/_/g, " ")}\nADDRESS: ${addressWithUnit}\nLOCATION CLASS: ${analysis.location_class || "unknown"}\nCLIENT RELATIONSHIP: ${d.client_relationship || "buyer's agent"}\nTODAY'S DATE: ${today}\n\nINTAKE DATA:\n${JSON.stringify(d, null, 2)}\n\nPerform a complete PropPrompt™ analysis for the above property. Follow the JSON schema and all instructions in the system prompt exactly.`;
 
     // Try PromptLibrary override
     try {

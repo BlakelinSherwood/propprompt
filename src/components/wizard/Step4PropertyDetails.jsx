@@ -67,28 +67,45 @@ export default function Step4PropertyDetails({ intake, update, onNext, onBack })
       </p>
 
       {/* Address */}
-      <div className="mb-5">
-        <Label className="text-xs font-medium text-[#1A3226]/60 mb-1.5 block">
-          Property Address <span className="text-red-400">*</span>
-        </Label>
-        <AddressAutocomplete
-          value={intake.address}
-          placeholder="123 Ocean Ave, Marblehead, MA 01945"
-          onChange={(result) => update(result)}
-        />
-        {marketCheck === "warn" && (
-          <p className="mt-1.5 flex items-center gap-1 text-xs text-amber-600">
-            <AlertCircle className="w-3.5 h-3.5" />
-            Address not confirmed as Eastern Massachusetts — please verify before proceeding.
-          </p>
-        )}
-        {marketCheck === true && intake.address && intake.address.length > 10 && (
-          <p className="mt-1.5 text-xs text-emerald-600">✓ Eastern Massachusetts market confirmed</p>
-        )}
-        <p className="mt-1 text-[10px] text-[#1A3226]/35">
-          Start typing to see address suggestions — select to auto-fill city, state, ZIP, and coordinates.
-        </p>
-      </div>
+       <div className="mb-5">
+         <Label className="text-xs font-medium text-[#1A3226]/60 mb-1.5 block">
+           Property Address <span className="text-red-400">*</span>
+         </Label>
+         <AddressAutocomplete
+           value={intake.address}
+           placeholder="123 Ocean Ave, Marblehead, MA 01945"
+           onChange={(result) => update(result)}
+         />
+         {marketCheck === "warn" && (
+           <p className="mt-1.5 flex items-center gap-1 text-xs text-amber-600">
+             <AlertCircle className="w-3.5 h-3.5" />
+             Address not confirmed as Eastern Massachusetts — please verify before proceeding.
+           </p>
+         )}
+         {marketCheck === true && intake.address && intake.address.length > 10 && (
+           <p className="mt-1.5 text-xs text-emerald-600">✓ Eastern Massachusetts market confirmed</p>
+         )}
+         <p className="mt-1 text-[10px] text-[#1A3226]/35">
+           Start typing to see address suggestions — select to auto-fill city, state, ZIP, and coordinates.
+         </p>
+       </div>
+
+       {/* Unit Number */}
+       <div className="mb-5">
+         <Label className="text-xs font-medium text-[#1A3226]/60 mb-1.5 block">
+           Unit Number (if applicable)
+         </Label>
+         <input
+           type="text"
+           value={intake.unit_number || ''}
+           onChange={(e) => update({ unit_number: e.target.value })}
+           placeholder="e.g. 402, Unit B, #3"
+           className="w-full px-3 py-2 rounded-lg border border-[#1A3226]/15 text-sm text-[#1A3226] placeholder-[#1A3226]/30 focus:outline-none focus:ring-1 focus:ring-[#B8982F] focus:border-[#B8982F]"
+         />
+         <p className="mt-1 text-[10px] text-[#1A3226]/35">
+           For condos, apartments, or multi-unit properties.
+         </p>
+       </div>
 
       {/* Property Type */}
       <div className="mb-5">
