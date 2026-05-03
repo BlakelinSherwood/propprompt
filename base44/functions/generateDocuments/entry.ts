@@ -119,7 +119,7 @@ Deno.serve(async (req) => {
       // CMA, Listing Pricing, Buyer Intelligence — rendered inline via generateReportPdfs
       const pdfRes = await base44.functions.invoke('generateReportPdfs', { analysisId, branding });
       const b64 = pdfRes?.data?.base64;
-      if (!b64) throw new Error('generateReportPdfs failed');
+      if (!b64) throw new Error(`generateReportPdfs failed: ${pdfRes?.data?.error || 'no base64 returned'}`);
       filename = pdfRes?.data?.filename || filename;
       const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
 

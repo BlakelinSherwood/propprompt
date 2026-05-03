@@ -34,7 +34,12 @@ Deno.serve(async (req) => {
 
     const arrayBuffer = doc.output('arraybuffer');
     const bytes = new Uint8Array(arrayBuffer);
-    const base64 = btoa(String.fromCharCode(...bytes));
+    let base64 = '';
+    const chunkSize = 8192;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      base64 += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+    }
+    base64 = btoa(base64);
     const LABELS = { listing_pricing: 'Listing_Pricing_Analysis', buyer_intelligence: 'Buyer_Intelligence_Report', cma: 'Comparative_Market_Analysis' };
     const filename = `${LABELS[analysis.assessment_type] || 'Analysis'}_${Date.now()}.pdf`;
 
