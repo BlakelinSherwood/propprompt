@@ -604,6 +604,8 @@ async function renderListingPricingPdf(doc, data, branding, netProceedsJson=null
     y+=60;
   }
 
+
+
   // SECTION 05: Seller Financial Summary
   doc.addPage(); drawSectionDivider(doc,branding,5,'Seller Financial Summary','Estimated net proceeds · analysis summary');
   doc.addPage(); await drawPageFrame(doc,branding,'Section 05 · Seller Financial Summary','Estimated Net Proceeds'); y=90;
