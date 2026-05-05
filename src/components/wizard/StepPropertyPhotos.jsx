@@ -33,22 +33,7 @@ export default function StepPropertyPhotos({ intake, update, onNext, onBack }) {
     setFetching(true);
     setFetchError(null);
     try {
-      const res = await base44.integrations.Core.InvokeLLM({
-        prompt: `Search online for the most recently marketed listing photos for this property: "${intake.address}". 
-Look on Zillow, Redfin, Realtor.com, Compass, and MLS sites. 
-Return ONLY a JSON array of up to 6 direct image URLs that are publicly accessible photos of this specific property's interior and exterior.
-If you cannot find real listing photos, return an empty array [].
-Return ONLY the JSON array, nothing else.`,
-        add_context_from_internet: true,
-        response_json_schema: {
-          type: "object",
-          properties: {
-            photo_urls: { type: "array", items: { type: "string" } },
-            source: { type: "string" },
-            found: { type: "boolean" }
-          }
-        }
-      });
+      const res = await base44.functions.invoke('fetchListingPhotos', { address: intake.address });
       const urls = (res?.photo_urls || []).filter(u => u && u.startsWith("http")).slice(0, 6);
       if (urls.length > 0) {
         update({ listing_photos: [...photos, ...urls].slice(0, MAX_PHOTOS), photos_source: "online" });
