@@ -127,9 +127,15 @@ Deno.serve(async (req) => {
       const driveConnections = await base44.asServiceRole.entities.DriveConnection.filter({ user_email: user.email, status: 'connected' });
       const drive = driveConnections[0];
       if (drive?.auto_sync_pdf) {
+        let bytesBase64 = '';
+        const chunkSize = 8192;
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+          bytesBase64 += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+        }
+        bytesBase64 = btoa(bytesBase64);
         const driveRes = await base44.functions.invoke('driveUpload', {
           analysisId, filename, mimeType: 'application/pdf',
-          bytesBase64: btoa(String.fromCharCode(...bytes)),
+          bytesBase64,
           folderId: drive.root_folder_id,
         });
         driveUrl = driveRes?.data?.driveUrl || null;
