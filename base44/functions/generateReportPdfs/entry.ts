@@ -434,7 +434,8 @@ async function renderListingPricingPdf(doc, data, branding, netProceedsJson=null
   const today=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
   const month=new Date().getMonth(), year=new Date().getFullYear();
   const season=month<3?'Winter':month<6?'Spring':month<9?'Summer':'Fall';
-  const BODY_SIZE=10.5, LINE_H=15, BOTTOM=720;
+  const BODY_SIZE=10.5, LINE_H=16, BOTTOM=720;
+  const SECTION_GAP=28, SUBSECTION_GAP=16;
 
   async function renderNarrative(text,breadcrumb,title,startY) {
     if (!text) return startY;
@@ -444,7 +445,7 @@ async function renderListingPricingPdf(doc, data, branding, netProceedsJson=null
       if (y+LINE_H>BOTTOM) { doc.addPage();await drawPageFrame(doc,branding,breadcrumb,title);y=90;doc.setFontSize(BODY_SIZE);doc.setFont('helvetica','normal');doc.setTextColor(50,50,50); }
       doc.text(lines[i],margin,y); y+=LINE_H;
     }
-    return y+10;
+    return y+SUBSECTION_GAP;
   }
 
   // COVER
@@ -478,6 +479,7 @@ async function renderListingPricingPdf(doc, data, branding, netProceedsJson=null
   doc.addPage(); await drawPageFrame(doc,branding,'Section 01 · Property & Market Context','Property & Market Overview');
   let y=90;
   if (data.executive_summary) y=await renderNarrative(data.executive_summary,'Section 01 · Property & Market Context','Property & Market Overview',y);
+  y+=SUBSECTION_GAP;
   const statBoxes=[
     {label:'MEDIAN SALE PRICE',value:mc.median_sale_price?fmt(mc.median_sale_price):'N/A'},
     {label:'YOY APPRECIATION',value:mc.yoy_appreciation?fmtPct(mc.yoy_appreciation):'N/A'},
@@ -488,19 +490,19 @@ async function renderListingPricingPdf(doc, data, branding, netProceedsJson=null
   if (y+60>BOTTOM) { doc.addPage();await drawPageFrame(doc,branding,'Section 01 · Property & Market Context','Market Snapshot');y=90; }
   statBoxes.forEach((sb,i)=>{
     const bx=margin+i*(boxW+6);
-    doc.setFillColor(primary.r,primary.g,primary.b);doc.roundedRect(bx,y,boxW,52,3,3,'F');
+    doc.setFillColor(primary.r,primary.g,primary.b);doc.roundedRect(bx,y,boxW,54,3,3,'F');
     doc.setFontSize(6.5);doc.setFont('helvetica','bold');doc.setTextColor(accent.r,accent.g,accent.b);doc.text(sb.label,bx+boxW/2,y+14,{align:'center',maxWidth:boxW-8});
-    doc.setFontSize(13);doc.setFont('helvetica','bold');doc.setTextColor(255,255,255);doc.text(sb.value,bx+boxW/2,y+36,{align:'center',maxWidth:boxW-8});
-  }); y+=64;
-  if (mc.narrative) { if (y+40>BOTTOM){doc.addPage();await drawPageFrame(doc,branding,'Section 01 · Property & Market Context','Market Conditions');y=90;} y=await renderNarrative(mc.narrative,'Section 01 · Property & Market Context','Market Conditions',y); }
-  drawTable(doc,margin,y,['Market Indicator','Value'],[
+    doc.setFontSize(13);doc.setFont('helvetica','bold');doc.setTextColor(255,255,255);doc.text(sb.value,bx+boxW/2,y+37,{align:'center',maxWidth:boxW-8});
+  }); y+=68;
+  if (mc.narrative) { if (y+40>BOTTOM){doc.addPage();await drawPageFrame(doc,branding,'Section 01 · Property & Market Context','Market Conditions');y=90;} y=await renderNarrative(mc.narrative,'Section 01 · Property & Market Context','Market Conditions',y); y+=SUBSECTION_GAP; }
+  y=drawTable(doc,margin,y,['Market Indicator','Value'],[
     ['Median Sale Price',mc.median_sale_price?fmt(mc.median_sale_price):'N/A'],
     ['YoY Appreciation',mc.yoy_appreciation?fmtPct(mc.yoy_appreciation):'N/A'],
     ['Avg Days on Market',mc.avg_days_on_market?`${mc.avg_days_on_market} days`:'N/A'],
     ['Sale-to-List Ratio',mc.sale_to_list_ratio?fmtPct(mc.sale_to_list_ratio*100):'N/A'],
     ['Months of Inventory',mc.months_inventory?`${mc.months_inventory} months`:'N/A'],
     ['Market Characterization',mc.market_characterization?prettifyEnum(mc.market_characterization):'N/A'],
-  ],[contentWidth-140,140],{headerFill:branding.primary_color||'#1A3226',headerTextColor:'#FFFFFF',fontSize:10,rowHeight:28,branding});
+    ],[contentWidth-140,140],{headerFill:branding.primary_color||'#1A3226',headerTextColor:'#FFFFFF',fontSize:10,rowHeight:28,branding});y+=SECTION_GAP;
 
   const pc=data.property_context||{};
   if (pc.walkability||pc.flood_zone||pc.schools) {
@@ -515,29 +517,32 @@ async function renderListingPricingPdf(doc, data, branding, netProceedsJson=null
     for (const tier of data.tiered_comps.tiers) {
       if (y+60>710){doc.addPage();await drawPageFrame(doc,branding,'Section 02 · Valuation Analysis','Comparable Sales (cont.)');y=90;}
       const tc=tier.tier_id==='A'?primary:tier.tier_id==='B'?accent:hexToRgb('#888888');
-      doc.setFillColor(tc.r,tc.g,tc.b);doc.roundedRect(margin,y,contentWidth,22,3,3,'F');
+      doc.setFillColor(tc.r,tc.g,tc.b);doc.roundedRect(margin,y,contentWidth,24,3,3,'F');
       doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(255,255,255);
       const ppsf=tier.ppsf_range?`  ·  $${tier.ppsf_range.low}–$${tier.ppsf_range.high}/SF`:'';
-      doc.text(`${tier.tier_label||'Tier '+tier.tier_id}${ppsf}`,margin+8,y+15);y+=26;
+      doc.text(`${tier.tier_label||'Tier '+tier.tier_id}${ppsf}`,margin+10,y+16);y+=28;
       if (tier.comps?.length) {
         y=drawTable(doc,margin,y,['Address','Date','Price','SF','$/SF Raw','$/SF Adj','Condition'],
           tier.comps.map(c=>[c.address||'',c.sale_date||'',c.sale_price?fmt(c.sale_price):'',c.square_feet?c.square_feet.toLocaleString():'',c.raw_ppsf?`$${c.raw_ppsf}`:'',c.adjusted_ppsf?`$${c.adjusted_ppsf}`:'',c.condition_vs_subject||'']),
-          [130,52,68,42,52,52,56],{headerFill:branding.primary_color||'#1A3226',headerTextColor:'#FFFFFF',fontSize:7.5,rowHeight:22,branding});y+=10;
+          [130,52,68,42,52,52,56],{headerFill:branding.primary_color||'#1A3226',headerTextColor:'#FFFFFF',fontSize:7.5,rowHeight:24,branding});y+=14;
       }
     }
   }
   if (data.tiered_comps?.implied_value_range) {
     const ivr=data.tiered_comps.implied_value_range;
-    if (y+36>710){doc.addPage();await drawPageFrame(doc,branding,'Section 02 · Valuation Analysis','Implied Value Range');y=90;}
-    doc.setFillColor(primary.r,primary.g,primary.b);doc.roundedRect(margin,y,contentWidth,32,3,3,'F');
+    if (y+44>710){doc.addPage();await drawPageFrame(doc,branding,'Section 02 · Valuation Analysis','Implied Value Range');y=90;}
+    y+=SUBSECTION_GAP;
+    doc.setFillColor(primary.r,primary.g,primary.b);doc.roundedRect(margin,y,contentWidth,36,3,3,'F');
     doc.setFontSize(11);doc.setFont('helvetica','bold');doc.setTextColor(accent.r,accent.g,accent.b);
-    doc.text(`Implied Value Range: ${fmt(ivr.low)} – ${fmt(ivr.high)}  ·  Midpoint: ${fmt(ivr.midpoint)}`,margin+10,y+21);y+=40;
+    doc.text(`Implied Value Range: ${fmt(ivr.low)} – ${fmt(ivr.high)}  ·  Midpoint: ${fmt(ivr.midpoint)}`,margin+12,y+23);y+=44;
   }
   if (v.narrative) {
     if (y+40>BOTTOM){doc.addPage();await drawPageFrame(doc,branding,'Section 02 · Valuation Analysis','Valuation Summary');y=90;}
-    doc.setFontSize(11);doc.setFont('helvetica','bold');doc.setTextColor(primary.r,primary.g,primary.b);doc.text('Valuation Summary',margin,y);y+=16;
+    y+=SUBSECTION_GAP;
+    doc.setFontSize(11);doc.setFont('helvetica','bold');doc.setTextColor(primary.r,primary.g,primary.b);doc.text('Valuation Summary',margin,y);y+=18;
     y=await renderNarrative(v.narrative,'Section 02 · Valuation Analysis','Valuation Summary',y);
   }
+  y+=SUBSECTION_GAP;
   await renderAvmSection(doc,data,branding,margin,contentWidth,primary,accent,fmt);
 
   // SECTION 03: Buyer Intelligence (Pro+)
@@ -587,15 +592,16 @@ async function renderListingPricingPdf(doc, data, branding, netProceedsJson=null
   if (data.pricing_scenarios?.length) {
     y=drawTable(doc,margin,y,['Scenario','Price','Est. DOM','Rationale'],
       data.pricing_scenarios.map(s=>[s.label||'',fmt(s.price),s.expected_dom||'',s.rationale||'']),
-      [140,72,65,contentWidth-285],{headerFill:branding.primary_color||'#1A3226',headerTextColor:'#FFFFFF',fontSize:8.5,rowHeight:26,branding});y+=16;
+      [140,72,65,contentWidth-285],{headerFill:branding.primary_color||'#1A3226',headerTextColor:'#FFFFFF',fontSize:8.5,rowHeight:28,branding});y+=20;
   }
   if (v.strategic_list_price) {
-    if (y+52>710){doc.addPage();await drawPageFrame(doc,branding,'Section 04 · Pricing Strategy','Strategic Recommendation');y=90;}
-    doc.setFillColor(primary.r,primary.g,primary.b);doc.roundedRect(margin,y,contentWidth,48,3,3,'F');
-    doc.setFontSize(8.5);doc.setFont('helvetica','bold');doc.setTextColor(accent.r,accent.g,accent.b);doc.text('RECOMMENDED STRATEGIC LIST PRICE',margin+10,y+14);
-    doc.setFontSize(24);doc.setFont('helvetica','bold');doc.setTextColor(255,255,255);doc.text(fmt(v.strategic_list_price),margin+10,y+39);
-    if (v.recommended_range_low) { doc.setFontSize(10);doc.setFont('helvetica','normal');doc.setTextColor(accent.r,accent.g,accent.b);doc.text(`Range: ${fmt(v.recommended_range_low)} – ${fmt(v.recommended_range_high)}`,margin+contentWidth*0.45,y+39); }
-    y+=56;
+    if (y+62>710){doc.addPage();await drawPageFrame(doc,branding,'Section 04 · Pricing Strategy','Strategic Recommendation');y=90;}
+    y+=SUBSECTION_GAP;
+    doc.setFillColor(primary.r,primary.g,primary.b);doc.roundedRect(margin,y,contentWidth,52,3,3,'F');
+    doc.setFontSize(8.5);doc.setFont('helvetica','bold');doc.setTextColor(accent.r,accent.g,accent.b);doc.text('RECOMMENDED STRATEGIC LIST PRICE',margin+12,y+15);
+    doc.setFontSize(28);doc.setFont('helvetica','bold');doc.setTextColor(255,255,255);doc.text(fmt(v.strategic_list_price),margin+12,y+40);
+    if (v.recommended_range_low) { doc.setFontSize(10);doc.setFont('helvetica','normal');doc.setTextColor(accent.r,accent.g,accent.b);doc.text(`Range: ${fmt(v.recommended_range_low)} – ${fmt(v.recommended_range_high)}`,margin+contentWidth*0.48,y+40); }
+    y+=60;
   }
 
   // SECTION 05: Seller Financial Summary
