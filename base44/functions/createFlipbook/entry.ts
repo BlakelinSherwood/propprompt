@@ -21,8 +21,9 @@ Deno.serve(async (req) => {
     let pdfUrl = analysis.output_pdf_url;
     if (!pdfUrl) {
       const pdfRes = await base44.functions.invoke('generateDocuments', { analysisId, format: 'pdf' });
+      if (pdfRes?.data?.error) throw new Error(`PDF generation failed: ${pdfRes.data.error}`);
       pdfUrl = pdfRes?.data?.url;
-      if (!pdfUrl) throw new Error('PDF generation failed');
+      if (!pdfUrl) throw new Error('PDF generation failed: no URL returned');
     }
 
     // Fetch PDF bytes
@@ -58,7 +59,9 @@ Deno.serve(async (req) => {
     return Response.json({ record, token, publicUrl });
 
   } catch (error) {
-    console.error('[createFlipbook] error:', error.message);
-    return Response.json({ error: error.message }, { status: 500 });
+    const msg = error?.message || String(error);
+    console.error('[createFlipbook] error:', msg);
+    console.error('[createFlipbook] stack:', error?.stack);
+    return Response.json({ error: msg }, { status: 500 });
   }
 });

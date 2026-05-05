@@ -156,7 +156,9 @@ Deno.serve(async (req) => {
     return Response.json({ url: fileUrl, format: 'pdf' });
 
   } catch (err) {
-    console.error('[generateDocuments] error:', err.message);
-    return Response.json({ error: err.message }, { status: 500 });
+   const msg = err?.message || String(err);
+   console.error('[generateDocuments] error:', msg);
+   console.error('[generateDocuments] stack:', err?.stack);
+   return Response.json({ error: msg }, { status: 500 });
   }
 });
