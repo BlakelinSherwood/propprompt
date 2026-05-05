@@ -678,7 +678,7 @@ async function renderClientPortfolioPdf(doc, data, branding) {
       if(y+80>BOTTOM){doc.addPage();await drawPageFrame(doc,branding,'Section 04 · Design Trends','Top Renovations by ROI');y=90;}
       doc.setFontSize(11);doc.setFont('helvetica','bold');doc.setTextColor(primary.r,primary.g,primary.b);doc.text('Top Renovations by ROI',margin,y);y+=12;
       doc.setDrawColor(accent.r,accent.g,accent.b);doc.setLineWidth(1.5);doc.line(margin,y,margin+170,y);y+=12;
-      const renR=dt.popular_renovations.filter(r=>r.relevant_to_subject!==false).map(r=>[r.renovation||'',r.avg_cost||'—',r.avg_roi||'—',r.time_to_complete||'—',r.priority?r.priority.charAt(0).toUpperCase()+r.priority.slice(1):'—']);
+      const renR=dt.popular_renovations.filter(r=>r.relevant_to_subject!==false).map(r=>[r.renovation||'',r.avg_cost||'—',r.avg_roi||'—',r.time_to_complete||'—',r.priority?String(r.priority).charAt(0).toUpperCase()+String(r.priority).slice(1):'—']);
       if(renR.length){y=drawTable(doc,margin,y,['Renovation','Est. Cost','Avg ROI','Timeline','Priority'],renR,[175,90,65,80,contentWidth-418],{headerFill:branding.primary_color||'#1A3226',headerTextColor:'#FFFFFF',fontSize:8.5,rowHeight:26,branding});y+=12;}
     }
   }
