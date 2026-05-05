@@ -25,7 +25,28 @@ Split-level, raised ranch, and multi-level homes present unique valuation challe
 
 ## Solution Architecture
 
-### 1. Property Architecture Detection
+### 1. Topography Detection
+
+Automatically detects property slope and elevation characteristics:
+- **Hilltop**: Elevated terrain (+0.15 desirability) — views, drainage benefits, but driveway complexity
+- **Steep Slope**: -0.15 desirability — maintenance cost, accessibility challenges, driveway danger
+- **Gentle Slope**: +0.05 — balanced views and accessibility
+- **Flat**: +0.10 — accessibility, flood risk, straightforward parking
+- **Valley**: -0.10 — flood risk, limited sun, privacy benefit
+
+Each topography has sub-factors: views, drainage, driveway complexity, flood risk, erosion risk, maintenance cost.
+
+### 2. Street Characteristics Detection
+
+Identifies street-level factors that impact buyer perception:
+- **Blind Curve**: -0.20 desirability — safety concern, delivery/emergency access risk
+- **Double Line Parking**: -0.10 — guest parking restricted, parking stress
+- **High Traffic**: -0.15 — noise, child safety, resale perception
+- **Quiet Street**: +0.15 — residential appeal, safety, neighborhood quality
+- **Limited Access**: -0.12 — single driveway, emergency access concerns, mover logistics
+- **Corner Lot**: -0.08 — traffic exposure, privacy loss, but visibility for business
+
+### 3. Property Architecture Detection
 
 The analyzer automatically detects property type based on intake data:
 - Split Level
@@ -42,32 +63,36 @@ Each type has a **basementFactor** (0.0 - 1.0) representing market perception of
 - **Colonial**: 0.80 (finished basements well-integrated)
 - **Ranch**: 0.75 (basement is separate space)
 
-### 2. Desirability Score Algorithm
+### 4. Desirability Score Algorithm
 
-Creates a 0-1 desirability score based on:
-
-**Factors** (each -1.0 to +1.0):
-- **Versatility**: Can basement/multiple levels adapt to different uses?
-- **Updates**: Are dated multi-level homes currently attractive?
-- **Marketing Flexibility**: Can agent highlight different selling points?
-- **Maintenance Complexity**: Multiple roof lines, foundations cost more
+Creates a 0-1 desirability score based on five weighted factors:
 
 **Score Calculation**:
 ```
 Baseline: 0.5
-+ Architecture score (15% weight) — how appealing is this type overall?
-+ Market performance of similar comps (15% weight) — how fast do they sell?
-+ Age appeal adjustment (10% weight) — is vintage or modern more desirable for this type?
++ Architecture appeal (15% weight)
++ Market performance of similar comps (15% weight)
++ Age/condition appeal (10% weight)
++ Topography factor (15% weight) — hilltop/slope/valley impact
++ Street characteristics factor (10% weight) — blind curve/parking/traffic impact
 = Final score (0-1)
 ```
 
 **Interpretation**:
 - **0.75+**: Highly desirable in current market
 - **0.60-0.75**: Good appeal with selective demographics
-- **0.45-0.60**: Requires strategic positioning
-- **<0.45**: Market headwinds — pricing and presentation critical
+- **0.45-0.60**: Requires strategic positioning due to one or more challenges
+- **<0.45**: Multiple headwinds — pricing and targeted marketing essential
 
-### 3. PPSF Adjustment for Basement
+**Example**: Split-level on steep slope with blind curve street:
+- Architecture factor: +0.10 (split-level baseline)
+- Topography factor: -0.15 (steep slope penalty)
+- Street factor: -0.20 (blind curve + driveway safety issues)
+- Comp performance: 0 (baseline)
+- Age appeal: 0 (neutral)
+- **Final: 0.5 + 0.10 - 0.15 - 0.20 = 0.25** (significant headwinds — requires strategic pricing and positioning)
+
+### 5. PPSF Adjustment for Basement
 
 When calculating effective square footage for PPSF:
 
@@ -85,25 +110,32 @@ effectiveSubjectSqft = 1,782 + 280 = 2,062 SF (vs. recorded 2,182 SF)
 // PPSF is then calculated on effective sqft, not recorded sqft
 ```
 
-### 4. Integration with AI Prompt Assembly
+### 6. Integration with AI Prompt Assembly
 
 Add the following section to `assemblePrompt()` in `functions/assemblePrompt.js`:
 
 ```javascript
-// STEP 1: Import architecture analyzer
+// STEP 1: Import architecture & site analyzer
 import { 
-  detectPropertyArchitecture, 
+  detectPropertyArchitecture,
+  detectTopography,
+  detectStreetCharacteristics,
   calculateDesirabilityScore, 
   adjustPPSFForArchitecture,
-  generateArchitectureNarrative 
+  generateArchitectureNarrative,
+  generatePropertyContextNarrative
 } from '@/lib/propertyArchitectureAnalyzer';
 
-// STEP 2: Detect architecture during prompt assembly
+// STEP 2: Detect all site characteristics during prompt assembly
 const architecture = detectPropertyArchitecture(intake);
+const topography = detectTopography(intake);
+const streetChar = detectStreetCharacteristics(intake);
 const desirability = calculateDesirabilityScore(
   architecture, 
   intake, 
-  analysis.agent_comps || []
+  analysis.agent_comps || [],
+  topography,
+  streetChar
 );
 
 // STEP 3: Adjust comps' PPSF if basement data available
@@ -118,46 +150,63 @@ if (intake.basement_sqft) {
 }
 
 // STEP 4: Include in prompt context
-const architectureContext = `
-PROPERTY ARCHITECTURE ANALYSIS:
-- Type: ${architecture.description} (${desirability.interpretation})
-- Desirability Score: ${(desirability.score * 100).toFixed(0)}%
+const siteAnalysisContext = `
+PROPERTY SITE & ARCHITECTURE ANALYSIS:
+- Architecture: ${architecture.description} (${desirability.interpretation})
+- Topography: ${topography.detectedTopo} (${topography.desirabilityFactor > 0 ? '+' : ''}${(topography.desirabilityFactor * 100).toFixed(0)}% desirability impact)
+- Street Characteristics: ${streetChar.description} (${streetChar.combinedFactor > 0 ? '+' : ''}${(streetChar.combinedFactor * 100).toFixed(0)}% desirability impact)
+- Overall Desirability Score: ${(desirability.score * 100).toFixed(0)}%
 - Basement Factor: ${(architecture.basementFactor * 100).toFixed(0)}% of above-grade market value
-- Effective Marketable Sqft: [calculated from above-grade + adjusted basement]
 
-NARRATIVE:
+ARCHITECTURAL CONTEXT:
 ${generateArchitectureNarrative(architecture, desirability, intake)}
 
-VALUATION ADJUSTMENT:
-When calculating PPSF ranges, use effective square footage which accounts for basement 
-being worth ${(architecture.basementFactor * 100).toFixed(0)}% of above-grade. This explains 
-any sqft discrepancies between MLS marketing claims and public record assessor data.
+SITE CONTEXT:
+${generatePropertyContextNarrative(architecture, desirability, intake)}
+
+VALUATION ADJUSTMENTS:
+1. Use effective square footage (above-grade + ${(architecture.basementFactor * 100).toFixed(0)}% of basement)
+2. Apply topography considerations (${topography.desirabilityFactor > 0 ? 'positive' : 'negative'} impact on pricing power)
+3. Account for street-level restrictions (${streetChar.combinedFactor > 0 ? 'supportive' : 'limiting'} factors for buyer pool)
+4. Adjust comparable PPSF if similar homes present topography/street challenges
 `;
 
-// Add architectureContext to the full prompt assembly
+// Add siteAnalysisContext to the full prompt assembly
 ```
 
-### 5. Prompt Instruction Addition
+### 7. Prompt Instruction Addition
 
 Add this to the AI system prompt for valuation analysis:
 
 ```
-PROPERTY ARCHITECTURE CONSIDERATION:
-For split-level, raised ranch, multi-level, and similar homes, analyze how basement 
-square footage affects market perception and PPSF calculations:
+COMPREHENSIVE SITE & ARCHITECTURE CONSIDERATION:
 
-1. Identify discrepancies between public record sqft and MLS marketed sqft
-2. Understand that multi-level homes are often marketed with different "livable sqft" 
-   totals by different agents based on what they're emphasizing
-3. When comparing comps, normalize PPSF by applying the basement factor 
-   (provided in architecture analysis)
-4. Explain any sqft discrepancies in the valuation narrative
-5. Recognize that below-grade spaces (even with windows) command lower PPSF 
-   and appeal to narrower buyer demographics
+ARCHITECTURE:
+For split-level, raised ranch, multi-level, and similar homes:
+- Identify discrepancies between public record sqft and MLS marketed sqft
+- Normalize PPSF by applying the basement factor (0.65-0.80 depending on type)
+- Explain any sqft discrepancies in the valuation narrative
+- Recognize that below-grade spaces command lower PPSF and narrower buyer appeal
 
-Example: A split-level with 2,182 SF recorded but 1,782 SF above-grade + 400 SF basement
-should be valued based on effective sqft of ~2,062 SF (not 2,182), explaining why 
-PPSF appears lower than listed comps that count full sqft without adjustment.
+TOPOGRAPHY:
+For hilltop, slope, or valley properties:
+- Hilltop: Positive for views and drainage, negative for driveway access/safety
+- Steep slopes: Reduce pricing power due to maintenance, accessibility, mover logistics
+- Valleys: Higher flood risk, limited sunlight, but potential privacy appeal
+- Adjust comparable PPSF if topography differs (sloped property vs. flat comp)
+
+STREET CHARACTERISTICS:
+For blind curves, double-line parking, high-traffic, or limited-access properties:
+- Blind curve at property end: Safety concern impacts buyer pool (-20% desirability)
+- Double-line parking: Guest parking restrictions affect buyer satisfaction (-10%)
+- High traffic: Noise and safety perception reduce appeal for families (-15%)
+- Limited access: Emergency response and moving logistics impact appeal (-12%)
+- Consider if comparables have similar street-level constraints
+
+COMBINED IMPACT EXAMPLE:
+A split-level (durable but dated) + steep slope driveway + blind curve street could 
+score 0.35-0.45 desirability, requiring significant positioning strategy. PPSF should 
+reflect these cumulative challenges, even if individual comps don't capture all factors.
 ```
 
 ## Implementation Checklist

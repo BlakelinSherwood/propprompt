@@ -116,37 +116,209 @@ export function detectPropertyArchitecture(intakeData) {
   };
 }
 
-export function calculateDesirabilityScore(architecture, intakeData, comps = []) {
+export function detectTopography(intakeData) {
+  const notes = (intakeData?.notes || '').toLowerCase();
+  const address = (intakeData?.address || '').toLowerCase();
+  const text = `${address} ${notes}`;
+  
+  const topographies = {
+    hilltop: {
+      keywords: ['hill', 'hilltop', 'elevated', 'high ground', 'rise', 'crest'],
+      desirabilityFactor: 0.15, // positive for views, negative for driveway
+      factors: {
+        views: 0.2,
+        drainage: 0.1,
+        drivewayComplexity: -0.2,
+        floodRisk: 0.3,
+        sunExposure: 0.1
+      }
+    },
+    steep_slope: {
+      keywords: ['steep', 'slope', 'sloped', 'hillside', 'grade change', 'steep driveway', 'steep slope'],
+      desirabilityFactor: -0.15,
+      factors: {
+        views: 0.1,
+        drainage: -0.2,
+        drivewayComplexity: -0.3,
+        floodRisk: 0.2,
+        erosionRisk: -0.2,
+        maintenanceCost: -0.2
+      }
+    },
+    gentle_slope: {
+      keywords: ['gentle slope', 'gradual', 'sloping', 'tiered'],
+      desirabilityFactor: 0.05,
+      factors: {
+        views: 0.05,
+        drainage: 0.1,
+        drivewayComplexity: -0.05,
+        floodRisk: 0.05
+      }
+    },
+    flat: {
+      keywords: ['flat', 'level', 'even terrain'],
+      desirabilityFactor: 0.1,
+      factors: {
+        drainage: -0.1,
+        drivewayComplexity: 0.2,
+        floodRisk: -0.1,
+        accessibility: 0.2
+      }
+    },
+    valley: {
+      keywords: ['valley', 'low spot', 'depression', 'basin'],
+      desirabilityFactor: -0.1,
+      factors: {
+        floodRisk: -0.3,
+        drainage: -0.2,
+        sunExposure: -0.15,
+        views: -0.2
+      }
+    }
+  };
+  
+  let detectedTopo = 'flat';
+  let topoFactor = 0;
+  
+  for (const [key, config] of Object.entries(topographies)) {
+    if (config.keywords.some(kw => text.includes(kw))) {
+      detectedTopo = key;
+      topoFactor = config.desirabilityFactor;
+      return { detectedTopo, topoFactor, ...config };
+    }
+  }
+  
+  return { detectedTopo, topoFactor, ...topographies[detectedTopo] };
+}
+
+export function detectStreetCharacteristics(intakeData) {
+  const notes = (intakeData?.notes || '').toLowerCase();
+  const address = (intakeData?.address || '').toLowerCase();
+  const text = `${address} ${notes}`;
+  
+  const characteristics = {
+    blind_curve: {
+      keywords: ['blind curve', 'blind turn', 'curve at end', 'curves into', 'turn blind'],
+      desirabilityFactor: -0.2,
+      factors: {
+        accessibilityAndSafety: -0.3,
+        trafficPattern: -0.15,
+        deliveryAndEmergency: -0.2,
+        guestParking: -0.1
+      }
+    },
+    double_line: {
+      keywords: ['double line', 'double yellow', 'no parking', 'restricted parking'],
+      desirabilityFactor: -0.1,
+      factors: {
+        guestParking: -0.25,
+        streetParking: -0.2,
+        resalePerception: -0.1
+      }
+    },
+    high_traffic: {
+      keywords: ['high traffic', 'busy street', 'main road', 'highway', 'major road', 'busy road'],
+      desirabilityFactor: -0.15,
+      factors: {
+        noiseAndActivity: -0.25,
+        childSafety: -0.2,
+        trafficPattern: -0.2,
+        guestExperience: -0.15
+      }
+    },
+    quiet_street: {
+      keywords: ['quiet street', 'quiet', 'dead end', 'cul-de-sac', 'tree-lined', 'peaceful', 'residential'],
+      desirabilityFactor: 0.15,
+      factors: {
+        noiseAndActivity: 0.25,
+        childSafety: 0.2,
+        neighborhoodAppeal: 0.2
+      }
+    },
+    limited_access: {
+      keywords: ['limited access', 'single access', 'one driveway', 'shared driveway', 'narrow access'],
+      desirabilityFactor: -0.12,
+      factors: {
+        accessibilityAndSafety: -0.25,
+        emergencyAccess: -0.2,
+        moverFriendliness: -0.15
+      }
+    },
+    corner_lot: {
+      keywords: ['corner lot', 'corner property', 'on corner'],
+      desirabilityFactor: -0.08,
+      factors: {
+        trafficExposure: -0.2,
+        privacyAndNoise: -0.15,
+        visibilityAndCommerce: 0.15
+      }
+    }
+  };
+  
+  const detected = [];
+  const allFactors = {};
+  let combinedFactor = 0;
+  
+  for (const [key, config] of Object.entries(characteristics)) {
+    if (config.keywords.some(kw => text.includes(kw))) {
+      detected.push(key);
+      combinedFactor += config.desirabilityFactor;
+      Object.assign(allFactors, config.factors);
+    }
+  }
+  
+  return {
+    detected: detected.length > 0 ? detected : ['standard'],
+    combinedFactor: Math.max(-0.4, Math.min(0.25, combinedFactor)), // cap to reasonable range
+    factors: allFactors,
+    description: detected.length > 0 ? detected.join(', ') : 'Standard street characteristics'
+  };
+}
+
+export function calculateDesirabilityScore(architecture, intakeData, comps = [], topography = null, streetChar = null) {
   if (!architecture) return { score: 0.5, factors: {} };
   
-  const factors = { ...architecture.desirabilityFactors };
+  // Detect topography and street characteristics if not provided
+  const topo = topography || detectTopography(intakeData);
+  const street = streetChar || detectStreetCharacteristics(intakeData);
+  
+  const factors = { 
+    ...architecture.desirabilityFactors,
+    ...topo.factors,
+    ...street.factors
+  };
+  
   let totalScore = 0.5; // baseline
   
-  // Factor 1: Market appeal of architecture (weighted -10 to +10 on scale)
-  const archScore = Object.values(factors).reduce((a, b) => a + b, 0);
-  totalScore += archScore * 0.15; // 15% weight
+  // Factor 1: Market appeal of architecture (15% weight)
+  const archScore = Object.values(architecture.desirabilityFactors).reduce((a, b) => a + b, 0);
+  totalScore += archScore * 0.15;
   
-  // Factor 2: Recent market performance of similar types
+  // Factor 2: Recent market performance of similar types (15% weight)
   if (comps && comps.length > 0) {
     const similarComps = comps.filter(c => 
       c.condition_vs_subject === 'Similar' || !c.condition_vs_subject
     );
     if (similarComps.length > 0) {
       const avgDOM = similarComps.reduce((sum, c) => sum + (c.days_on_market || 25), 0) / similarComps.length;
-      // Faster sales = more desirable (invert DOM)
       const domScore = Math.max(-0.2, 0.3 - (avgDOM / 50));
-      totalScore += domScore * 0.15; // 15% weight
+      totalScore += domScore * 0.15;
     }
   }
   
-  // Factor 3: Age/condition appeal (newer multi-level = harder to market)
+  // Factor 3: Age/condition appeal (10% weight)
   const yearBuilt = intakeData?.year_built || 1980;
   const age = new Date().getFullYear() - yearBuilt;
   if (architecture.detectedType.includes('level')) {
-    // Older split/raised levels are seen as "character", newer ones as dated
     const ageAppeal = age > 40 ? 0.15 : age < 20 ? -0.15 : 0;
-    totalScore += ageAppeal * 0.1; // 10% weight
+    totalScore += ageAppeal * 0.1;
   }
+  
+  // Factor 4: Topography impact (15% weight)
+  totalScore += topo.desirabilityFactor * 0.15;
+  
+  // Factor 5: Street characteristics impact (10% weight)
+  totalScore += street.combinedFactor * 0.1;
   
   // Normalize to 0-1 scale
   totalScore = Math.max(0, Math.min(1, totalScore));
@@ -155,7 +327,11 @@ export function calculateDesirabilityScore(architecture, intakeData, comps = [])
     score: totalScore,
     factors,
     archScore,
-    interpretation: scoreToInterpretation(totalScore, architecture.description)
+    topoFactor: topo.desirabilityFactor,
+    streetFactor: street.combinedFactor,
+    topography: topo,
+    streetCharacteristics: street,
+    interpretation: scoreToInterpretation(totalScore, architecture.description, topo, street)
   };
 }
 
@@ -190,6 +366,60 @@ export function adjustPPSFForArchitecture(comps, architecture, subjectSqft, base
         (comp.sale_price / compEffectiveSqft)
     };
   });
+}
+
+export function generatePropertyContextNarrative(architecture, desirability, intakeData) {
+  const { description, detectedType, basementFactor } = architecture;
+  const { score, topography, streetCharacteristics } = desirability;
+  const yearBuilt = intakeData?.year_built || 'unknown';
+  const sqft = intakeData?.sqft || 0;
+  const basementSqft = intakeData?.basement_sqft || 0;
+  
+  let narrative = [];
+  
+  // Topography narrative
+  if (topography) {
+    switch (topography.detectedTopo) {
+      case 'hilltop':
+        narrative.push(`The property sits on elevated terrain with views and excellent drainage characteristics. Driveway access may require grading or upslope approach, which appeals to buyers seeking privacy and vistas but requires careful presentation of any maintenance considerations.`);
+        break;
+      case 'steep_slope':
+        narrative.push(`The property is situated on sloped terrain with a sloped driveway approach. While this creates visual interest and potential drainage benefits, it may present challenges for accessibility, mover logistics, and driveway maintenance that should be positioned strategically to the right buyer demographic.`);
+        break;
+      case 'gentle_slope':
+        narrative.push(`The property benefits from gentle topography with gradual slope, providing good drainage and visual variety while maintaining practical accessibility.`);
+        break;
+      case 'valley':
+        narrative.push(`The property is situated in lower terrain, which may impact drainage and water management. Buyers valuing privacy and shelter from wind may find this appealing, though flood risk and sunlight exposure should be carefully evaluated and disclosed.`);
+        break;
+    }
+  }
+  
+  // Street characteristics narrative
+  if (streetCharacteristics && streetCharacteristics.detected.length > 0) {
+    const issues = [];
+    if (streetCharacteristics.detected.includes('blind_curve')) {
+      issues.push(`blind curve at end of street affecting visibility and safety`);
+    }
+    if (streetCharacteristics.detected.includes('double_line')) {
+      issues.push(`double line parking restrictions limiting guest parking`);
+    }
+    if (streetCharacteristics.detected.includes('high_traffic')) {
+      issues.push(`high traffic volume along the street`);
+    }
+    if (streetCharacteristics.detected.includes('limited_access')) {
+      issues.push(`limited access to the property`);
+    }
+    if (streetCharacteristics.detected.includes('corner_lot')) {
+      issues.push(`corner lot exposure with dual street frontage`);
+    }
+    
+    if (issues.length > 0 && streetCharacteristics.combinedFactor < -0.1) {
+      narrative.push(`Street-level considerations: ${issues.join('; ')}. These factors may impact buyer perception and should be addressed through strategic positioning, pricing adjustments, or marketing focus on other property strengths.`);
+    }
+  }
+  
+  return narrative.join(' ');
 }
 
 export function generateArchitectureNarrative(architecture, desirability, intakeData) {
@@ -229,9 +459,29 @@ export function generateArchitectureNarrative(architecture, desirability, intake
   return narrative;
 }
 
-function scoreToInterpretation(score, archType) {
-  if (score > 0.75) return `${archType} is highly desirable in current market conditions`;
-  if (score > 0.6) return `${archType} shows good market appeal with selective buyer demographics`;
-  if (score > 0.45) return `${archType} requires strategic positioning due to market perception challenges`;
-  return `${archType} may face headwinds in current market—pricing and presentation are critical`;
+function scoreToInterpretation(score, archType, topography, streetChar) {
+  let base = '';
+  if (score > 0.75) {
+    base = `${archType} is highly desirable in current market conditions`;
+  } else if (score > 0.6) {
+    base = `${archType} shows good market appeal with selective buyer demographics`;
+  } else if (score > 0.45) {
+    base = `${archType} requires strategic positioning due to market perception challenges`;
+  } else {
+    base = `${archType} may face headwinds in current market—pricing and presentation are critical`;
+  }
+  
+  let constraints = [];
+  if (topography && topography.desirabilityFactor < -0.05) {
+    constraints.push(`topography challenges (${topography.detectedTopo})`);
+  }
+  if (streetChar && streetChar.combinedFactor < -0.1) {
+    constraints.push(`street characteristics (${streetChar.description})`);
+  }
+  
+  if (constraints.length > 0) {
+    base += `. Note: ${constraints.join(' and ')} may require pricing adjustments or targeted marketing.`;
+  }
+  
+  return base;
 }
