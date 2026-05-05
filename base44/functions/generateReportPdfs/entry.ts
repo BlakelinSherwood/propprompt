@@ -439,9 +439,10 @@ async function renderListingPricingPdf(doc, data, branding, netProceedsJson=null
   async function renderNarrative(text,breadcrumb,title,startY) {
     if (!text) return startY;
     let y=startY; doc.setFontSize(BODY_SIZE);doc.setFont('helvetica','normal');doc.setTextColor(50,50,50);
-    for (const line of doc.splitTextToSize(text,contentWidth)) {
+    const lines=doc.splitTextToSize(text,contentWidth);
+    for (let i=0;i<lines.length;i++) {
       if (y+LINE_H>BOTTOM) { doc.addPage();await drawPageFrame(doc,branding,breadcrumb,title);y=90;doc.setFontSize(BODY_SIZE);doc.setFont('helvetica','normal');doc.setTextColor(50,50,50); }
-      doc.text(line,margin,y); y+=LINE_H;
+      doc.text(lines[i],margin,y); y+=LINE_H;
     }
     return y+10;
   }
