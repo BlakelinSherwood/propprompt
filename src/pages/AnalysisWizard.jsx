@@ -15,11 +15,13 @@ import StepReportEnhancements from "../components/wizard/StepReportEnhancements"
 import StepPublicRecords from "../components/wizard/StepPublicRecords";
 import StepComparableSales from "../components/wizard/StepComparableSales";
 import StepPropertyPhotos from "../components/wizard/StepPropertyPhotos";
+import StepMortgageResearch from "../components/wizard/StepMortgageResearch";
+import StepSellerFinancial from "../components/wizard/StepSellerFinancial";
 
 function getStepLabels(assessmentType) {
   const base = ["Assessment", "Client Role", "Property", "Public Records", "Comparables", "Photos"];
   const afterProperty = [];
-  if (assessmentType === "listing_pricing") afterProperty.push("Buyer Context");
+  if (assessmentType === "listing_pricing") afterProperty.push("Buyer Context", "Mortgage & Costs", "Seller Financials");
   else if (assessmentType === "client_portfolio") afterProperty.push("Financial Context");
   else if (["buyer_intelligence"].includes(assessmentType)) afterProperty.push("Buyer Context");
   else if (["cma", "investment_analysis"].includes(assessmentType)) afterProperty.push("Enhancements");
@@ -276,8 +278,9 @@ export default function AnalysisWizard() {
   const stepLabels = getStepLabels(intake.assessment_type);
   const hasFinancialStep = intake.assessment_type === "client_portfolio";
   const hasBuyerStep = ["listing_pricing", "buyer_intelligence"].includes(intake.assessment_type);
+  const hasMortgageStep = intake.assessment_type === "listing_pricing";
   const hasEnhancementStep = ["cma", "investment_analysis"].includes(intake.assessment_type);
-  const hasContextStep = hasFinancialStep || hasBuyerStep || hasEnhancementStep;
+  const hasContextStep = hasFinancialStep || hasBuyerStep || hasMortgageStep || hasEnhancementStep;
 
   // Map step number to component based on assessment type
   function getStepComponent() {
@@ -290,14 +293,27 @@ export default function AnalysisWizard() {
 
     let nextStep = 7;
 
-    if (hasContextStep) {
-      if (step === nextStep) {
-        if (hasFinancialStep) return <StepClientFinancial {...stepProps} />;
-        if (hasBuyerStep) return <StepBuyerIntelligence {...stepProps} />;
-        if (hasEnhancementStep) return <StepReportEnhancements {...stepProps} />;
-      }
+    if (hasBuyerStep) {
+      if (step === nextStep) return <StepBuyerIntelligence {...stepProps} />;
       nextStep++;
     }
+
+    if (hasMortgageStep) {
+      if (step === nextStep) return <StepMortgageResearch {...stepProps} />;
+      nextStep++;
+      if (step === nextStep) return <StepSellerFinancial {...stepProps} />;
+      nextStep++;
+    }
+
+    if (hasFinancialStep && step === nextStep) {
+      return <StepClientFinancial {...stepProps} />;
+    }
+    if (hasFinancialStep) nextStep++;
+
+    if (hasEnhancementStep && step === nextStep) {
+      return <StepReportEnhancements {...stepProps} />;
+    }
+    if (hasEnhancementStep) nextStep++;
 
 
     if (step === nextStep) return <Step5OutputFormat {...stepProps} />;
