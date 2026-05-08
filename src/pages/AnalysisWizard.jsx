@@ -34,9 +34,6 @@ function getMaxStep(assessmentType) {
 }
 
 const STORAGE_KEY = "wizard_draft";
-function loadDraft() {
-  try { const r = sessionStorage.getItem(STORAGE_KEY); return r ? JSON.parse(r) : null; } catch { return null; }
-}
 function saveDraft(step, intake) {
   try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ step, intake })); } catch {}
 }
@@ -78,9 +75,8 @@ const INITIAL_INTAKE = {
 export default function AnalysisWizard() {
   const { user, isLoadingAuth } = useAuth();
   const [searchParams] = useSearchParams();
-  const _draft = loadDraft();
-  const [step, setStep] = useState(_draft?.step || 1);
-  const [intake, setIntake] = useState(_draft?.intake || INITIAL_INTAKE);
+  const [step, setStep] = useState(1);
+  const [intake, setIntake] = useState(INITIAL_INTAKE);
   const [orgMembers, setOrgMembers] = useState([]);
   const [userTier, setUserTier] = useState(null);
   const [submitting, setSubmitting] = useState(false);
