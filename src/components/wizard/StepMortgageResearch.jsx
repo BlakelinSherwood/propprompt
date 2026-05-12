@@ -23,23 +23,28 @@ export default function StepMortgageResearch({ intake, update, onNext, onBack })
     setResearchError(null);
 
     try {
+      // Extract state from address (last 2-letter uppercase token before zip, or default to MA)
+      const stateMatch = intake.address?.match(/\b([A-Z]{2})\b(?:\s+\d{5})?$/);
+      const stateCode = stateMatch ? stateMatch[1] : 'MA';
+
       const res = await base44.functions.invoke('searchPublicRecords', {
         address: intake.address,
-        state_code: intake.state_code || 'MA',
+        state: stateCode,
         include_mortgage_search: true
       });
 
-      if (res?.data) {
-        setMortgageData(res.data);
+      const record = res?.data?.record || res?.data;
+      if (record) {
+        setMortgageData(record);
         // Auto-populate payoff if available
-        if (res.data.estimated_mortgage_payoff) {
-          setManualPayoff(String(res.data.estimated_mortgage_payoff));
+        if (record.estimated_mortgage_payoff) {
+          setManualPayoff(String(Math.round(record.estimated_mortgage_payoff)));
         }
       } else {
         setResearchError("Could not retrieve mortgage data. You can enter the payoff amount manually below.");
       }
     } catch (err) {
-      setResearchError(err?.message || "Failed to research mortgage data. Please try again.");
+      setResearchError(err?.response?.data?.error || err?.message || "Failed to research mortgage data. Please try again.");
     } finally {
       setResearching(false);
     }
