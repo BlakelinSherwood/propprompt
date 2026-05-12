@@ -37,14 +37,24 @@ export default function StepMortgageResearch({ intake, update, onNext, onBack })
       });
 
       const record = res?.data?.record || res?.data;
-      if (record) {
+      const hasUsefulData = record && (
+        record.estimated_mortgage_payoff > 0 ||
+        (record.most_recent_mortgage_amount > 0) ||
+        (record.original_mortgage_amount > 0) ||
+        (record.original_mortgage_lender && record.original_mortgage_lender !== 'Unknown' && record.original_mortgage_lender !== '')
+      );
+
+      if (hasUsefulData) {
         setMortgageData(record);
-        // Auto-populate payoff if available
-        if (record.estimated_mortgage_payoff) {
+        if (record.estimated_mortgage_payoff > 0) {
           setManualPayoff(String(Math.round(record.estimated_mortgage_payoff)));
+        } else if (record.most_recent_mortgage_amount > 0) {
+          // fallback: show raw loan amount so agent can adjust
+          setManualPayoff(String(Math.round(record.most_recent_mortgage_amount)));
         }
       } else {
-        setResearchError("Could not retrieve mortgage data. You can enter the payoff amount manually below.");
+        setMortgageData(null);
+        setResearchError("No mortgage records found in public records. Please enter the payoff amount manually below.");
       }
     } catch (err) {
       setResearchError(err?.response?.data?.error || err?.message || "Failed to research mortgage data. Please try again.");
@@ -136,30 +146,27 @@ export default function StepMortgageResearch({ intake, update, onNext, onBack })
               )}
 
               {mortgageData && (
-                <div className="mt-4 bg-[#FAF8F4] border border-[#1A3226]/10 rounded-lg p-4 space-y-2">
-                  <div className="flex items-start gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
-                    <div className="text-xs">
-                      <p className="font-semibold text-[#1A3226] mb-1">Mortgage data found:</p>
-                      {mortgageData.original_mortgage_lender && (
-                        <p className="text-[#1A3226]/70">
-                          <span className="font-medium">Original lender:</span> {mortgageData.original_mortgage_lender}
-                        </p>
-                      )}
-                      {mortgageData.most_recent_mortgage_amount && (
-                        <p className="text-[#1A3226]/70">
-                          <span className="font-medium">Original loan amount:</span> ${Number(mortgageData.most_recent_mortgage_amount).toLocaleString()}
-                        </p>
-                      )}
-                      {mortgageData.mortgage_search_status && (
-                        <p className="text-[#1A3226]/70">
-                          <span className="font-medium">Search status:</span> {mortgageData.mortgage_search_status}
-                        </p>
-                      )}
-                      {mortgageData.mortgage_search_notes && (
-                        <p className="text-[#1A3226]/60 italic mt-1">{mortgageData.mortgage_search_notes}</p>
-                      )}
-                    </div>
+                <div className="mt-4 bg-[#FAF8F4] border border-[#1A3226]/10 rounded-lg p-4 space-y-1.5">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
+                    <p className="text-xs font-semibold text-[#1A3226]">Mortgage records found — payoff pre-filled below</p>
+                  </div>
+                  <div className="text-xs text-[#1A3226]/70 space-y-1">
+                    {mortgageData.original_mortgage_lender && mortgageData.original_mortgage_lender !== 'Unknown' && (
+                      <p><span className="font-medium">Lender:</span> {mortgageData.original_mortgage_lender}</p>
+                    )}
+                    {mortgageData.most_recent_mortgage_lender && mortgageData.most_recent_mortgage_lender !== mortgageData.original_mortgage_lender && (
+                      <p><span className="font-medium">Most recent lender:</span> {mortgageData.most_recent_mortgage_lender}</p>
+                    )}
+                    {mortgageData.most_recent_mortgage_amount > 0 && (
+                      <p><span className="font-medium">Original loan amount:</span> ${Number(mortgageData.most_recent_mortgage_amount).toLocaleString()}</p>
+                    )}
+                    {mortgageData.estimated_mortgage_payoff > 0 && (
+                      <p><span className="font-medium">Estimated current payoff:</span> ${Number(mortgageData.estimated_mortgage_payoff).toLocaleString()}</p>
+                    )}
+                    {mortgageData.mortgage_search_notes && (
+                      <p className="italic text-[#1A3226]/50 mt-1">{mortgageData.mortgage_search_notes}</p>
+                    )}
                   </div>
                 </div>
               )}
