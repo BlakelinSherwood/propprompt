@@ -23,9 +23,12 @@ export default function StepMortgageResearch({ intake, update, onNext, onBack })
     setResearchError(null);
 
     try {
-      // Extract state from address (last 2-letter uppercase token before zip, or default to MA)
-      const stateMatch = intake.address?.match(/\b([A-Z]{2})\b(?:\s+\d{5})?$/);
-      const stateCode = stateMatch ? stateMatch[1] : 'MA';
+      // Extract state from address — handles both "MA" abbreviation and full state name
+      const address = intake.address || '';
+      const stateAbbrMatch = address.match(/,\s*([A-Z]{2})\b/);
+      const stateNameMap = { 'Massachusetts': 'MA', 'Maine': 'ME', 'New Hampshire': 'NH', 'Vermont': 'VT' };
+      const stateNameMatch = address.match(/\b(Massachusetts|Maine|New Hampshire|Vermont)\b/);
+      const stateCode = stateAbbrMatch ? stateAbbrMatch[1] : (stateNameMatch ? stateNameMap[stateNameMatch[1]] : 'MA');
 
       const res = await base44.functions.invoke('searchPublicRecords', {
         address: intake.address,
