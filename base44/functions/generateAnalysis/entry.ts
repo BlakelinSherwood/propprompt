@@ -1107,7 +1107,12 @@ Instruction: ${cm.comp_weight || 'Use agent-provided condition to weight comps a
     }
 
     if (agentComps.length > 0) {
-      prompt += `\n\nCOMPARABLE SALES (Use ONLY these — do not invent or substitute):\n${JSON.stringify(agentComps, null, 2)}`;
+      // Separate manually tiered comps so AI respects agent's tier assignments
+      const tieredManual = agentComps.filter(c => c.source === 'agent_manual' && c.comp_tier);
+      const tierNote = tieredManual.length > 0
+        ? `\n\nNOTE: ${tieredManual.length} comp(s) have agent-assigned tiers (comp_tier field). You MUST place each of these into the exact tier specified by the agent — do not reassign them.`
+        : '';
+      prompt += `\n\nCOMPARABLE SALES (Use ONLY these — do not invent or substitute):${tierNote}\n${JSON.stringify(agentComps, null, 2)}`;
     }
 
     if (analysis.prior_sale_price || analysis.prior_sale_year) {

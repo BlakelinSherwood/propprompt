@@ -6,7 +6,12 @@ import CompsMapWithHeat from "./CompsMapWithHeat";
 
 const CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
 const CONDITIONS = ["Superior", "Similar", "Inferior"];
-const EMPTY_MANUAL = { address: "", sale_price: "", sale_date: "", bedrooms: "", bathrooms: "", sqft: "", notes: "" };
+const COMP_TIERS = [
+  { value: "A", label: "Tier A — Same Town (Primary)" },
+  { value: "B", label: "Tier B — Same Town (Secondary)" },
+  { value: "C", label: "Tier C — Adjacent Town (Context)" },
+];
+const EMPTY_MANUAL = { address: "", sale_price: "", sale_date: "", bedrooms: "", bathrooms: "", sqft: "", notes: "", tier: "A" };
 
 async function computeCacheKey(params) {
   const str = [params.address, params.bedrooms, params.bathrooms, params.sqft, params.propertyType]
@@ -209,6 +214,7 @@ export default function StepComparableSales({ intake, update, onNext, onBack }) 
       bathrooms: manual.bathrooms ? Number(manual.bathrooms) : null,
       price_per_sqft: (price && sqft) ? Math.round(price / sqft) : null,
       source: "agent_manual", search_tier: "manual",
+      comp_tier: manual.tier || "A",
       perplexity_confirmed: false, perplexity_variance: null,
       agent_excluded: false, agent_notes: manual.notes || "",
     };
@@ -374,6 +380,7 @@ export default function StepComparableSales({ intake, update, onNext, onBack }) 
                 <th className="px-3 py-2.5 text-center font-medium text-[#1A3226]/50">Date</th>
                 <th className="px-3 py-2.5 text-center font-medium text-[#1A3226]/50">Bed/Bath/SF</th>
                 <th className="px-3 py-2.5 text-right font-medium text-[#1A3226]/50">$/SF</th>
+                <th className="px-3 py-2.5 text-center font-medium text-[#1A3226]/50">Tier</th>
                 <th className="px-3 py-2.5 text-center font-medium text-[#1A3226]/50">Verify</th>
                 <th className="px-3 py-2.5 text-center font-medium text-[#1A3226]/50">Condition</th>
                 <th className="px-3 py-2.5 text-left font-medium text-[#1A3226]/50">Notes</th>
@@ -398,6 +405,19 @@ export default function StepComparableSales({ intake, update, onNext, onBack }) 
                   <td className="px-3 py-2.5 text-center text-[#1A3226]/60">{comp.sale_date ? comp.sale_date.slice(0, 7) : "—"}</td>
                   <td className="px-3 py-2.5 text-center text-[#1A3226]/60">{comp.bedrooms || "—"}/{comp.bathrooms || "—"}/{comp.sqft?.toLocaleString() || "—"}</td>
                   <td className="px-3 py-2.5 text-right text-[#1A3226]/60">{comp.price_per_sqft ? `$${comp.price_per_sqft}` : "—"}</td>
+                  <td className="px-3 py-2.5 text-center">
+                    {comp.source === "agent_manual" ? (
+                      <select
+                        value={comp.comp_tier || "A"}
+                        onChange={e => setManualComps(prev => prev.map(c => c.address === comp.address ? { ...c, comp_tier: e.target.value } : c))}
+                        className="text-xs border border-[#1A3226]/15 rounded px-1.5 py-1 bg-white"
+                      >
+                        {COMP_TIERS.map(t => <option key={t.value} value={t.value}>Tier {t.value}</option>)}
+                      </select>
+                    ) : (
+                      <span className="text-xs text-[#1A3226]/40">{comp.comp_tier ? `Tier ${comp.comp_tier}` : "—"}</span>
+                    )}
+                  </td>
                   <td className="px-3 py-2.5 text-center">
                     <div className="flex items-center justify-center gap-1">
                       <VarianceBadge comp={comp} />
@@ -486,9 +506,21 @@ export default function StepComparableSales({ intake, update, onNext, onBack }) 
                 </div>
               ))}
             </div>
-            <div>
-              <label className="text-xs text-[#1A3226]/50 mb-1 block">Notes (optional)</label>
-              <input type="text" value={manual.notes} onChange={e => setManual(p => ({ ...p, notes: e.target.value }))} placeholder="e.g. same street, slightly smaller" className="w-full text-sm border border-[#1A3226]/15 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[#1A3226]/30" />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-[#1A3226]/50 mb-1 block">Comp Tier</label>
+                <select
+                  value={manual.tier}
+                  onChange={e => setManual(p => ({ ...p, tier: e.target.value }))}
+                  className="w-full text-sm border border-[#1A3226]/15 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[#1A3226]/30 bg-white"
+                >
+                  {COMP_TIERS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-[#1A3226]/50 mb-1 block">Notes (optional)</label>
+                <input type="text" value={manual.notes} onChange={e => setManual(p => ({ ...p, notes: e.target.value }))} placeholder="e.g. same street, slightly smaller" className="w-full text-sm border border-[#1A3226]/15 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[#1A3226]/30" />
+              </div>
             </div>
             <Button onClick={addManualComp} disabled={!manual.address || !manual.sale_price || !manual.sale_date} size="sm" className="bg-[#1A3226] text-white hover:bg-[#1A3226]/90">
               Add Comp
