@@ -1,0 +1,56 @@
+{
+  "name": "TrainingVideo",
+  "type": "object",
+  "description": "A single training video belonging to a module.",
+  "properties": {
+    "module_id": {
+      "type": "string",
+      "description": "References TrainingModule.id"
+    },
+    "title": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "description": {
+      "type": "string"
+    },
+    "heygen_video_id": {
+      "type": "string",
+      "maxLength": 100
+    },
+    "heygen_embed_url": {
+      "type": "string",
+      "maxLength": 500
+    },
+    "thumbnail_url": {
+      "type": "string",
+      "maxLength": 500
+    },
+    "duration_seconds": {
+      "type": "integer"
+    },
+    "sort_order": {
+      "type": "integer",
+      "default": 0
+    },
+    "is_published": {
+      "type": "boolean",
+      "default": false
+    },
+    "transcript": {
+      "type": "string"
+    },
+    "requires_tier": {
+      "type": "string",
+      "enum": [
+        "pro",
+        "team"
+      ],
+      "description": "null = all tiers; pro = Pro and Team only; team = Team only"
+    }
+  },
+  "required": [
+    "module_id",
+    "title"
+  ]
+}

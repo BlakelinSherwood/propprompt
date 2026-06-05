@@ -1,0 +1,74 @@
+{
+  "name": "TerritoryWatchAlert",
+  "type": "object",
+  "description": "Individual alert sent to a subscriber about an available territory.",
+  "properties": {
+    "watch_list_id": {
+      "type": "string",
+      "description": "References TerritoryWatchList.id"
+    },
+    "user_id": {
+      "type": "string",
+      "description": "References User.id"
+    },
+    "territory_id": {
+      "type": "string",
+      "description": "References Territory.id"
+    },
+    "alert_reason": {
+      "type": "string",
+      "description": "Why this territory was recommended (e.g., 'adjacent_to_current', 'same_county', 'manual_watch', 'county_completion')"
+    },
+    "pricing_summary": {
+      "type": "string",
+      "description": "HTML or plain text pricing information to include in alert"
+    },
+    "pre_filled_claim_url": {
+      "type": "string",
+      "description": "Pre-populated claim URL with territory, brokerage, and tier pre-filled"
+    },
+    "in_app_shown_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When in-app banner was shown"
+    },
+    "email_sent_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When alert email was sent"
+    },
+    "follow_up_sent_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When 72-hour follow-up was sent"
+    },
+    "actioned_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When subscriber took action on this alert"
+    },
+    "action_taken": {
+      "type": "string",
+      "enum": [
+        "claimed",
+        "dismissed",
+        "expired"
+      ],
+      "description": "What action subscriber took"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this alert was generated"
+    }
+  },
+  "required": [
+    "watch_list_id",
+    "user_id",
+    "territory_id",
+    "alert_reason",
+    "pricing_summary",
+    "pre_filled_claim_url",
+    "created_at"
+  ]
+}

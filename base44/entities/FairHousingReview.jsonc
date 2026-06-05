@@ -1,0 +1,74 @@
+{
+  "name": "FairHousingReview",
+  "type": "object",
+  "description": "Monthly auto-generated Fair Housing Compliance Review per org per Addendum A4. Records are permanent and cannot be deleted.",
+  "properties": {
+    "org_id": {
+      "type": "string",
+      "description": "Organization this review covers (references Organization)"
+    },
+    "reviewer_email": {
+      "type": "string",
+      "description": "Email of the brokerage_admin or team_lead responsible for signing"
+    },
+    "review_period_month": {
+      "type": "string",
+      "description": "ISO month string (e.g. '2026-03') for the review period"
+    },
+    "licensed_states": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "States whose fair housing rules were included in this review (e.g. ['MA', 'NH'])"
+    },
+    "review_text": {
+      "type": "string",
+      "description": "Full AI-generated compliance review checklist text (Claude-generated per A4.3)"
+    },
+    "review_generation_model": {
+      "type": "string",
+      "description": "Claude model version used to generate this review"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "viewed",
+        "signed",
+        "overdue"
+      ],
+      "default": "pending",
+      "description": "Signature status"
+    },
+    "signed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of e-signature. Immutable once set."
+    },
+    "signature_name": {
+      "type": "string",
+      "description": "Full name typed at time of e-signature"
+    },
+    "reminder_sent_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of the 7-day reminder email"
+    },
+    "overdue_banner_shown_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when overdue banner first displayed (14-day threshold per A4.1)"
+    },
+    "liability_disclosure_accepted": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether the reviewer accepted the A4.5 liability disclosure at signing"
+    }
+  },
+  "required": [
+    "org_id",
+    "reviewer_email",
+    "review_period_month"
+  ]
+}

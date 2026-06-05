@@ -1,0 +1,116 @@
+{
+  "name": "Organization",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Organization display name (brokerage or team name)"
+    },
+    "org_type": {
+      "type": "string",
+      "enum": [
+        "brokerage",
+        "team",
+        "independent"
+      ],
+      "description": "Hierarchy tier of this org"
+    },
+    "parent_org_id": {
+      "type": "string",
+      "description": "ID of the parent organization (a team's parent is a brokerage). Null for top-level orgs."
+    },
+    "owner_email": {
+      "type": "string",
+      "description": "Email of the brokerage_admin or team_lead who owns this org"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "suspended",
+        "trial",
+        "canceled"
+      ],
+      "default": "active",
+      "description": "Org subscription/access status"
+    },
+    "licensed_markets": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Array of state codes this org is licensed to operate in (e.g. ['MA', 'NH'])"
+    },
+    "stripe_customer_id": {
+      "type": "string",
+      "description": "Stripe customer ID for org-level billing"
+    },
+    "stripe_subscription_id": {
+      "type": "string",
+      "description": "Stripe subscription ID for this org"
+    },
+    "subscription_plan": {
+      "type": "string",
+      "enum": [
+        "team",
+        "brokerage",
+        "enterprise"
+      ],
+      "description": "Org-level billing plan"
+    },
+    "seat_count": {
+      "type": "integer",
+      "default": 0,
+      "description": "Current number of active seats in this org"
+    },
+    "seat_limit": {
+      "type": "integer",
+      "description": "Maximum seats allowed under current plan. Null = unlimited."
+    },
+    "branding_logo_url": {
+      "type": "string",
+      "description": "URL of org logo for white-label/co-brand use"
+    },
+    "branding_primary_color": {
+      "type": "string",
+      "description": "Hex color for org-level branding override"
+    },
+    "fair_housing_compliance_enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether monthly fair housing compliance reviews are active for this org"
+    },
+    "allow_agent_private_toggle": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether agents in this org are allowed to mark their own analyses as private"
+    },
+    "ai_billing_mode": {
+      "type": "string",
+      "enum": [
+        "platform_managed",
+        "org_managed",
+        "agent_managed"
+      ],
+      "default": "platform_managed",
+      "description": "Who provides the AI API keys: platform S&C keys, org-level keys, or each agent's own keys"
+    },
+    "ai_platform_toggles": {
+      "type": "object",
+      "description": "Per-platform enable/disable overrides. Keys are platform names (claude, chatgpt, gemini, perplexity, grok), values are booleans."
+    },
+    "org_ai_api_keys": {
+      "type": "object",
+      "description": "Org-level AI API keys (encrypted). Only used when ai_billing_mode = org_managed. Keys are platform names."
+    },
+    "notes": {
+      "type": "string",
+      "description": "Internal notes (platform owner only)"
+    }
+  },
+  "required": [
+    "name",
+    "org_type",
+    "owner_email"
+  ]
+}

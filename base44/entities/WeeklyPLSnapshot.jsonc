@@ -1,0 +1,66 @@
+{
+  "name": "WeeklyPLSnapshot",
+  "type": "object",
+  "description": "One record per week capturing the platform's financial snapshot. Source of truth for the P/L history graph and summary stats shown to the platform owner.",
+  "properties": {
+    "week_start_date": {
+      "type": "string",
+      "format": "date",
+      "description": "The Monday of the week this snapshot covers. Format: YYYY-MM-DD. One record per week maximum.",
+      "unique": true
+    },
+    "week_end_date": {
+      "type": "string",
+      "format": "date",
+      "description": "The Sunday of the same week."
+    },
+    "active_agents": {
+      "type": "integer",
+      "default": 0,
+      "description": "Count of agents with an active paid subscription this week."
+    },
+    "new_agents": {
+      "type": "integer",
+      "default": 0,
+      "description": "Agents who started a new subscription this week."
+    },
+    "churned_agents": {
+      "type": "integer",
+      "default": 0,
+      "description": "Agents whose subscription lapsed or cancelled this week."
+    },
+    "total_reports_generated": {
+      "type": "integer",
+      "default": 0,
+      "description": "Total AI reports generated across all agents this week."
+    },
+    "gross_revenue_cents": {
+      "type": "integer",
+      "default": 0,
+      "description": "Total subscription revenue collected this week, stored in cents."
+    },
+    "ai_cost_cents": {
+      "type": "integer",
+      "default": 0,
+      "description": "Total AI API costs this week across all providers, in cents. Populated by summing AITokenLog.cost_cents for the week."
+    },
+    "other_cost_cents": {
+      "type": "integer",
+      "default": 0,
+      "description": "Any other platform costs for the week, in cents. Platform owner adds manually with a note."
+    },
+    "net_pl_cents": {
+      "type": "integer",
+      "default": 0,
+      "description": "Stored calculated value: gross_revenue_cents - ai_cost_cents - other_cost_cents. Recalculated and stored on every save."
+    },
+    "notes": {
+      "type": "string",
+      "description": "Free-text annotation by the platform owner. Example: 'Opened Maine \u2014 4 HeyGen videos ($0.48)'"
+    }
+  },
+  "required": [
+    "week_start_date",
+    "week_end_date"
+  ]
+}

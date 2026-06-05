@@ -1,0 +1,49 @@
+{
+  "name": "AnalysisAddon",
+  "type": "object",
+  "description": "Optional add-on modules purchased alongside an analysis run.",
+  "properties": {
+    "analysis_id": {
+      "type": "string",
+      "description": "References Analysis.id"
+    },
+    "addon_type": {
+      "type": "string",
+      "enum": [
+        "archetype_listing_remarks",
+        "migration_pattern_layer",
+        "value_add_recommendations",
+        "top_alternative_markets"
+      ],
+      "description": "Type of add-on module"
+    },
+    "credit_cost": {
+      "type": "number",
+      "description": "Credit cost for this add-on (e.g. 1.0, 0.5)"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this add-on content was generated"
+    },
+    "output_content": {
+      "type": "string",
+      "description": "Generated add-on output (never shown to platform owner per A3.2)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "complete",
+        "failed"
+      ],
+      "default": "pending",
+      "description": "Generation status of this add-on"
+    }
+  },
+  "required": [
+    "analysis_id",
+    "addon_type",
+    "credit_cost"
+  ]
+}

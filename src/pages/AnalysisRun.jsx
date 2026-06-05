@@ -87,17 +87,21 @@ export default function AnalysisRun() {
         if (brands[0]) setBranding({ primary: brands[0].primary_color, accent: brands[0].accent_color });
       } catch (e) { /* use defaults */ }
 
-      // If already complete with comps, show stored output with typing effect
-      // If complete but no comps, reset and re-run to get proper comp data
-      const hasComps = rec.agent_comps && rec.agent_comps.length > 0;
-      if (rec.status === "complete" && rec.output_text && hasComps) {
+      // If already complete, show stored output with typing effect
+      // Fetch from URL if output_text is a stored file URL
+      if (rec.status === "complete" && rec.output_text) {
         setStatus("streaming");
-        simulateTyping(rec.output_text);
+        let textToShow = rec.output_text;
+        if (textToShow.startsWith("http")) {
+          try {
+            const fetched = await fetch(textToShow);
+            textToShow = await fetched.text();
+          } catch (e) {
+            console.warn("Failed to fetch output text from URL:", e);
+          }
+        }
+        simulateTyping(textToShow);
         return;
-      }
-      // Reset status so generateAnalysis re-runs fresh
-      if (rec.status === "complete" && !hasComps) {
-        await base44.entities.Analysis.update(rec.id, { status: "draft", output_text: null, output_json: null });
       }
 
       // Load CRM connections
@@ -121,13 +125,17 @@ export default function AnalysisRun() {
 
       // Fire generateAnalysis — don't await (may 504 on long analyses like client_portfolio ~3 min)
       // Polling below is the source of truth for completion.
-      base44.functions.invoke("generateAnalysis", { analysisId, orgId }).then(res => {
+      base44.functions.invoke("generateAnalysis", { analysisId, orgId }).then(async res => {
         if (res.data?.anomaly) {
           setAnomalyData(res.data.anomaly);
           setStatus("complete");
         } else if (res.data?.output) {
           setKeySource(res.data.keySource);
-          simulateTyping(res.data.output);
+          let outputText = res.data.output;
+          if (outputText.startsWith("http")) {
+            try { const f = await fetch(outputText); outputText = await f.text(); } catch (e) { /* use as-is */ }
+          }
+          simulateTyping(outputText);
         }
         // Polling loop will also catch completion — no duplicate harm
       }).catch(() => {
@@ -156,7 +164,14 @@ export default function AnalysisRun() {
 
             if (latest.status === 'complete' && latest.output_text) {
               clearInterval(poll);
-              simulateTyping(latest.output_text);
+              let pollText = latest.output_text;
+              if (pollText.startsWith("http")) {
+                try {
+                  const fetched = await fetch(pollText);
+                  pollText = await fetched.text();
+                } catch (e) { /* use as-is */ }
+              }
+              simulateTyping(pollText);
               resolve();
               return;
             }

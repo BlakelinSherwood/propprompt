@@ -942,7 +942,9 @@ Deno.serve(async (req) => {
 
     // ── AUTO-FETCH COMPS (if none provided) + TIER LOOKUP + PROMPT LIBRARY — all parallel ──
     let agentComps = analysis.agent_comps || [];
-    const needsComps = agentComps.length === 0 && analysis.intake_data?.address &&
+    // Only auto-fetch if no comps exist AND none were manually added (comps_source !== 'agent_manual' and !== 'mixed')
+    const hasManualComps = ['agent_manual', 'mixed'].includes(analysis.comps_source);
+    const needsComps = agentComps.length === 0 && !hasManualComps && analysis.intake_data?.address &&
       ['listing_pricing', 'cma', 'investment_analysis', 'client_portfolio'].includes(analysis.assessment_type);
 
     const [compsResult, subsResult, allLibraryPrompts] = await Promise.all([

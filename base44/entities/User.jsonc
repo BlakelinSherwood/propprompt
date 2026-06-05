@@ -1,0 +1,149 @@
+{
+  "name": "User",
+  "type": "object",
+  "properties": {
+    "role": {
+      "type": "string",
+      "enum": [
+        "platform_owner",
+        "brokerage_owner",
+        "team_lead",
+        "brokerage_admin",
+        "team_admin",
+        "agent",
+        "individual_agent",
+        "team_agent",
+        "assistant"
+      ],
+      "default": "agent",
+      "description": "Platform-wide role. platform_owner = blake.sherwood@compass.com. brokerage_owner = owns a brokerage org. team_lead = leads a team. brokerage_admin = admin under a brokerage. team_admin = admin under a team. agent = agent under brokerage/team. individual_agent = solo agent with broker permissions. team_agent = agent within a team. assistant = support/admin assistant."
+    },
+    "org_name": {
+      "type": "string",
+      "description": "Primary organization or brokerage name"
+    },
+    "phone": {
+      "type": "string",
+      "description": "Contact phone number"
+    },
+    "license_number": {
+      "type": "string",
+      "description": "Real estate license number"
+    },
+    "license_state": {
+      "type": "string",
+      "enum": [
+        "MA",
+        "NH",
+        "ME",
+        "RI",
+        "CT"
+      ],
+      "description": "State(s) of licensure (primary)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "suspended",
+        "pending"
+      ],
+      "default": "active",
+      "description": "Account status"
+    },
+    "invited_by": {
+      "type": "string",
+      "description": "Email of the user who invited this person"
+    },
+    "stripe_customer_id": {
+      "type": "string",
+      "description": "Stripe customer ID for billing"
+    },
+    "stripe_subscription_id": {
+      "type": "string",
+      "description": "Stripe subscription ID"
+    },
+    "subscription_plan": {
+      "type": "string",
+      "enum": [
+        "free",
+        "agent",
+        "team",
+        "brokerage",
+        "platform_owner"
+      ],
+      "default": "free",
+      "description": "Current billing plan"
+    },
+    "subscription_status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "trialing",
+        "past_due",
+        "canceled",
+        "unpaid"
+      ],
+      "description": "Stripe subscription status"
+    },
+    "analyses_run_this_month": {
+      "type": "integer",
+      "default": 0,
+      "description": "Running count of analyses this billing period"
+    },
+    "analyses_limit": {
+      "type": "integer",
+      "default": 10,
+      "description": "Monthly analysis cap for this seat"
+    },
+    "last_login_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO timestamp of last login"
+    },
+    "onboarding_completed": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether the user has completed onboarding"
+    },
+    "onboarding_welcome_shown": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether the founder welcome modal has been shown"
+    },
+    "privacy_notice_accepted_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when user accepted the privacy notice"
+    },
+    "default_ai_platform": {
+      "type": "string",
+      "enum": [
+        "claude",
+        "chatgpt",
+        "gemini",
+        "perplexity",
+        "grok"
+      ],
+      "description": "User's preferred AI platform for analyses"
+    },
+    "default_output_format": {
+      "type": "string",
+      "enum": [
+        "narrative",
+        "structured",
+        "bullets"
+      ],
+      "description": "User's preferred output format"
+    }
+  },
+  "required": [
+    "org_name",
+    "phone",
+    "license_number",
+    "license_state",
+    "subscription_status",
+    "default_ai_platform",
+    "default_output_format"
+  ]
+}

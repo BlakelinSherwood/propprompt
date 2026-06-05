@@ -1,0 +1,37 @@
+{
+  "name": "TrainingModule",
+  "type": "object",
+  "description": "A training module grouping related videos by category.",
+  "properties": {
+    "title": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "description": {
+      "type": "string"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "getting_started",
+        "cma",
+        "market_reports",
+        "presentations",
+        "territory",
+        "advanced"
+      ]
+    },
+    "sort_order": {
+      "type": "integer",
+      "default": 0
+    },
+    "is_published": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": [
+    "title",
+    "category"
+  ]
+}

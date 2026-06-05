@@ -1,0 +1,97 @@
+{
+  "name": "AdminDigestItem",
+  "type": "object",
+  "description": "Individual actionable item in the daily admin digest.",
+  "properties": {
+    "digest_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date this item was generated for"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "churn_risk",
+        "upsell",
+        "approval_urgent",
+        "technical",
+        "data_quality"
+      ],
+      "description": "Category of item"
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "urgent",
+        "review",
+        "info"
+      ],
+      "description": "Severity level"
+    },
+    "subject_user_id": {
+      "type": "string",
+      "description": "References User.id if item pertains to a subscriber"
+    },
+    "subject_territory_id": {
+      "type": "string",
+      "description": "References Territory.id if item pertains to a territory"
+    },
+    "subject_subscription_id": {
+      "type": "string",
+      "description": "References subscription ID if applicable"
+    },
+    "summary": {
+      "type": "string",
+      "description": "Brief summary of the issue"
+    },
+    "recommended_action": {
+      "type": "string",
+      "description": "What the admin should do about this item"
+    },
+    "draft_email_subject": {
+      "type": "string",
+      "description": "Pre-drafted email subject line (if action involves emailing)"
+    },
+    "draft_email_body": {
+      "type": "string",
+      "description": "Pre-drafted email body (if action involves emailing)"
+    },
+    "action_taken": {
+      "type": "string",
+      "enum": [
+        "email_sent",
+        "reviewed",
+        "approved",
+        "rejected",
+        "technical_fix_initiated"
+      ],
+      "description": "What action was taken on this item"
+    },
+    "action_taken_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When action was taken"
+    },
+    "dismissed": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this item was dismissed without action"
+    },
+    "dismissed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When dismissed"
+    },
+    "dismissed_reason": {
+      "type": "string",
+      "description": "Reason for dismissal"
+    }
+  },
+  "required": [
+    "digest_date",
+    "category",
+    "severity",
+    "summary",
+    "recommended_action"
+  ]
+}

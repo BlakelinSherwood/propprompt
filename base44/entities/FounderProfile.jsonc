@@ -1,0 +1,54 @@
+{
+  "name": "FounderProfile",
+  "type": "object",
+  "description": "Founder credentials and messaging \u2014 single configuration record.",
+  "properties": {
+    "founder_name": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "credentials_line": {
+      "type": "string",
+      "maxLength": 300,
+      "description": "e.g., 'Licensed Real Estate Broker \u00b7 Team Lead'"
+    },
+    "years_experience": {
+      "type": "integer"
+    },
+    "licensed_states": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 2
+      },
+      "description": "Array of state codes: MA, NH, ME, VT, CT, RI"
+    },
+    "detail_1": {
+      "type": "string",
+      "maxLength": 200,
+      "description": "e.g., '500+ Transactions Closed' or 'Team of 12 Agents'"
+    },
+    "detail_2": {
+      "type": "string",
+      "maxLength": 200,
+      "description": "e.g., 'GRI Designate' or 'RE/MAX Top Producer'"
+    },
+    "founder_statement": {
+      "type": "string",
+      "description": "First-person statement for landing page and onboarding (rich text HTML)"
+    },
+    "headshot_url": {
+      "type": "string",
+      "maxLength": 500
+    },
+    "updated_by": {
+      "type": "string",
+      "description": "Email of user who last updated"
+    }
+  },
+  "required": [
+    "founder_name",
+    "credentials_line",
+    "years_experience"
+  ]
+}

@@ -1,0 +1,84 @@
+{
+  "description": "Admin Territory Monitoring Agent \u2014 monitors all territories, subscriptions, and operational items daily. Flags churn risks, upsell opportunities, urgent approvals, technical issues, and surfaces actionable digest each morning.",
+  "instructions": "You are the Admin Territory Monitoring Agent. Your job is to:\n\n1. DAILY HEALTH CHECK: Run at 7:00 AM EST every day to scan all active subscriptions, territories, and operational data.\n\n2. IDENTIFY ISSUES ACROSS 5 CATEGORIES:\n   - Churn Risk: Subscribers with zero analyses in 30 days, declining usage, long login gaps, or low onboarding engagement\n   - Upsell: Subscribers hitting caps 3+ months, buying top-ups repeatedly, or adjacent to unclaimed territories\n   - Approval Urgency: Claim requests auto-approving within 24 hours or overdue for review\n   - Technical: Missed Stripe webhooks, failed revenue shares, stuck analysis jobs, overdue data quality issues, expiring top-up packs\n   - Revenue: Daily snapshot of MRR, new/churned revenue, pending pipeline, top-up and revenue share revenue MTD\n\n3. DRAFT ACTIONABLE EMAILS: For churn risks and upsells, pre-draft personalized emails the admin can send with one click.\n\n4. URGENT EVENT-BASED MONITORING: Also check every 2 hours for claims auto-approving within 4 hours \u2014 send immediate notifications.\n\n5. DAILY DIGEST: Compile findings into a prioritized digest (\ud83d\udea8 URGENT, \u26a0\ufe0f REVIEW, \ud83d\udcca REVENUE, \u2705 ALL CLEAR) delivered at 7:15 AM via email and in-app, with one-click actions on every item.\n\nYour goal: Give the admin a complete, actionable view of business health and subscriber wellness each morning \u2014 proactive not reactive.",
+  "tool_configs": [
+    {
+      "entity_name": "AdminDigestItem",
+      "allowed_operations": [
+        "create",
+        "read",
+        "update"
+      ]
+    },
+    {
+      "entity_name": "AdminDigestRun",
+      "allowed_operations": [
+        "create",
+        "read",
+        "update"
+      ]
+    },
+    {
+      "entity_name": "TerritorySubscription",
+      "allowed_operations": [
+        "read"
+      ]
+    },
+    {
+      "entity_name": "TerritoryBundle",
+      "allowed_operations": [
+        "read"
+      ]
+    },
+    {
+      "entity_name": "PopulationPool",
+      "allowed_operations": [
+        "read"
+      ]
+    },
+    {
+      "entity_name": "FullBuyoutSubscription",
+      "allowed_operations": [
+        "read"
+      ]
+    },
+    {
+      "entity_name": "TerritoryClaimRequest",
+      "allowed_operations": [
+        "read"
+      ]
+    },
+    {
+      "entity_name": "Analysis",
+      "allowed_operations": [
+        "read"
+      ]
+    },
+    {
+      "entity_name": "User",
+      "allowed_operations": [
+        "read",
+        "update"
+      ]
+    },
+    {
+      "entity_name": "Territory",
+      "allowed_operations": [
+        "read"
+      ]
+    },
+    {
+      "entity_name": "TopupPack",
+      "allowed_operations": [
+        "read"
+      ]
+    },
+    {
+      "entity_name": "OnboardingJourney",
+      "allowed_operations": [
+        "read"
+      ]
+    }
+  ],
+  "name": "admin-territory-monitoring"
+}

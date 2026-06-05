@@ -1,0 +1,105 @@
+{
+  "name": "PromptLibrary",
+  "type": "object",
+  "description": "Versioned prompt templates for each AI platform, assessment type, and property type combination.",
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "PropPrompt version this prompt belongs to (e.g. '4.0')"
+    },
+    "ai_platform": {
+      "type": "string",
+      "enum": [
+        "claude",
+        "chatgpt",
+        "gemini",
+        "perplexity",
+        "grok",
+        "generic"
+      ],
+      "description": "Target AI platform"
+    },
+    "assessment_type": {
+      "type": "string",
+      "enum": [
+        "listing_pricing",
+        "buyer_intelligence",
+        "investment_analysis",
+        "cma",
+        "rental_analysis"
+      ],
+      "description": "Analysis type this prompt handles"
+    },
+    "property_type": {
+      "type": "string",
+      "enum": [
+        "single_family",
+        "condo",
+        "multi_family",
+        "land",
+        "all"
+      ],
+      "description": "Property type module. 'all' = universal."
+    },
+    "prompt_section": {
+      "type": "string",
+      "enum": [
+        "system_instructions",
+        "intake_template",
+        "followup_protocol",
+        "valuation_module",
+        "migration_module",
+        "archetype_module",
+        "avm_module",
+        "listing_strategy_module",
+        "disclaimer_footer",
+        "full_assembled",
+        "market_research",
+        "neighborhood_snapshot",
+        "report_assembly",
+        "narrative_layer",
+        "buyer_archetype"
+      ],
+      "description": "Which section of the prompt this record represents"
+    },
+    "tier_required": {
+      "type": "string",
+      "enum": [
+        "starter",
+        "pro",
+        "team",
+        "broker"
+      ],
+      "description": "Minimum subscription tier required to use this prompt. starter = single-model full_assembled; pro+ = ensemble pipeline steps."
+    },
+    "ensemble_order": {
+      "type": "integer",
+      "description": "Execution order in the ensemble pipeline. 1=market_research, 2=neighborhood_snapshot, 3=report_assembly, 4=narrative_layer, 5=buyer_archetype. null for full_assembled records."
+    },
+    "prompt_text": {
+      "type": "string",
+      "description": "Full prompt template text with [PLACEHOLDER] tokens for runtime substitution"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this prompt version is current and in use"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Editorial notes on this prompt version (platform owner only)"
+    },
+    "last_updated_by": {
+      "type": "string",
+      "description": "Email of admin who last edited this prompt"
+    }
+  },
+  "required": [
+    "version",
+    "ai_platform",
+    "assessment_type",
+    "property_type",
+    "prompt_section",
+    "prompt_text"
+  ]
+}

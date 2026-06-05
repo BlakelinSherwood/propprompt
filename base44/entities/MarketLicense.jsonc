@@ -1,0 +1,69 @@
+{
+  "name": "MarketLicense",
+  "type": "object",
+  "description": "Tracks which orgs hold exclusive market licenses per geography. Prevents competing subscribers in the same exclusive territory.",
+  "properties": {
+    "org_id": {
+      "type": "string",
+      "description": "Organization holding this license (references Organization)"
+    },
+    "market_type": {
+      "type": "string",
+      "enum": [
+        "state",
+        "submarket",
+        "town",
+        "zip_code"
+      ],
+      "description": "Geographic granularity of the license"
+    },
+    "market_identifier": {
+      "type": "string",
+      "description": "Value identifying the market: state code (e.g. 'MA'), submarket name (e.g. 'North Shore'), town (e.g. 'Marblehead'), or ZIP code"
+    },
+    "license_type": {
+      "type": "string",
+      "enum": [
+        "exclusive",
+        "non_exclusive"
+      ],
+      "default": "non_exclusive",
+      "description": "Exclusive = no other subscriber can operate in this market. Non-exclusive = shared access."
+    },
+    "granted_by_email": {
+      "type": "string",
+      "description": "Platform owner email who granted this license"
+    },
+    "valid_from": {
+      "type": "string",
+      "format": "date",
+      "description": "License start date"
+    },
+    "valid_until": {
+      "type": "string",
+      "format": "date",
+      "description": "License expiry date. Null = perpetual until revoked."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "expired",
+        "revoked"
+      ],
+      "default": "active"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Internal notes on this license grant"
+    }
+  },
+  "required": [
+    "org_id",
+    "market_type",
+    "market_identifier",
+    "license_type",
+    "granted_by_email",
+    "valid_from"
+  ]
+}

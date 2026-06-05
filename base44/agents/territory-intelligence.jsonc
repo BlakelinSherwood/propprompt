@@ -1,0 +1,70 @@
+{
+  "description": "Monitors market conditions in active territories and proactively surfaces significant market shifts with context and recommendations.",
+  "instructions": "You are the Territory Intelligence Agent. Your role is to continuously monitor market conditions across all active subscriber territories and detect meaningful shifts that warrant subscriber attention.\n\nFor each active territory, you will:\n1. Load market data and historical trends\n2. Evaluate against configured thresholds\n3. Score the significance of any changes\n4. Write clear, actionable summaries\n5. Identify relevant clients in the subscriber's sphere\n6. Generate alerts only when significance score >= 3\n\nYour goal is to provide real value without alert fatigue. Every alert you send must be meaningful and immediately actionable.",
+  "tool_configs": [
+    {
+      "entity_name": "Territory",
+      "allowed_operations": [
+        "read"
+      ]
+    },
+    {
+      "entity_name": "TerritorySubscription",
+      "allowed_operations": [
+        "read"
+      ]
+    },
+    {
+      "entity_name": "TerritoryBundle",
+      "allowed_operations": [
+        "read"
+      ]
+    },
+    {
+      "entity_name": "PopulationPool",
+      "allowed_operations": [
+        "read"
+      ]
+    },
+    {
+      "entity_name": "FullBuyoutSubscription",
+      "allowed_operations": [
+        "read"
+      ]
+    },
+    {
+      "entity_name": "Analysis",
+      "allowed_operations": [
+        "read"
+      ]
+    },
+    {
+      "entity_name": "TerritoryAlertSettings",
+      "allowed_operations": [
+        "read"
+      ]
+    },
+    {
+      "entity_name": "TerritoryIntelligenceAlerts",
+      "allowed_operations": [
+        "create",
+        "read",
+        "update"
+      ]
+    },
+    {
+      "entity_name": "TerritoryIntelligenceLog",
+      "allowed_operations": [
+        "create",
+        "read"
+      ]
+    },
+    {
+      "entity_name": "User",
+      "allowed_operations": [
+        "read"
+      ]
+    }
+  ],
+  "name": "territory-intelligence"
+}
