@@ -481,20 +481,28 @@ async function callClaudeOnce(apiKey, prompt, keySource) {
   const model = keySource === "agent" ? ANTHROPIC_MODELS.agent : ANTHROPIC_MODELS.default;
   const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
   const systemPrompt = getExpandedSystemPrompt(today);
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: 16000,
-      messages: [{ role: "user", content: prompt }],
-      system: systemPrompt,
-    }),
-  });
+  const controller = new AbortController();
+  const fetchTimeout = setTimeout(() => controller.abort(), 150000); // 150s timeout
+  let res;
+  try {
+    res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 16000,
+        messages: [{ role: "user", content: prompt }],
+        system: systemPrompt,
+      }),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(fetchTimeout);
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     const msg = err.error?.message || `Claude API error ${res.status}`;
@@ -1352,6 +1360,14 @@ Include a "design_trends" object with: trend_year (${currentYear}), intro, kitch
 
   } catch (error) {
     console.error("[generateAnalysis] error:", error);
+    // Reset status so user can retry — don't leave stuck as in_progress
+    try {
+      const { analysisId: aId } = await req.json().catch(() => ({}));
+      if (aId) {
+        const base44sr = createClientFromRequest(req);
+        await base44sr.asServiceRole.entities.Analysis.update(aId, { status: "draft" });
+      }
+    } catch (_) {}
     return Response.json({ error: error.message }, { status: 500 });
   }
 });
