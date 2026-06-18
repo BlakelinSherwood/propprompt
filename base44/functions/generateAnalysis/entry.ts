@@ -494,7 +494,7 @@ async function callClaudeOnce(apiKey, prompt, keySource) {
       },
       body: JSON.stringify({
         model,
-        max_tokens: 16000,
+        max_tokens: 8000,
         messages: [{ role: "user", content: prompt }],
         system: systemPrompt,
       }),
@@ -543,7 +543,7 @@ async function callOpenAI(apiKey, prompt) {
     headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       model: "gpt-4o",
-      max_tokens: 16000,
+      max_tokens: 8000,
       messages: [{ role: "system", content: systemPrompt }, { role: "user", content: prompt }],
     }),
   });
@@ -569,7 +569,7 @@ async function callGemini(apiKey, prompt) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { maxOutputTokens: 16000 },
+      generationConfig: { maxOutputTokens: 8000 },
       systemInstruction: { parts: [{ text: systemPrompt }] },
     }),
   });
@@ -1022,7 +1022,7 @@ Deno.serve(async (req) => {
     await base44.asServiceRole.entities.Analysis.update(analysisId, { status: "in_progress" });
 
     // ── ALL ENRICHMENT IN PARALLEL (AVM + neighborhood + walk + flood + schools + town-intel) ──
-    const enrichmentTimeout = analysis.assessment_type === 'client_portfolio' ? 35000 : 25000;
+    const enrichmentTimeout = analysis.assessment_type === 'client_portfolio' ? 20000 : 15000;
     const enrichment = await withTimeout(
       fetchAllEnrichment(analysis, perpKey, openaiKey),
       enrichmentTimeout,
