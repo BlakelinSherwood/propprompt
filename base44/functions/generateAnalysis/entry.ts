@@ -473,8 +473,8 @@ Start with { and end with }. No markdown. No text outside the JSON.`;
 }
 
 const ANTHROPIC_MODELS = {
-  default: "claude-sonnet-4-20250514",
-  agent:   "claude-sonnet-4-20250514",
+  default: "claude-opus-4-5",
+  agent:   "claude-opus-4-5",
 };
 
 async function callClaudeOnce(apiKey, prompt, keySource) {
